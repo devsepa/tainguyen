@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
@@ -18,1243 +18,9 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     />
-    <style>
-      :root {
-        color-scheme: light;
-        box-sizing: border-box;
-        padding-top: env(safe-area-inset-top, 0px);
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-      }
-      html {
-        scroll-padding-top: env(safe-area-inset-top, 0px);
-      }
-      body {
-        margin: 0;
-        padding: 0;
-        font:
-          14px -apple-system,
-          BlinkMacSystemFont,
-          sans-serif;
-        background: #fff;
-        color: #000;
-      }
-      img {
-        max-width: 100%;
-      }
-      [hidden]:not([hidden="until-found" i]) {
-        display: none !important;
-      }
-    </style>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <style>
-      /* Layout: sidebar cố định + topbar + lưới KPI, biểu đồ, danh sách; chi tiết trượt từ phải. Chỉ giao diện tối. */
-      :root {
-        color-scheme: dark;
-        --bg: #0a0e17;
-        --side: #0e1320;
-        --panel: #121929;
-        --raise: #1a2338;
-        --line: #232e47;
-        --fg: #e8edf7;
-        --mute: #8e9bb5;
-        --accent: #5b8cff;
-        --accent-ink: #07112b;
-        --danger: #f0625f;
-        --ok: #2fbf71;
-        --warn: #e5b53b;
-        --sans: "Be Vietnam Pro", system-ui, sans-serif;
-        --mono: "JetBrains Mono", ui-monospace, monospace;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        background: var(--bg);
-        color: var(--fg);
-        font: 14px/1.5 var(--sans);
-      }
-      button,
-      input,
-      select,
-      textarea {
-        font: inherit;
-        color: inherit;
-      }
-      input,
-      select,
-      textarea {
-        background: var(--bg);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 8px 11px;
-        min-width: 0;
-        max-width: 100%;
-      }
-      input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        accent-color: var(--accent);
-        padding: 0;
-      }
-      input[type="color"] {
-        padding: 2px;
-        width: 44px;
-        height: 36px;
-      }
-      textarea {
-        width: 100%;
-        resize: vertical;
-      }
-      button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 7px;
-        background: var(--raise);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 8px 14px;
-        cursor: pointer;
-        white-space: nowrap;
-        font-weight: 500;
-        user-select: none;
-        transition:
-          transform 0.08s ease,
-          border-color 0.15s ease,
-          background-color 0.15s ease,
-          box-shadow 0.15s ease;
-      }
-      button:hover:not(:disabled) {
-        border-color: var(--accent);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-      }
-      button:active:not(:disabled) {
-        transform: scale(0.95);
-        box-shadow: none;
-      }
-      button:disabled {
-        opacity: 0.45;
-        cursor: default;
-      }
-      button.primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: var(--accent-ink);
-        font-weight: 600;
-      }
-      button.primary:hover:not(:disabled) {
-        box-shadow: 0 0 12px rgba(91, 140, 255, 0.4);
-      }
-      button.danger {
-        color: var(--danger);
-      }
-      button.danger:hover:not(:disabled) {
-        border-color: var(--danger);
-        box-shadow: 0 0 12px rgba(240, 98, 95, 0.3);
-      }
-      button.link {
-        background: none;
-        border: 0;
-        padding: 0;
-        color: var(--accent);
-      }
-      button.link:hover {
-        text-decoration: underline;
-      }
-      button.mini {
-        padding: 5px 12px;
-        font-size: 12.5px;
-        border-radius: 8px;
-        font-weight: 600;
-      }
-      button.ico {
-        width: 32px;
-        height: 32px;
-        padding: 0;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 8px;
-        color: var(--mute);
-        transition: all 0.12s ease;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-      button.ico:hover:not(:disabled) {
-        color: var(--fg);
-        background: var(--raise);
-        border-color: var(--accent);
-        transform: scale(1.08);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      }
-      button.ico:active:not(:disabled) {
-        transform: scale(0.92);
-      }
-      button.ico svg.i {
-        width: 17px;
-        height: 17px;
-      }
-      svg.i {
-        width: 16px;
-        height: 16px;
-        flex: none;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 1.8;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
-      :focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
-      }
-      .app {
-        display: grid;
-        grid-template-columns: 232px minmax(0, 1fr);
-        min-height: 100%;
-        padding-right: max(16px, env(safe-area-inset-right, 0px));
-        padding-left: max(16px, env(safe-area-inset-left, 0px));
-      }
-      nav {
-        background: var(--side);
-        border-right: 1px solid var(--line);
-        margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
-        padding: 20px 14px 20px max(14px, env(safe-area-inset-left, 0px));
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        position: sticky;
-        top: env(safe-area-inset-top, 0px);
-        align-self: start;
-        height: 100vh;
-      }
-      .brand {
-        display: flex;
-        gap: 11px;
-        align-items: center;
-        padding: 0 6px 22px;
-        font-weight: 700;
-        line-height: 1.3;
-      }
-      .brand span {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #7b42ff, #078df5);
-        color: #fff;
-        display: grid;
-        place-items: center;
-        box-shadow: 0 4px 14px rgba(123, 66, 255, 0.35);
-      }
-      .brand span svg.i {
-        width: 22px;
-        height: 22px;
-      }
-      .brand small {
-        display: block;
-        font-weight: 400;
-        color: var(--mute);
-        font-size: 12px;
-      }
-      nav a {
-        color: var(--mute);
-        text-decoration: none;
-        padding: 9px 11px;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        gap: 11px;
-        font-weight: 500;
-      }
-      nav a:hover {
-        color: var(--fg);
-        background: var(--panel);
-      }
-      nav a[aria-current] {
-        background: color-mix(in srgb, var(--accent) 17%, transparent);
-        color: var(--fg);
-        font-weight: 600;
-      }
-      nav a[aria-current] svg {
-        color: var(--accent);
-      }
-      nav a .num {
-        margin-left: auto;
-        font-size: 11.5px;
-        background: var(--raise);
-        border-radius: 99px;
-        padding: 0 8px;
-      }
-      .vaultbox {
-        margin-top: auto;
-        border: 1px solid var(--line);
-        border-radius: 11px;
-        padding: 12px;
-        display: grid;
-        gap: 3px;
-        background: var(--panel);
-      }
-      #vstate {
-        font-weight: 600;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-      }
-      #save {
-        font-size: 12px;
-        color: var(--mute);
-      }
-      #identity {
-        font-size: 11px;
-        color: var(--mute);
-        overflow-wrap: anywhere;
-        margin-bottom: 6px;
-      }
-      .login-panel {
-        width: min(440px, 100%);
-        margin: 48px auto;
-        padding: 28px;
-      }
-      .login-panel label {
-        margin-top: 14px;
-      }
-      .login-panel button {
-        margin-top: 20px;
-        width: 100%;
-      }
-      main {
-        padding: 0 0 90px 24px;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-      header {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-        padding: 18px 0 16px;
-        border-bottom: 1px solid var(--line);
-      }
-      .title {
-        margin-right: auto;
-        min-width: 0;
-      }
-      h1 {
-        font-size: 22px;
-        margin: 0;
-        line-height: 1.3;
-      }
-      #subtitle {
-        color: var(--mute);
-        font-size: 12.5px;
-      }
-      h2 {
-        font-size: 14px;
-        margin: 0 0 14px;
-        font-weight: 600;
-      }
-      .head {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .banner {
-        border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent);
-        background: color-mix(in srgb, var(--warn) 9%, transparent);
-        border-radius: 10px;
-        padding: 9px 13px;
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-      }
-      .view {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        min-width: 0;
-      }
-      .panel {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 18px;
-        min-width: 0;
-      }
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-        gap: 14px;
-      }
-      .stat {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        justify-items: start;
-        text-align: left;
-        background: var(--panel);
-        border-radius: 14px;
-        padding: 16px 18px;
-        gap: 4px;
-        white-space: normal;
-      }
-      .stat .lbl {
-        color: var(--mute);
-        font-size: 13px;
-        align-self: center;
-      }
-      .stat .tile {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        display: grid;
-        place-items: center;
-        color: var(--c);
-        background: color-mix(in srgb, var(--c) 16%, transparent);
-      }
-      .stat b {
-        grid-column: 1/-1;
-        font-size: 32px;
-        line-height: 1.15;
-      }
-      .stat small {
-        grid-column: 1/-1;
-        color: var(--mute);
-        font-weight: 400;
-      }
-      .dot {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--c);
-        margin-right: 7px;
-        flex: none;
-      }
-      .pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 10px;
-        border-radius: 99px;
-        background: color-mix(in srgb, var(--c) 15%, transparent);
-        font-size: 12px;
-        white-space: nowrap;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
-      }
-      .wide {
-        grid-column: span 2;
-      }
-      .two {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
-        gap: 16px;
-      }
-      .donut {
-        position: relative;
-        width: 180px;
-        margin: 0 auto 14px;
-      }
-      .donut svg {
-        display: block;
-        width: 100%;
-        transform: rotate(-90deg);
-      }
-      .donut circle {
-        fill: none;
-        stroke-width: 13;
-      }
-      .donut div {
-        position: absolute;
-        inset: 0;
-        display: grid;
-        place-content: center;
-        text-align: center;
-      }
-      .donut b {
-        font-size: 28px;
-        line-height: 1.2;
-      }
-      .donut small {
-        color: var(--mute);
-      }
-      .keys {
-        display: grid;
-        gap: 2px;
-      }
-      .keys button {
-        justify-content: space-between;
-        background: none;
-        border-color: transparent;
-        padding: 5px 8px;
-        font-weight: 400;
-      }
-      .chart {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 0 10px;
-      }
-      .yaxis {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        height: 210px;
-        text-align: right;
-        color: var(--mute);
-        font-size: 11.5px;
-        margin-block: -8px;
-        height: 226px;
-      }
-      .trend {
-        display: flex;
-        align-items: flex-end;
-        gap: 2px;
-        height: 210px;
-        background:
-          linear-gradient(var(--line), var(--line)) top/100% 1px no-repeat,
-          linear-gradient(var(--line), var(--line)) center/100% 1px no-repeat;
-        border-bottom: 1px solid var(--line);
-      }
-      .col {
-        flex: 1;
-        display: flex;
-        flex-direction: column-reverse;
-        align-items: center;
-        gap: 2px;
-        height: 100%;
-        min-width: 0;
-      }
-      .col:hover {
-        background: color-mix(in srgb, var(--fg) 6%, transparent);
-      }
-      .col i {
-        display: block;
-        width: min(70%, 22px);
-        background: var(--c);
-        min-height: 2px;
-      }
-      .col i:last-child {
-        border-radius: 4px 4px 0 0;
-      }
-      .axis {
-        grid-column: 2;
-        display: flex;
-        justify-content: space-between;
-        color: var(--mute);
-        font-size: 11.5px;
-        margin-top: 6px;
-      }
-      .legend {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 16px;
-        font-size: 12px;
-        color: var(--mute);
-        margin-top: 10px;
-      }
-      .bar {
-        display: grid;
-        grid-template-columns: 130px minmax(0, 1fr) 56px;
-        gap: 10px;
-        align-items: center;
-        padding: 5px 0;
-      }
-      .track {
-        display: flex;
-        gap: 2px;
-        height: 8px;
-        background: var(--bg);
-        border-radius: 5px;
-        overflow: hidden;
-      }
-      .track i {
-        display: block;
-        height: 100%;
-        background: var(--c);
-      }
-      .num {
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-        color: var(--mute);
-      }
-      .row {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 10px 0;
-        border-top: 1px solid var(--line);
-        align-items: center;
-        flex-wrap: wrap;
-      }
-      .row:first-of-type {
-        border-top: 0;
-      }
-      .row > span {
-        min-width: 0;
-        overflow-wrap: anywhere;
-      }
-      .who {
-        display: flex;
-        gap: 11px;
-        align-items: center;
-      }
-      .who small {
-        display: block;
-        color: var(--mute);
-      }
-      .big {
-        font-size: 30px;
-        font-weight: 700;
-        line-height: 1.2;
-      }
-      .muted {
-        color: var(--mute);
-      }
-      .tools {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-      }
-      .tools .grow {
-        flex: 1 1 220px;
-      }
-      .filters {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 12px;
-      }
-      .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-      .tabs button {
-        border-radius: 99px;
-        background: none;
-        padding: 5px 13px;
-      }
-      .tabs button[aria-pressed="true"] {
-        background: color-mix(in srgb, var(--accent) 20%, transparent);
-        border-color: var(--accent);
-      }
-      .bulk {
-        background: var(--raise);
-        border: 1px solid var(--accent);
-        border-radius: 12px;
-        padding: 9px 12px;
-      }
-      .tablewrap {
-        overflow-x: auto;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-      }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        font-size: 13px;
-      }
-      th,
-      td {
-        text-align: left;
-        padding: 9px 8px;
-        border-bottom: 1px solid var(--line);
-        white-space: nowrap;
-        max-width: 240px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      th:first-child,
-      td:first-child {
-        padding-left: 14px;
-      }
-      th {
-        color: var(--mute);
-        font-weight: 500;
-        font-size: 12px;
-        background: var(--side);
-      }
-      th button {
-        background: none;
-        border: 0;
-        padding: 0;
-        color: inherit;
-      }
-      tbody tr {
-        cursor: pointer;
-      }
-      tbody tr:hover {
-        background: var(--raise) !important;
-      }
-      tr:last-child td {
-        border-bottom: 0;
-      }
-      .mono {
-        font-family: var(--mono);
-        font-size: 12.5px;
-      }
-      .tag {
-        font-size: 11.5px;
-        border: 1px solid var(--line);
-        border-radius: 5px;
-        padding: 1px 7px;
-        margin-right: 4px;
-        color: var(--mute);
-      }
-      .empty {
-        text-align: center;
-        padding: 48px 16px;
-        color: var(--mute);
-      }
-      .empty div {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-top: 14px;
-      }
-      .sec {
-        display: inline-flex;
-        gap: 4px;
-        align-items: center;
-        max-width: 100%;
-      }
-      .sec > :first-child {
-        margin-right: 6px;
-      }
-      .sec > .mono, .sec > span:first-child {
-        max-width: 140px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        display: inline-block;
-        vertical-align: middle;
-      }
-      .sec button.ico, .sec a.link {
-        flex-shrink: 0;
-      }
-      .sec a.link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        color: var(--mute);
-        transition: all 0.12s ease;
-        text-decoration: none;
-      }
-      .sec a.link:hover {
-        color: var(--accent);
-        background: var(--raise);
-        border-color: var(--accent);
-        transform: scale(1.08);
-      }
-      .sec a.link svg.i {
-        width: 17px;
-        height: 17px;
-      }
-      select.state {
-        padding: 3px 8px;
-        font-size: 12px;
-        border-radius: 99px;
-        border-color: color-mix(in srgb, var(--c) 70%, transparent);
-        background: color-mix(in srgb, var(--c) 16%, var(--panel));
-      }
-      details {
-        position: relative;
-      }
-      summary {
-        cursor: pointer;
-        list-style: none;
-        background: var(--raise);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 8px 14px;
-      }
-      details .menu {
-        position: absolute;
-        right: 0;
-        top: 44px;
-        background: var(--raise);
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 10px 14px;
-        z-index: 5;
-        display: grid;
-        gap: 7px;
-        white-space: nowrap;
-      }
-      @keyframes dlgPop {
-        from {
-          opacity: 0;
-          transform: scale(0.96) translateY(-8px);
-        }
-        to {
-          opacity: 1;
-          transform: scale(1) translateY(0);
-        }
-      }
-      @keyframes toastDrop {
-        from {
-          opacity: 0;
-          transform: translate(-50%, -16px) scale(0.95);
-        }
-        to {
-          opacity: 1;
-          transform: translate(-50%, 0) scale(1);
-        }
-      }
-      @keyframes pulseOtpBox {
-        0%,
-        100% {
-          box-shadow: 0 0 0 0 rgba(47, 191, 113, 0.3);
-        }
-        50% {
-          box-shadow: 0 0 18px 3px rgba(47, 191, 113, 0.45);
-        }
-      }
-      dialog {
-        background: var(--panel);
-        color: var(--fg);
-        border: 1px solid var(--line);
-        border-radius: 16px;
-        padding: 22px;
-        width: min(680px, calc(100% - 24px));
-        max-height: 90%;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
-      }
-      dialog[open] {
-        animation: dlgPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      dialog.drawer {
-        margin: auto;
-        height: auto;
-        max-height: calc(100dvh - 32px);
-        width: min(720px, calc(100% - 32px));
-        box-sizing: border-box;
-        border-radius: 16px;
-        padding: 22px;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-      }
-      dialog::backdrop {
-        background: rgba(3, 6, 13, 0.78);
-        backdrop-filter: blur(6px);
-        -webkit-backdrop-filter: blur(6px);
-      }
-      .form {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
-      label {
-        display: grid;
-        gap: 4px;
-        font-size: 12px;
-        color: var(--mute);
-        align-content: start;
-        min-width: 0;
-      }
-      label > * {
-        font-size: 14px;
-        color: var(--fg);
-      }
-      .full {
-        grid-column: 1/-1;
-      }
-      .actions {
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-        margin-top: 18px;
-        flex-wrap: wrap;
-      }
-      .actions .left {
-        margin-right: auto;
-      }
-      .err {
-        color: var(--danger);
-        margin: 8px 0 0;
-      }
-      #toast {
-        position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
-        top: 24px;
-        bottom: auto;
-        background: rgba(18, 25, 41, 0.96);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        color: var(--fg);
-        border: 1px solid var(--accent);
-        padding: 10px 20px;
-        border-radius: 99px;
-        max-width: calc(100% - 32px);
-        z-index: 9999999;
-        margin: 0;
-        box-shadow:
-          0 12px 36px rgba(0, 0, 0, 0.5),
-          0 0 20px rgba(91, 140, 255, 0.25);
-        font-size: 13px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        pointer-events: none;
-        animation: toastDrop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      #toast[data-type="success"] {
-        border-color: #2fbf71;
-        box-shadow:
-          0 12px 36px rgba(0, 0, 0, 0.5),
-          0 0 22px rgba(47, 191, 113, 0.35);
-      }
-      #toast[data-type="error"] {
-        border-color: #f0625f;
-        box-shadow:
-          0 12px 36px rgba(0, 0, 0, 0.5),
-          0 0 22px rgba(240, 98, 95, 0.35);
-      }
-      @keyframes mailPopupIn {
-        from {
-          opacity: 0;
-          transform: translateX(24px) scale(0.96);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0) scale(1);
-        }
-      }
-      #mailNotifStack {
-        position: fixed;
-        top: auto;
-        left: auto;
-        right: 20px;
-        bottom: 20px;
-        margin: 0;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        width: min(360px, calc(100vw - 24px));
-        display: grid;
-        gap: 10px;
-        z-index: 9999998;
-        pointer-events: none;
-      }
-      #mailNotifStack[hidden] {
-        display: none;
-      }
-      .mail-popup {
-        pointer-events: auto;
-        background: rgba(18, 25, 41, 0.97);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        color: var(--fg);
-        border: 1px solid #2fbf71;
-        border-radius: 12px;
-        padding: 12px 14px;
-        box-shadow:
-          0 14px 38px rgba(0, 0, 0, 0.55),
-          0 0 22px rgba(47, 191, 113, 0.28);
-        display: grid;
-        gap: 8px;
-        animation: mailPopupIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      .mail-popup.no-otp {
-        border-color: var(--accent);
-        box-shadow:
-          0 14px 38px rgba(0, 0, 0, 0.55),
-          0 0 22px rgba(91, 140, 255, 0.25);
-      }
-      #tip {
-        position: fixed;
-        pointer-events: none;
-        background: var(--raise);
-        border: 1px solid var(--line);
-        border-radius: 9px;
-        padding: 8px 11px;
-        font-size: 12px;
-        white-space: pre;
-        z-index: 30;
-      }
-      @media (max-width: 1100px) {
-        .stats {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .grid {
-          grid-template-columns: minmax(0, 1fr);
-        }
-        .wide {
-          grid-column: auto;
-        }
-      }
-      @media (max-width: 760px) {
-        .app {
-          display: flex;
-          flex-direction: column;
-          min-height: 100vh;
-          padding-left: 0;
-          padding-right: 0;
-        }
-        /* Mobile Bottom Navigation Bar */
-        nav {
-          position: fixed !important;
-          left: 0 !important;
-          right: 0 !important;
-          bottom: 0 !important;
-          top: auto !important;
-          height: auto !important;
-          min-height: 58px;
-          z-index: 99999 !important;
-          background: rgba(14, 19, 32, 0.95) !important;
-          backdrop-filter: blur(20px) !important;
-          -webkit-backdrop-filter: blur(20px) !important;
-          border: none !important;
-          border-top: 1px solid var(--line) !important;
-          margin: 0 !important;
-          padding: 4px 6px calc(6px + env(safe-area-inset-bottom, 0px)) !important;
-          display: flex !important;
-          flex-direction: row !important;
-          justify-content: space-around !important;
-          align-items: center !important;
-          box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5) !important;
-        }
-        nav .brand {
-          display: none !important;
-        }
-        nav .vaultbox {
-          display: none !important;
-        }
-        #menu {
-          display: flex !important;
-          flex-direction: row !important;
-          justify-content: space-around !important;
-          align-items: center !important;
-          width: 100% !important;
-          gap: 2px !important;
-        }
-        nav a {
-          flex: 1 !important;
-          display: flex !important;
-          flex-direction: column !important;
-          align-items: center !important;
-          justify-content: center !important;
-          padding: 4px 2px !important;
-          gap: 3px !important;
-          font-size: 10.5px !important;
-          font-weight: 500 !important;
-          color: var(--mute) !important;
-          border-radius: 8px !important;
-          position: relative !important;
-          text-align: center !important;
-          white-space: nowrap !important;
-          text-decoration: none !important;
-        }
-        nav a svg.i {
-          width: 20px !important;
-          height: 20px !important;
-          stroke-width: 2 !important;
-        }
-        nav a[aria-current] {
-          color: var(--accent) !important;
-          background: rgba(91, 140, 255, 0.12) !important;
-          font-weight: 700 !important;
-        }
-        nav a[aria-current] svg.i {
-          filter: drop-shadow(0 0 6px var(--accent)) !important;
-        }
-        nav a .num {
-          position: absolute !important;
-          top: 1px !important;
-          right: calc(50% - 18px) !important;
-          font-size: 9px !important;
-          line-height: 1.2 !important;
-          padding: 1px 5px !important;
-          border-radius: 99px !important;
-          background: var(--accent) !important;
-          color: #07112b !important;
-          font-weight: 700 !important;
-          box-shadow: 0 0 8px rgba(91, 140, 255, 0.7) !important;
-        }
-
-        /* Vùng nội dung chính trên mobile */
-        .mobile-topbar {
-          display: flex !important;
-          justify-content: space-between !important;
-          align-items: center !important;
-          padding: 6px 0 10px !important;
-          border-bottom: 1px solid var(--line) !important;
-          margin-bottom: 6px !important;
-        }
-        main {
-          padding: 12px 12px calc(76px + env(safe-area-inset-bottom, 0px)) 12px !important;
-          min-width: 0 !important;
-          overflow-x: hidden !important;
-        }
-        header {
-          padding: 8px 0 12px !important;
-          gap: 8px !important;
-          display: flex !important;
-          flex-wrap: wrap !important;
-          align-items: center !important;
-          justify-content: space-between !important;
-        }
-        .title {
-          width: 100% !important;
-          margin-bottom: 2px !important;
-        }
-        h1 {
-          font-size: 18px !important;
-        }
-        #subtitle {
-          font-size: 11px !important;
-        }
-        header button {
-          padding: 6px 11px !important;
-          font-size: 12px !important;
-        }
-        header #btnAdd {
-          flex: 1 1 100% !important;
-          order: -1 !important;
-          margin-bottom: 4px !important;
-          padding: 10px 14px !important;
-          font-size: 13.5px !important;
-          font-weight: 700 !important;
-        }
-
-        /* Lưới thống kê 2 cột chuẩn mobile */
-        .stats {
-          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-          gap: 10px !important;
-        }
-        .stat {
-          padding: 12px 14px !important;
-          border-radius: 12px !important;
-        }
-        .stat b {
-          font-size: 24px !important;
-        }
-        .stat .lbl {
-          font-size: 12px !important;
-        }
-        .stat .tile {
-          width: 30px !important;
-          height: 30px !important;
-        }
-        .stat .tile svg.i {
-          width: 15px !important;
-          height: 15px !important;
-        }
-
-        .grid, .two {
-          grid-template-columns: 1fr !important;
-          gap: 12px !important;
-        }
-        .chart {
-          overflow-x: auto !important;
-        }
-
-        /* Bộ lọc và Tabs cuộn mượt */
-        .filters {
-          padding: 10px !important;
-          border-radius: 12px !important;
-          display: flex !important;
-          flex-direction: column !important;
-          gap: 8px !important;
-        }
-        .filters input, .filters select {
-          width: 100% !important;
-          font-size: 13px !important;
-        }
-        .tabs {
-          overflow-x: auto !important;
-          white-space: nowrap !important;
-          flex-wrap: nowrap !important;
-          -webkit-overflow-scrolling: touch !important;
-          padding-bottom: 4px !important;
-          scrollbar-width: none !important;
-        }
-        .tabs::-webkit-scrollbar {
-          display: none !important;
-        }
-        .tabs button {
-          flex-shrink: 0 !important;
-          padding: 6px 12px !important;
-          font-size: 12px !important;
-        }
-        .bulk {
-          padding: 8px 10px !important;
-          font-size: 12px !important;
-          gap: 6px !important;
-        }
-
-        /* Bảng dữ liệu */
-        .tablewrap {
-          border-radius: 12px !important;
-          -webkit-overflow-scrolling: touch !important;
-        }
-        table {
-          font-size: 12.5px !important;
-        }
-        th, td {
-          padding: 8px 7px !important;
-        }
-
-        /* Modal chuyển thành Bottom Sheet trên Mobile */
-        dialog, dialog.drawer {
-          position: fixed !important;
-          inset: auto 0 0 0 !important;
-          width: 100% !important;
-          max-width: 100% !important;
-          max-height: 88vh !important;
-          border-radius: 20px 20px 0 0 !important;
-          border-bottom: none !important;
-          border-left: none !important;
-          border-right: none !important;
-          padding: 18px 16px max(18px, env(safe-area-inset-bottom, 0px)) !important;
-          margin: 0 !important;
-          animation: slideUpMobile 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-        }
-        @keyframes slideUpMobile {
-          from {
-            opacity: 0;
-            transform: translateY(100%);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .form {
-          grid-template-columns: 1fr !important;
-          gap: 10px !important;
-        }
-
-        /* Toast thông báo góc trên cho mobile */
-        #toast {
-          top: max(12px, env(safe-area-inset-top, 0px)) !important;
-          max-width: calc(100% - 24px) !important;
-          font-size: 12px !important;
-          padding: 8px 14px !important;
-        }
-        .bar {
-          grid-template-columns: 100px minmax(0, 1fr) 42px !important;
-        }
-      }
-    </style>
 
     <div class="app">
       <nav aria-label="Chính">
@@ -1556,7 +322,8 @@
           selGmail = new Set(),
           mailSubTab = "edu",
           fStatusGmail = "",
-          fDomainGmail = "";
+          fDomainGmail = "",
+          fUsageGmail = "";
         function makeGmailUid(email) {
           const clean =
             "gm_" +
@@ -2069,9 +836,29 @@
             off += len;
             return `<circle cx="60" cy="60" r="50" pathLength="100" stroke="${esc(s.color)}" stroke-dasharray="${Math.max(len - gap, 0.4)} ${100 - Math.max(len - gap, 0.4)}" stroke-dashoffset="${-o}" data-tip="${esc(s.name + ": " + c + " (" + pct(c) + "%)")}"/>`;
           }).join("");
+          const mxhList = list.filter((a) => a.platform !== "gmail");
           const alerts = list
             .filter((a) => !["live", "new"].includes(a.status))
             .sort((a, b) => b.updated - a.updated);
+          const staleList = mxhList.filter(stale);
+          const no2faList = mxhList.filter((a) => !secretsOf(a).twofa);
+          const noMailList = mxhList.filter((a) => !String(a.email || "").trim());
+          const actionQueue = [];
+          const seenAlert = new Set();
+          for (const [arr, tag, color] of [
+            [alerts, "Die / Lỗi", "#ef5350"],
+            [staleList, "Quá hạn kiểm tra", "#e5b53b"],
+            [no2faList, "Thiếu 2FA", "#a855f7"],
+            [noMailList, "Chưa gắn Gmail", "#5b8cff"],
+          ]) {
+            for (const item of arr) {
+              if (seenAlert.has(item.uid)) continue;
+              seenAlert.add(item.uid);
+              actionQueue.push({ a: item, tag, color });
+              if (actionQueue.length >= 6) break;
+            }
+            if (actionQueue.length >= 6) break;
+          }
           const feed = list
             .flatMap((a) => (a.hist || []).map((x) => ({ ...x, a })))
             .sort((a, b) => b.t - a.t)
@@ -2099,14 +886,13 @@
     )}</div><div class="axis"><span>${dm(days[0])}</span><span>${dm(days[14])}</span><span>${dm(days[29])}</span></div></div>
   <div class="legend">${S.map((s) => `<span><span class="dot" style="--c:${esc(s.color)}"></span>${esc(s.name)}</span>`).join("")}<span>Cột trống là ngày không có thay đổi.</span></div></section>
   <section class="panel"><h2>Tỷ lệ Live/Die</h2><div class="donut"><svg viewBox="0 0 120 120" role="img" aria-label="Tỷ lệ trạng thái">${arcs}</svg><div style="pointer-events:none"><b>${pct(cnt("live"))}%</b><small>${esc(st("live").name)}</small></div></div><div class="keys">${S.map((s) => `<button data-act="filter" data-v="${esc(s.id)}"><span><span class="dot" style="--c:${esc(s.color)}"></span>${esc(s.name)}</span><span class="num">${cnt(s.id)} · ${pct(cnt(s.id))}%</span></button>`).join("")}</div></section>
-  <section class="panel"><div class="head"><h2>Cần xử lý</h2>${alerts.length ? `<button class="link" data-act="filter" data-v="dead">Xem Die</button>` : ""}</div>${
-    alerts
-      .slice(0, 6)
+  <section class="panel"><div class="head"><h2>Cần xử lý</h2><span style="display:flex;gap:8px;flex-wrap:wrap;font-size:11.5px">${alerts.length ? `<button class="link" style="color:#ef5350" data-act="filter" data-v="dead">Die (${alerts.length})</button>` : ""}${staleList.length ? `<button class="link" style="color:#e5b53b" data-act="stale">Quá hạn (${staleList.length})</button>` : ""}${no2faList.length ? `<span style="color:#a855f7">Thiếu 2FA (${no2faList.length})</span>` : ""}${noMailList.length ? `<span style="color:#5b8cff">Thiếu Mail (${noMailList.length})</span>` : ""}</span></div>${
+    actionQueue
       .map(
-        (a) =>
-          `<div class="row">${who(a, a.email || a.name || "Chưa có Gmail")}${pill(a.status)}</div>`,
+        ({ a, tag, color }) =>
+          `<div class="row">${who(a, a.email || a.name || "Chưa có Gmail")}<span class="pill" style="--c:${color};font-size:11px">${tag}</span></div>`,
       )
-      .join("") || '<div class="muted">Không có tài khoản Die.</div>'
+      .join("") || '<div class="muted">Tất cả tài khoản đều ổn định.</div>'
   }</section>
   <section class="panel"><div class="head"><h2>Hoạt động gần đây</h2><a class="muted" href="#lich-su">Tất cả</a></div>${feed.map((x) => `<div class="row">${who(x.a, x.m)}<span class="muted" style="font-size:12px">${fmtTime(x.t)}</span></div>`).join("") || '<div class="muted">Chưa có thay đổi.</div>'}</section>
   <section class="panel"><h2>Tiến độ kiểm tra</h2><div class="big">${pct(n - old)}%</div><div class="track" style="margin:8px 0"><i style="--c:var(--accent);width:${((n - old) / n) * 100}%"></i></div><p class="muted">${n - old}/${n} tài khoản được kiểm tra trong ${settings.staleDays} ngày qua.</p><button data-act="stale" ${old ? "" : "disabled"}>Xem ${old} tài khoản quá hạn</button></section></div>`;
@@ -2213,7 +999,7 @@
             if (!s[k]) return '<span class="muted">—</span>';
             const id = a.uid + "|" + k,
               on = shown.has(id);
-            return `<span class="sec"><span class="mono">${on ? esc(s[k]) : "••••••"}</span>${ib("show", esc(id), on ? "off" : "eye", (on ? "Ẩn " : "Hiện ") + LABEL[k])}${ib("cp", esc(id), "copy", "Chép " + LABEL[k])}${k === "twofa" ? ib("code", u, "key", "Lấy mã 6 số") : ""}</span>`;
+            return `<span class="sec"><span class="mono">${on ? esc(s[k]) : "••••••"}</span>${ib("show", esc(id), on ? "off" : "eye", (on ? "Ẩn " : "Hiện ") + LABEL[k])}${ib("cp", esc(id), "copy", "Chép " + LABEL[k])}${k === "twofa" ? `<button type="button" class="mini mono totp-pill" data-act="code" data-v="${u}" data-totp-uid="${u}" title="Bấm để Copy mã 2FA 6 số" style="padding:2px 7px;gap:5px;border-color:rgba(47,191,113,0.45);background:rgba(47,191,113,0.1);color:#2fbf71;display:inline-flex;align-items:center"><span>🔑</span><span class="totp-code">••••••</span><span class="totp-sec" style="font-size:11px;opacity:.85">--s</span></button>` : ""}</span>`;
           }
           if (k === "email" && a.email)
             return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail", u, "copy", "Chép Gmail")}<button class="ico" data-act="inboxTempMailByEmail" data-v="${esc(a.email)}" title="Mở hộp thư &amp; lấy mã OTP" style="color:#2fbf71;width:24px;height:24px">${icon("mail")}</button></span>`;
@@ -2265,7 +1051,38 @@
     [25, 50, 100].map((n) => [String(n), n + " dòng"]),
     String(per),
   )}</select><button data-act="prev" ${page <= 1 ? "disabled" : ""} style="padding:7px 16px;font-size:13px;font-weight:600">◀ Trước</button><button data-act="next" ${page >= pages ? "disabled" : ""} style="padding:7px 16px;font-size:13px;font-weight:600">Sau ▶</button></span></div>`;
-          el.querySelector(".tablewrap").scrollLeft = sx;
+          if (el.querySelector(".tablewrap"))
+            el.querySelector(".tablewrap").scrollLeft = sx;
+          refreshTotpCells();
+        }
+        let totpTicker = null;
+        async function refreshTotpCells() {
+          const tbl = $("#tbl");
+          if (!tbl) return;
+          const els = tbl.querySelectorAll?.("[data-totp-uid]");
+          if (!els || !els.length) return;
+          const secLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+          for (const btn of els) {
+            const rec = get(btn.dataset.totpUid);
+            const codeEl = btn.querySelector(".totp-code");
+            const secEl = btn.querySelector(".totp-sec");
+            if (!rec || !codeEl || !secEl) continue;
+            const secret = secretsOf(rec).twofa || "";
+            const code = await totp(secret);
+            codeEl.textContent = code || "Lỗi key";
+            secEl.textContent = code ? secLeft + "s" : "";
+            const urgent = code && secLeft <= 5;
+            btn.style.borderColor = urgent
+              ? "rgba(239,83,80,0.65)"
+              : "rgba(47,191,113,0.45)";
+            btn.style.color = urgent ? "#ef5350" : "#2fbf71";
+            btn.style.background = urgent
+              ? "rgba(239,83,80,0.12)"
+              : "rgba(47,191,113,0.1)";
+          }
+        }
+        if (typeof setInterval === "function") {
+          totpTicker = setInterval(refreshTotpCells, 1000);
         }
         function isEduMailRecord(a) {
           const email = String(a.email || "").toLowerCase();
@@ -2296,6 +1113,21 @@
                 .toLowerCase()
                 .endsWith("@" + fDomainGmail.toLowerCase()),
             );
+          }
+          if (fUsageGmail) {
+            const usedEmails = new Set(
+              all()
+                .filter((r) => r.platform !== "gmail" && r.email)
+                .map((r) => String(r.email).trim().toLowerCase()),
+            );
+            base = base.filter((a) => {
+              const isUsed = usedEmails.has(
+                String(a.email || "")
+                  .trim()
+                  .toLowerCase(),
+              );
+              return fUsageGmail === "used" ? isUsed : !isUsed;
+            });
           }
           return base
             .filter(
@@ -2412,11 +1244,18 @@
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
           }
 
-          if (!rows.length && !qGmail && !fStatusGmail && !fDomainGmail) {
+          if (!rows.length && !qGmail && !fStatusGmail && !fDomainGmail && !fUsageGmail) {
             v.innerHTML = `${tabSwitcher}${noteBanner}<div class="panel empty">Chưa có tài khoản nào trong danh sách này.<div>${actionBtns}</div></div>`;
             return;
           }
 
+          const linkedByEmail = {};
+          for (const acc of list) {
+            if (acc.platform === "gmail" || !acc.email) continue;
+            const emKey = String(acc.email).trim().toLowerCase();
+            if (!linkedByEmail[emKey]) linkedByEmail[emKey] = [];
+            linkedByEmail[emKey].push(acc);
+          }
           v.innerHTML = `${tabSwitcher}${noteBanner}<div class="tools filters">
     <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ mail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Mail">
     <select id="fStatusGmail" style="padding:6px 10px;font-size:12.5px;border-radius:8px">
@@ -2424,6 +1263,11 @@
       <option value="live" ${fStatusGmail === "live" ? "selected" : ""}>🟢 Chỉ Live</option>
       <option value="dead" ${fStatusGmail === "dead" ? "selected" : ""}>🔴 Chỉ Die</option>
       <option value="new" ${fStatusGmail === "new" ? "selected" : ""}>⚪ Chưa kiểm tra</option>
+    </select>
+    <select id="fUsageGmail" style="padding:6px 10px;font-size:12.5px;border-radius:8px" aria-label="Lọc theo tình trạng sử dụng">
+      <option value="" ${!fUsageGmail ? "selected" : ""}>Tất cả mức dùng</option>
+      <option value="unused" ${fUsageGmail === "unused" ? "selected" : ""}>✨ Chưa gắn nick</option>
+      <option value="used" ${fUsageGmail === "used" ? "selected" : ""}>🔗 Đã gắn nick</option>
     </select>
     ${domainSelectHtml}
     ${actionBtns}
@@ -2474,6 +1318,16 @@
             <div style="display:flex;flex-direction:column;gap:2px">
               <span class="sec"><span style="color:${isEdu ? "#2fbf71" : "#7b42ff"};display:inline-flex;align-items:center" title="${isEdu ? "Mail Edu" : "TempMail Cloud"}">${icon("mail")}</span> <b>${email}</b> ${ib("cpText", email, "copy", "Chép Email")}</span>
               <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
+              <div style="padding-left:22px;display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">${
+                (linkedByEmail[String(a.email || "").trim().toLowerCase()] || []).length
+                  ? (linkedByEmail[String(a.email || "").trim().toLowerCase()] || [])
+                      .map((acc) => {
+                        const pl = platOf(acc);
+                        return `<button type="button" class="mini" data-act="open" data-v="${esc(acc.uid)}" title="Mở tài khoản ${pl.name}: ${esc(acc.uid)}" style="padding:1px 6px;font-size:10.5px;border-color:${pl.color};color:${pl.color};background:rgba(255,255,255,0.03)">🔗 ${pl.name === "Instagram" ? "IG" : "FB"}: ${esc(acc.uid)}</button>`;
+                      })
+                      .join("")
+                  : '<span class="muted" style="font-size:10.5px;opacity:.75">✨ Chưa gắn nick</span>'
+              }</div>
             </div>
           </td>
           <td>
@@ -4167,9 +3021,40 @@
           const inp = (k, extra = "", cls = "") =>
             `<label class="${cls}">${LABEL[k]}<input id="e-${k}" value="${esc(val(k))}" maxlength="120" autocomplete="off" spellcheck="false" ${extra}></label>`;
           const sec = (k) => inp(k, 'type="password" class="mono secretIn"');
+          const allRecords = all();
+          const usedEmailCount = {};
+          for (const rec of allRecords) {
+            if (rec.platform === "gmail") continue;
+            const em = String(rec.email || "").trim().toLowerCase();
+            if (em) usedEmailCount[em] = (usedEmailCount[em] || 0) + 1;
+          }
+          const mailPool = allRecords
+            .filter((m) => m.platform === "gmail" && m.email)
+            .map((m) => {
+              const email = String(m.email).trim();
+              const pass = secretsOf(m).pass || m.pass || "";
+              const used = usedEmailCount[email.toLowerCase()] || 0;
+              const isEdu = isEduMailRecord(m);
+              return { email, pass, used, isEdu };
+            })
+            .sort((x, y) => x.used - y.used || x.email.localeCompare(y.email, "vi"));
+          const unusedCount = mailPool.filter((m) => m.used === 0).length;
           d.innerHTML = `<form><h2>${old ? "Chỉnh sửa " + esc(a.uid) : "Thêm tài khoản"}</h2><div class="form">
   <label class="full">Nền tảng<select id="e-platform"><option value="facebook" ${(a.platform || "facebook") === "facebook" ? "selected" : ""}>Facebook</option><option value="instagram" ${a.platform === "instagram" ? "selected" : ""}>Instagram</option></select></label>
-  ${inp("uid", old ? "readonly" : "required", "full")}${sec("pass")}${sec("twofa")}${inp("email")}${sec("mailpass")}
+  ${inp("uid", old ? "readonly" : "required", "full")}${sec("pass")}${sec("twofa")}
+  <div class="full" style="display:grid;gap:6px">
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:210px;position:relative">
+        <label style="margin:0">Tìm nhanh từ Kho Gmail (${mailPool.length})
+          <input id="ePickMailSearch" placeholder="Gõ tên mail hoặc @tên-miền để lọc..." autocomplete="off" spellcheck="false">
+        </label>
+        <div id="ePickMailList" hidden style="position:absolute;left:0;right:0;top:100%;margin-top:4px;max-height:220px;overflow-y:auto;background:var(--raise);border:1px solid var(--line);border-radius:8px;box-shadow:0 12px 28px rgba(0,0,0,0.5);z-index:20"></div>
+      </div>
+      <button type="button" class="mini" id="ePickUnusedMail" style="height:36px;white-space:nowrap;border-color:#2fbf71;color:#2fbf71" title="Tự động chọn 1 mail chưa gắn vào tài khoản nào">⚡ Lấy mail trống (${unusedCount})</button>
+      <button type="button" class="mini" id="ePasteMailPass" style="height:36px;white-space:nowrap" title="Đọc Clipboard dạng email|pass và điền vào 2 ô bên dưới">📋 Dán Mail|Pass</button>
+    </div>
+  </div>
+  ${inp("email")}${sec("mailpass")}
   <label class="full" style="display:flex;gap:8px"><input type="checkbox" id="eShow">Hiện mật khẩu</label>
   ${inp("born", 'type="date"')}${inp("checked", 'type="date"')}<label class="full">Live/Die<select id="e-status">${opts(
     settings.statuses.map((s) => [s.id, s.name]),
@@ -4185,6 +3070,109 @@
               .forEach(
                 (i) => (i.type = e.target.checked ? "text" : "password"),
               );
+          const applyMailPair = (raw) => {
+            const text = String(raw || "").trim();
+            const m = text.match(/^([^\s|:\t]+@[^\s|:\t]+)\s*[|:\t]\s*(.+)$/);
+            if (!m) return false;
+            $("#e-email").value = m[1].trim();
+            $("#e-mailpass").value = m[2].trim();
+            toast("Đã tự động tách & điền Gmail + Pass!", "success");
+            return true;
+          };
+          const pickSearchEl = $("#ePickMailSearch"),
+            pickListEl = $("#ePickMailList"),
+            pickUnusedBtn = $("#ePickUnusedMail");
+          const fillPickedMail = (picked) => {
+            if (!picked) return;
+            $("#e-email").value = picked.email;
+            $("#e-mailpass").value = picked.pass;
+            if (pickSearchEl) pickSearchEl.value = picked.email;
+            if (pickListEl) pickListEl.hidden = true;
+            toast(`Đã điền ${picked.email}`, "success");
+          };
+          const renderMailSuggestions = (q = "") => {
+            if (!pickListEl) return;
+            const needle = q.trim().toLowerCase();
+            const filtered = needle
+              ? mailPool.filter((m) => m.email.toLowerCase().includes(needle))
+              : mailPool;
+            const eduHits = filtered.filter((m) => m.isEdu).slice(0, 20);
+            const gmailHits = filtered.filter((m) => !m.isEdu).slice(0, 20);
+            if (!eduHits.length && !gmailHits.length) {
+              pickListEl.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--mute)">Không tìm thấy mail khớp "${esc(q)}"</div>`;
+            } else {
+              const renderGroup = (title, color, items) => {
+                if (!items.length) return "";
+                return `<div style="padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:${color};background:rgba(255,255,255,0.03);border-bottom:1px solid var(--line);position:sticky;top:0">${title} (${items.length})</div>` +
+                  items
+                    .map(
+                      (m) =>
+                        `<button type="button" data-mail-pick="${esc(m.email)}" style="width:100%;text-align:left;padding:8px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--fg);display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;font-size:12.5px">
+                          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.isEdu ? '<span style="color:#2fbf71">[Edu]</span> ' : '<span style="color:var(--accent)">[Gmail]</span> '}${esc(m.email)}</span>
+                          <span style="font-size:11px;flex-shrink:0;color:${m.used ? "var(--mute)" : "#2fbf71"}">${m.used ? `đã dùng ${m.used}` : "chưa dùng"}</span>
+                        </button>`,
+                    )
+                    .join("");
+              };
+              pickListEl.innerHTML =
+                renderGroup("🎓 Mail Edu", "#2fbf71", eduHits) +
+                renderGroup("📧 Gmail / Mail khác", "var(--accent)", gmailHits);
+              pickListEl.querySelectorAll("[data-mail-pick]").forEach((btn) => {
+                btn.onmousedown = (ev) => {
+                  ev.preventDefault();
+                  const picked = mailPool.find(
+                    (m) => m.email === btn.dataset.mailPick,
+                  );
+                  fillPickedMail(picked);
+                };
+              });
+            }
+            pickListEl.hidden = false;
+          };
+          if (pickSearchEl) {
+            pickSearchEl.onfocus = () =>
+              renderMailSuggestions(pickSearchEl.value);
+            pickSearchEl.oninput = () =>
+              renderMailSuggestions(pickSearchEl.value);
+            pickSearchEl.onblur = () =>
+              setTimeout(() => {
+                if (pickListEl) pickListEl.hidden = true;
+              }, 120);
+          }
+          if (pickUnusedBtn) {
+            pickUnusedBtn.onclick = () => {
+              const unused = mailPool.find((m) => m.used === 0);
+              if (!unused)
+                return toast("Tất cả mail trong kho đều đã được dùng!", "warn");
+              fillPickedMail(unused);
+            };
+          }
+          const pasteMailBtn = $("#ePasteMailPass");
+          if (pasteMailBtn) {
+            pasteMailBtn.onclick = async () => {
+              try {
+                const clip = await navigator.clipboard.readText();
+                if (!clip || !clip.trim())
+                  return toast("Clipboard đang trống", "error");
+                if (!applyMailPair(clip))
+                  return toast(
+                    "Clipboard không đúng dạng email|pass",
+                    "error",
+                  );
+              } catch {
+                toast(
+                  "Trình duyệt chặn đọc Clipboard, hãy dán trực tiếp vào ô Gmail",
+                  "warn",
+                );
+              }
+            };
+          }
+          const emailIn = $("#e-email");
+          if (emailIn) {
+            emailIn.addEventListener("input", () => {
+              if (/[|:\t]/.test(emailIn.value)) applyMailPair(emailIn.value);
+            });
+          }
           const form = d.querySelector("form");
           let saving = false;
           form.onsubmit = async (e) => {
@@ -4705,10 +3693,8 @@
           code: async (u) => {
             const c = await totp(secretsOf(get(u)).twofa || "");
             if (!c) return toast("Khoá 2FA không hợp lệ", "error");
-            return copy(
-              c,
-              "Đã sao chép mã 2FA (có hiệu lực 30 giây mỗi chu kỳ)",
-            );
+            const rem = 30 - (Math.floor(Date.now() / 1000) % 30);
+            return copy(c, `Đã sao chép mã 2FA: ${c} (còn ${rem}s)`);
           },
           del: (u) =>
             ask("Xoá tài khoản", "Xoá tài khoản này?", async () => {
@@ -4848,6 +3834,7 @@
             qGmail = "";
             fStatusGmail = "";
             fDomainGmail = "";
+            fUsageGmail = "";
             pageGmail = 1;
             render();
           },
@@ -4965,19 +3952,32 @@
               all().find(
                 (x) => x.platform === "gmail" && norm(x.email) === norm(email),
               );
+            const linkedAcc = all().find(
+              (x) => x.platform !== "gmail" && norm(x.email) === norm(email),
+            );
+            const linkedPass = linkedAcc
+              ? secretsOf(linkedAcc).mailpass || ""
+              : "";
             if (!gm) {
               gm = {
                 uid: gmUid,
                 email,
                 platform: "gmail",
-                sec: {},
-                pass: "",
+                sec: linkedPass ? { pass: linkedPass } : {},
+                pass: linkedPass,
                 note: "Liên kết từ nick MXH",
                 status: "live",
                 added: Date.now(),
                 updated: Date.now(),
               };
               await commit([gm]);
+            } else if (linkedPass && !secretsOf(gm).pass && !gm.pass) {
+              const rev = revise(
+                gm,
+                { sec: { pass: linkedPass }, pass: linkedPass },
+                "Đồng bộ pass/key từ nick MXH",
+              );
+              if (rev) await commit([rev]);
             }
             openTempMailInbox(gm.uid);
           },
@@ -5180,6 +4180,10 @@
             render();
           } else if (t.id === "fDomainGmail") {
             fDomainGmail = t.value;
+            pageGmail = 1;
+            render();
+          } else if (t.id === "fUsageGmail") {
+            fUsageGmail = t.value;
             pageGmail = 1;
             render();
           } else if (t.id === "fPlatform") {
