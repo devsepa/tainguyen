@@ -2494,15 +2494,6 @@
                 </div>
               </div>
             </div>
-
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button type="button" class="primary" style="flex:1;min-width:200px;background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:700;padding:11px 18px;border-radius:10px;font-size:13.5px" onclick="copy('${esc(email)}|${esc(pass)}','Đã chép Email|Pass');window.open('https://tempmail.cloud/','_blank')">
-                🚀 Mở TempMail.cloud &amp; Tự Chép Email|Pass
-              </button>
-              <button type="button" class="mini" onclick="copy('${esc(email)}|${esc(pass)}','Đã sao chép email|pass')" style="font-weight:600;padding:8px 14px">
-                📋 Chép Cả Hai
-              </button>
-            </div>
           </div>`;
           d.showModal();
         }
@@ -4200,8 +4191,12 @@
               const action = acts[b.dataset.act];
               if (!action) throw new Error("Missing action");
               await action(b.dataset.v);
-            } catch {
-              toast("Thao tác thất bại. Vui lòng thử lại.", "error");
+            } catch (err) {
+              console.error("Action failed:", b.dataset.act, err);
+              toast(
+                `Thao tác "${b.dataset.act}" thất bại: ${err?.message || "Vui lòng thử lại."}`,
+                "error",
+              );
             }
             return;
           }
