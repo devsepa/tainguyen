@@ -244,7 +244,7 @@ let sel=new Set(), q="", fStatus="", fPlatform="", fStale=false, page=1, sort={k
 let per=store.get("per",25), cols=store.get("cols3",ORDER).filter(c=>!["group","tags"].includes(c));
 if(!cols.includes("platform"))cols=["platform",...cols];
 if(!cols.includes("name")){const uIdx=cols.indexOf("uid");if(uIdx>=0)cols.splice(uIdx+1,0,"name");else cols.unshift("name")}
-let qGmail="", sortGmail={k:"updated",d:-1}, pageGmail=1, perGmail=25, selGmail=new Set(), mailSubTab="edu";
+let qGmail="", sortGmail={k:"updated",d:-1}, pageGmail=1, perGmail=25, selGmail=new Set(), mailSubTab="edu", fStatusGmail="";
 function makeGmailUid(email){
   const clean='gm_'+String(email||'').trim().toLowerCase().replace('@','_at_').replace(/[^A-Za-z0-9._-]/g,'_');
   return clean.slice(0,60);
@@ -526,6 +526,9 @@ function filteredGmail(){
   }else if(mailSubTab==="cloud"){
     base=base.filter(a=>!isEduMailRecord(a));
   }
+  if(fStatusGmail){
+    base=base.filter(a=>(a.status||"new")===fStatusGmail);
+  }
   return base.filter(a=>!k||norm([a.email,secretsOf(a).pass,a.note].join(" ")).includes(k))
     .sort((a,b)=>{const val=x=>sortGmail.k==="updated"?x.updated||0:x[sortGmail.k]??"";const x=val(a),y=val(b);return sortGmail.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
 }
@@ -581,27 +584,37 @@ function gmailView(v,list){
   let actionBtns="";
   if(mailSubTab==="edu"){
     actionBtns=`<button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail .EDU</button>
+      <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
   } else if(mailSubTab==="cloud"){
     actionBtns=`<button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#078df5,#7b42ff);border:none;font-weight:600">${icon("bolt")} Tạo Mail TempMail.cloud</button>
+      <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
   } else {
     actionBtns=`<button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail .EDU</button>
       <button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#078df5,#7b42ff);border:none;font-weight:600">${icon("bolt")} Tạo TempMail.cloud</button>
+      <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
   }
 
-  if(!rows.length&&!qGmail){
+  if(!rows.length&&!qGmail&&!fStatusGmail){
     v.innerHTML=`${tabSwitcher}${noteBanner}<div class="panel empty">Chưa có tài khoản nào trong danh sách này.<div>${actionBtns}</div></div>`;
     return;
   }
 
   v.innerHTML=`${tabSwitcher}${noteBanner}<div class="tools filters">
     <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ mail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Mail">
+    <select id="fStatusGmail" style="padding:6px 10px;font-size:12.5px;border-radius:8px">
+      <option value="" ${!fStatusGmail?'selected':''}>Tất cả trạng thái</option>
+      <option value="live" ${fStatusGmail==='live'?'selected':''}>🟢 Chỉ Live</option>
+      <option value="dead" ${fStatusGmail==='dead'?'selected':''}>🔴 Chỉ Die</option>
+      <option value="new" ${fStatusGmail==='new'?'selected':''}>⚪ Chưa kiểm tra</option>
+    </select>
     ${actionBtns}
   </div>
   ${selGmail.size?`<div class="tools bulk"><b>Đã chọn ${selGmail.size}</b>
     ${selGmail.size<rows.length?`<button class="link" data-act="selAllGmail">Chọn cả ${rows.length}</button>`:""}
+    <button data-act="bCheckMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live đã chọn</button>
     <button data-act="bCopyMail">Chép danh sách Email</button>
     <button data-act="bCopyMailPass">Chép dạng Mail|Pass</button>
     <button data-act="bExportGmail">Xuất file</button>
@@ -611,9 +624,10 @@ function gmailView(v,list){
   <div class="tablewrap"><table>
     <thead><tr>
       <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length&&shownRows.every(a=>selGmail.has(a.uid))?"checked":""}></th>
-      <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Email &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
-      <th style="min-width:180px">${mailSubTab==='cloud'?'Mật khẩu (Password)':'Mật khẩu / Key'}</th>
-      <th style="min-width:240px">Ghi chú (Nhấp để sửa)</th>
+      <th style="min-width:240px"><button data-act="sortGmail" data-v="email">Địa chỉ Email &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
+      <th style="width:130px"><button data-act="sortGmail" data-v="status">Live / Die ${sortGmail.k==="status"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
+      <th style="min-width:170px">${mailSubTab==='cloud'?'Mật khẩu (Password)':'Mật khẩu / Key'}</th>
+      <th style="min-width:220px">Ghi chú (Nhấp để sửa)</th>
       <th style="min-width:220px">Sao chép &amp; Thao tác</th>
     </tr></thead>
     <tbody>
@@ -631,6 +645,15 @@ function gmailView(v,list){
               <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
             </div>
           </td>
+          <td>
+            ${a.status==="live"
+              ?`<span class="pill" style="--c:#2fbf71;cursor:pointer" data-act="checkSingleMailLive" data-v="${u}" title="Nhấp để kiểm tra lại"><span class="dot" style="--c:#2fbf71"></span>Live</span>`
+              :a.status==="dead"
+              ?`<span class="pill" style="--c:#ef5350;cursor:pointer" data-act="checkSingleMailLive" data-v="${u}" title="Nhấp để kiểm tra lại"><span class="dot" style="--c:#ef5350"></span>Die</span>`
+              :`<span class="pill" style="--c:#8b95a7;cursor:pointer" data-act="checkSingleMailLive" data-v="${u}" title="Nhấp để kiểm tra"><span class="dot" style="--c:#8b95a7"></span>Chưa check</span>`
+            }
+            ${a.checked?`<div class="muted mono" style="font-size:10.5px;margin-top:2px">${esc(a.checked)}</div>`:""}
+          </td>
           <td>${pass?`<span class="sec"><span class="mono">${on?esc(pass):"••••••••"}</span>${ib("show",esc(passId),on?"off":"eye",on?"Ẩn ":"Hiện ")}${ib("cpText",esc(pass),"copy","Chép mật khẩu")}${isUrlPass?`<a href="${esc(pass.trim())}" target="_blank" rel="noopener noreferrer" class="link" style="margin-left:4px;display:inline-flex;align-items:center;color:var(--accent)" title="Mở link hòm thư ảo" onclick="event.stopPropagation()">${icon("ext")}</a>`:""}</span>`:'<span class="muted">—</span>'}</td>
           <td>
             <input type="text" data-note-guid="${u}" value="${esc(displayNote)}" placeholder="— Nhập ghi chú..." title="Nhấp vào để sửa ghi chú, nhấn Enter hoặc bấm ra ngoài để lưu" style="background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;width:100%;max-width:280px;color:var(--fg);font-size:12.5px;transition:all .15s" onfocus="this.style.background='var(--raise)';this.style.borderColor='var(--accent)';this.style.borderStyle='solid'" onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.borderStyle='dashed'">
@@ -641,7 +664,7 @@ function gmailView(v,list){
             <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Mail">${icon("x")}</button>
           </td>
         </tr>`;
-      }).join("")||`<tr><td colspan="5" class="empty">Không tìm thấy tài khoản nào khớp từ khoá. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
+      }).join("")||`<tr><td colspan="6" class="empty">Không tìm thấy tài khoản nào khớp từ khoá hoặc bộ lọc. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
     </tbody>
   </table></div>
   <div class="tools" style="justify-content:space-between">
@@ -1160,6 +1183,130 @@ async function checkAccountLive(a){
     return {status:"manual",plat};
   }
   return {status:"unknown",plat};
+}
+
+async function checkMailLive(a){
+  if(!a)return {status:"unknown",reason:"Không có dữ liệu"};
+  const email=String(a.email||"").trim();
+  if(!email||!email.includes("@"))return {status:"dead",reason:"Email không hợp lệ"};
+  const domain=email.split("@")[1].toLowerCase();
+
+  // 1. Kiểm tra DNS MX của domain qua Cloudflare DoH (CORS mở 100%)
+  try{
+    const dnsRes=await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=MX`,{
+      headers:{"Accept":"application/dns-json"}
+    });
+    if(dnsRes.ok){
+      const dnsData=await dnsRes.json();
+      if(dnsData.Status===3){
+        return {status:"dead",reason:`Domain ${domain} không tồn tại (NXDOMAIN)`};
+      }
+      const answers=dnsData.Answer||[];
+      const hasMx=answers.some(ans=>ans.type===15);
+      if(!hasMx&&dnsData.Status!==0){
+        return {status:"dead",reason:`Domain ${domain} không có bản ghi MX nhận thư`};
+      }
+    }
+  }catch(e){
+    console.warn("DNS check error:",e);
+  }
+
+  // 2. Nếu là Tempamail (.EDU / Temp Mail có uuid)
+  const uuid=extractEmailUuid(a);
+  if(uuid){
+    try{
+      const res=await fetch("https://api.tempamail.com/v1/manage",{
+        method:"POST",
+        headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:new URLSearchParams({
+          action:"access",
+          email_uuid:uuid,
+          client_uuid:"unknown",
+          app_uuid:"a5x-cj6a-ka1q"
+        })
+      });
+      if(!res.ok){
+        return {status:"dead",reason:`Hòm thư đã hết hạn hoặc bị xóa trên máy chủ (HTTP ${res.status})`};
+      }
+      const data=await res.json();
+      if(data&&(data.client||data.success||data.email)){
+        return {status:"live",reason:"Hòm thư còn sống và sẵn sàng nhận thư!"};
+      }else if(data&&data.error){
+        return {status:"dead",reason:data.error};
+      }
+    }catch(err){
+      return {status:"unknown",reason:`Lỗi kết nối máy chủ Tempamail: ${err.message}`};
+    }
+  }
+
+  return {status:"live",reason:"Tên miền thư hoạt động bình thường"};
+}
+
+async function runBatchCheckMailLive(list){
+  if(!list||!list.length)return toast("Không có tài khoản mail nào để kiểm tra","error");
+  const d=$("#dlg");
+  let stopped=false;
+  d.innerHTML=`<div style="display:grid;gap:12px;padding:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
+      <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
+        <span style="color:#2fbf71">${icon("check")}</span> ⚡ Kiểm Tra Live / Die Kho Mail
+      </h2>
+      <button type="button" class="ico" id="btnMailStop">${icon("x")}</button>
+    </div>
+    <div id="mProgText" style="font-size:13px;color:var(--mute)">Đang khởi tạo danh sách kiểm tra...</div>
+    <div class="track" style="margin:4px 0"><i id="mBar" style="--c:#2fbf71;width:0%"></i></div>
+    <div id="mCurrent" style="font-size:12px;font-family:var(--mono);color:var(--fg);min-height:18px"></div>
+    <div style="display:flex;gap:14px;font-size:13px;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--line)">
+      <span style="color:#2fbf71;font-weight:600">Live: <b id="mCntL">0</b></span>
+      <span style="color:#ef5350;font-weight:600">Die: <b id="mCntD">0</b></span>
+      <span style="color:var(--mute);font-weight:500">Bỏ qua: <b id="mCntS">0</b></span>
+    </div>
+    <div class="actions">
+      <button type="button" id="btnCancelMailCheck" class="danger">Dừng kiểm tra</button>
+    </div>
+  </div>`;
+  d.showModal();
+
+  const progText=d.querySelector("#mProgText"),bar=d.querySelector("#mBar"),cur=d.querySelector("#mCurrent"),cntL=d.querySelector("#mCntL"),cntD=d.querySelector("#mCntD"),cntS=d.querySelector("#mCntS");
+  const stop=()=>{stopped=true;};
+  d.querySelector("#btnMailStop").onclick=()=>{stop();d.close();};
+  d.querySelector("#btnCancelMailCheck").onclick=()=>{stop();d.close();};
+
+  let live=0,dead=0,skip=0,total=list.length;
+  const updated=[];
+
+  for(let i=0;i<total;i++){
+    if(stopped)break;
+    const a=list[i];
+    const pct=Math.round(((i+1)/total)*100);
+    bar.style.width=`${pct}%`;
+    progText.textContent=`Đang kiểm tra mail [${i+1}/${total}]...`;
+    cur.textContent=`${a.email}`;
+
+    const res=await checkMailLive(a);
+    if(stopped)break;
+
+    if(res.status==="live"){
+      live++;cntL.textContent=live;
+      const rev=revise(a,{status:"live",checked:today()},"Check Live Mail");
+      if(rev)updated.push(rev);
+    }else if(res.status==="dead"){
+      dead++;cntD.textContent=dead;
+      const rev=revise(a,{status:"dead",checked:today()},"Check Live Mail");
+      if(rev)updated.push(rev);
+    }else{
+      skip++;cntS.textContent=skip;
+    }
+    await new Promise(r=>setTimeout(r,120));
+  }
+
+  if(updated.length){
+    await commit(updated);
+  }
+  playChime("success");
+  d.close();
+  render();
+  toast(`Hoàn tất kiểm tra: ${live} Mail Live, ${dead} Mail Die${skip?`, ${skip} bỏ qua`:""}!`);
 }
 
 async function runBatchCheckLive(list){
@@ -1875,6 +2022,30 @@ const acts={
    if(!list.length)return toast("Vui lòng chọn ít nhất 1 tài khoản Facebook để kiểm tra","error");
    runBatchCheckLive(list);
  },
+ checkSingleMailLive:async u=>{
+   const a=get(u);if(!a)return;
+   toast(`Đang kiểm tra mail ${a.email}...`);
+   const res=await checkMailLive(a);
+   if(res.status==="live"){
+     const r=revise(a,{status:"live",checked:today()},"Check Live Mail");
+     if(r&&await commit([r])){playChime("success");toast(`🟢 Mail ${a.email} đang LIVE!`,"success");render();}
+   }else if(res.status==="dead"){
+     const r=revise(a,{status:"dead",checked:today()},"Check Live Mail");
+     if(r&&await commit([r])){playChime("error");toast(`🔴 Mail ${a.email} đã DIE: ${res.reason||"Không thể nhận thư"}`,"error");render();}
+   }else{
+     toast(`Không xác định được: ${res.reason||"Lỗi kết nối"}`,"warn");
+   }
+ },
+ checkAllMailLive:()=>{
+   const list=filteredGmail();
+   if(!list.length)return toast("Không có tài khoản mail nào để kiểm tra","error");
+   runBatchCheckMailLive(list);
+ },
+ bCheckMailLive:()=>{
+   const list=[...selGmail].map(get).filter(Boolean);
+   if(!list.length)return toast("Vui lòng chọn ít nhất 1 mail để kiểm tra","error");
+   runBatchCheckMailLive(list);
+ },
  switchMailTab:v=>{mailSubTab=v;pageGmail=1;render();}
 };
 document.addEventListener("click",async e=>{
@@ -1908,6 +2079,7 @@ document.addEventListener("change",async e=>{
   else if(t.id==="pageAllGmail"){$("#view").querySelectorAll("[data-gsel]").forEach(c=>t.checked?selGmail.add(c.dataset.gsel):selGmail.delete(c.dataset.gsel));render()}
   else if(t.dataset.gsel!==undefined){t.checked?selGmail.add(t.dataset.gsel):selGmail.delete(t.dataset.gsel);render()}
   else if(t.id==="perGmail"){perGmail=+t.value;pageGmail=1;render()}
+  else if(t.id==="fStatusGmail"){fStatusGmail=t.value;pageGmail=1;render()}
   else if(t.id==="fPlatform"){fPlatform=t.value;page=1;table()}
   else if(t.id==="fStatus"){fStatus=t.value;page=1;tabs();table()}
   else if(t.id==="fStale"){fStale=t.checked;page=1;table()}
