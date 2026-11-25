@@ -167,9 +167,9 @@ const SHARDS=64, LIMIT=250000, DAY=864e5;
 const VIEWS={"tong-quan":"Tổng quan","tai-khoan":"Tài khoản MXH","gmail":"Kho Gmail","lich-su":"Lịch sử","cai-dat":"Cài đặt"};
 const DEF={staleDays:7,statuses:[
 {id:"live",name:"Live",color:"#2fbf71"},{id:"dead",name:"Die",color:"#ef5350"},{id:"new",name:"Chưa kiểm tra",color:"#8b95a7"}]};
-const FIELDS=[["platform","Nền tảng"],["uid","UID"],["pass","Mật khẩu"],["twofa","2FA"],["email","Gmail"],["mailpass","Pass Gmail"],["born","Ngày tạo"],["checked","Kiểm tra gần nhất"],["status","Live/Die"],["name","Tên"],["phone","Số điện thoại"],["source","Nguồn"],["note","Ghi chú"]];
+const FIELDS=[["platform","Nền tảng"],["uid","UID"],["name","Tên"],["pass","Mật khẩu"],["twofa","2FA"],["email","Gmail"],["mailpass","Pass Gmail"],["born","Ngày tạo"],["checked","Kiểm tra gần nhất"],["status","Live/Die"],["phone","Số điện thoại"],["source","Nguồn"],["note","Ghi chú"]];
 const SECRETS=["pass","twofa","mailpass"];
-const ORDER=["platform","uid","pass","twofa","email","mailpass","born","checked","status"];
+const ORDER=["platform","uid","name","pass","twofa","email","mailpass","born","checked","status"];
 const LABEL=Object.fromEntries(FIELDS);
 const $=s=>document.querySelector(s);
 const PATHS={grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -187,7 +187,7 @@ copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 
 key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.500 6.500l4 4"/>',
 facebook:'<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
 instagram:'<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>',
-mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>'};
+mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',info:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',ext:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'};
 const PLATFORMS={
   facebook:{id:"facebook",name:"Facebook",color:"#1877f2",icon:"facebook",url:uid=>/^\d+$/.test(uid)?`https://www.facebook.com/profile.php?id=${encodeURIComponent(uid)}`:`https://www.facebook.com/${encodeURIComponent(uid)}`},
   instagram:{id:"instagram",name:"Instagram",color:"#e1306c",icon:"instagram",url:uid=>`https://www.instagram.com/${encodeURIComponent(uid)}/`}
@@ -230,7 +230,9 @@ function openLocalStore(){
 }
 let shards=Array.from({length:SHARDS},()=>({})), settings=structuredClone(DEF), daily={};
 let sel=new Set(), q="", fStatus="", fPlatform="", fStale=false, page=1, sort={k:"updated",d:-1};
-let per=store.get("per",25), cols=store.get("cols2",ORDER).filter(c=>!["group","tags"].includes(c)); if(!cols.includes("platform"))cols=["platform",...cols];
+let per=store.get("per",25), cols=store.get("cols3",ORDER).filter(c=>!["group","tags"].includes(c));
+if(!cols.includes("platform"))cols=["platform",...cols];
+if(!cols.includes("name")){const uIdx=cols.indexOf("uid");if(uIdx>=0)cols.splice(uIdx+1,0,"name");else cols.unshift("name")}
 let qGmail="", sortGmail={k:"updated",d:-1}, pageGmail=1, perGmail=25, selGmail=new Set();
 function makeGmailUid(email){
   const clean='gm_'+String(email||'').trim().toLowerCase().replace('@','_at_').replace(/[^A-Za-z0-9._-]/g,'_');
@@ -475,6 +477,7 @@ function cell(a,k){
   if(k==="email"&&a.email)return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail",u,"copy","Chép Gmail")}</span>`;
   if(k==="status")return `<select class="state" ${canWrite()?"":"disabled"} style="--c:${esc(st(a.status).color)}" data-state="${u}" id="state-${u}" aria-label="Trạng thái ${u}">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select>`;
   if(k==="checked"||k==="born")return fmt(a[k]&&a[k]+"T00:00:00")+(k==="checked"&&stale(a)?' <span title="Quá hạn kiểm tra" style="color:var(--warn)">●</span>':"");
+  if(k==="name")return a.name?`<b>${esc(a.name)}</b>`:'<span class="muted">—</span>';
   return esc(a[k])||'<span class="muted">—</span>';
 }
 function table(){
@@ -497,14 +500,31 @@ function filteredGmail(){
 }
 function gmailView(v,list){
   const gList=list.filter(a=>a.platform==="gmail");
+  const noteBanner=`<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(91,140,255,0.06);border:1px solid rgba(91,140,255,0.22);border-radius:10px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+          <span style="color:#5b8cff;display:inline-flex">${icon("info")}</span> Hướng dẫn đăng nhập &amp; mở hòm thư ảo:
+        </div>
+        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.65;color:var(--text)">
+          <li>Dùng <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempmail.cloud/</a> để log mail | pass.</li>
+          <li>Đối với mail edu <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempamail.com/edu</a> dùng link pass để mở hòm thư ảo.</li>
+        </ul>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:6px 12px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail.cloud">${icon("ext")} Mở TempMail.cloud</a>
+        <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:6px 12px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail Edu">${icon("ext")} Mở TempMail Edu</a>
+      </div>
+    </div>
+  </div>`;
   if(!gList.length&&!qGmail){
-    v.innerHTML=`<div class="panel empty">Chưa có tài khoản Gmail nào trong kho. Dán danh sách text / file TXT hoặc thêm thủ công.<div><button class="primary" data-act="addGmail">+ Thêm Gmail</button><button data-act="importGmail">${icon("up")} Nhập text / file TXT</button></div></div>`;
+    v.innerHTML=`${noteBanner}<div class="panel empty">Chưa có tài khoản Gmail nào trong kho. Dán danh sách text / file TXT hoặc thêm thủ công.<div><button class="primary" data-act="addGmail">+ Thêm Gmail</button><button data-act="importGmail">${icon("up")} Nhập text / file TXT</button></div></div>`;
     return;
   }
   const rows=filteredGmail(),pages=Math.max(1,Math.ceil(rows.length/perGmail));
   pageGmail=Math.min(pageGmail,pages);
   const shownRows=rows.slice((pageGmail-1)*perGmail,pageGmail*perGmail);
-  v.innerHTML=`<div class="tools filters">
+  v.innerHTML=`${noteBanner}<div class="tools filters">
     <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ Gmail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Gmail">
     <button class="primary" data-act="addGmail">+ Thêm Gmail</button>
     <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>
@@ -520,27 +540,35 @@ function gmailView(v,list){
   <div class="tablewrap"><table>
     <thead><tr>
       <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length&&shownRows.every(a=>selGmail.has(a.uid))?"checked":""}></th>
-      <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Gmail ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
+      <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Gmail &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
       <th style="min-width:200px">Mật khẩu</th>
       <th>Ghi chú</th>
-      <th style="width:140px"><button data-act="sortGmail" data-v="updated">Thời gian ${sortGmail.k==="updated"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
-      <th style="width:180px">Sao chép nhanh</th>
+      <th style="width:190px">Sao chép &amp; Thao tác</th>
     </tr></thead>
     <tbody>
       ${shownRows.map(a=>{
         const u=esc(a.uid),email=esc(a.email||""),pass=secretsOf(a).pass||"",passId=a.uid+"|pass",on=shown.has(passId);
+        const isUrlPass=/^https?:\/\//i.test(pass.trim()),isEdu=/\.edu(\.|\/|$)|@.*edu/i.test(email);
+        const isTimeNote=/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\b/.test(String(a.note||"").trim());
+        const timeLabel=isTimeNote?a.note:fmtTime(a.updated||a.added);
+        const displayNote=isTimeNote?"":a.note;
         return `<tr data-guid="${u}" title="Nhấp vào dòng để chỉnh sửa">
           <td><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid)?"checked":""}></td>
-          <td><span class="sec"><span style="color:#ea4335;display:inline-flex;align-items:center" title="Gmail">${icon("mail")}</span> <b>${email}</b> ${ib("cpText",email,"copy","Chép Gmail")}</span></td>
-          <td>${pass?`<span class="sec"><span class="mono">${on?esc(pass):"••••••••"}</span>${ib("show",esc(passId),on?"off":"eye",on?"Ẩn ":"Hiện ")}${ib("cpText",esc(pass),"copy","Chép mật khẩu")}</span>`:'<span class="muted">—</span>'}</td>
-          <td><span class="muted" style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:320px">${esc(a.note)||"—"}</span></td>
-          <td class="muted mono">${fmtTime(a.updated||a.added)}</td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span class="sec"><span style="color:#ea4335;display:inline-flex;align-items:center" title="Gmail">${icon("mail")}</span> <b>${email}</b> ${ib("cpText",email,"copy","Chép Gmail")}</span>
+              <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
+            </div>
+          </td>
+          <td>${pass?`<span class="sec"><span class="mono">${on?esc(pass):"••••••••"}</span>${ib("show",esc(passId),on?"off":"eye",on?"Ẩn ":"Hiện ")}${ib("cpText",esc(pass),"copy","Chép mật khẩu")}${isUrlPass?`<a href="${esc(pass.trim())}" target="_blank" rel="noopener noreferrer" class="link" style="margin-left:4px;display:inline-flex;align-items:center;color:var(--accent)" title="Mở link hòm thư ảo" onclick="event.stopPropagation()">${icon("ext")}</a>`:""}</span>`:'<span class="muted">—</span>'}</td>
+          <td><span class="muted" style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:320px">${esc(displayNote)||"—"}</span></td>
           <td>
             <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
+            ${isEdu?`<a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px;color:var(--ink)" title="Mở TempMail Edu" onclick="event.stopPropagation()">${icon("ext")} Edu</a>`:""}
             <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Gmail">${icon("x")}</button>
           </td>
         </tr>`;
-      }).join("")||`<tr><td colspan="6" class="empty">Không tìm thấy tài khoản Gmail khớp từ khoá. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
+      }).join("")||`<tr><td colspan="5" class="empty">Không tìm thấy tài khoản Gmail khớp từ khoá. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
     </tbody>
   </table></div>
   <div class="tools" style="justify-content:space-between">
@@ -810,7 +838,7 @@ const bulk=async(fn,msg)=>{const put=[...sel].map(get).filter(Boolean).map(a=>re
 const acts={
  add:()=>openAccount(),import:importDialog,export:()=>exportDialog(),open:openAccount,
  close:()=>$("#dlg").close(),closeDrawer:()=>$("#drawer").close(),
- show:id=>{const [u,k]=id.split("|");if(!secretsOf(get(u))[k])return toast("Không có dữ liệu để hiển thị","error");const hide=shown.has(id);hide?shown.delete(id):shown.add(id);table();toast((hide?"Đã ẩn ":"Đã hiện ")+LABEL[k])},
+ show:id=>{const [u,k]=id.split("|");const a=get(u);if(!a||!secretsOf(a)[k])return toast("Không có dữ liệu để hiển thị","error");const hide=shown.has(id);hide?shown.delete(id):shown.add(id);if(route()==="gmail")gmailView($("#view"),all());else table();toast((hide?"Đã ẩn ":"Đã hiện ")+LABEL[k])},
  cp:id=>{const [u,k]=id.split("|");return copy(secretsOf(get(u))[k],"Đã sao chép "+LABEL[k])},
  cpUid:u=>copy(u,"Đã sao chép UID"),cpMail:u=>copy(get(u)?.email,"Đã sao chép Gmail"),
  code:async u=>{const c=await totp(secretsOf(get(u)).twofa||"");if(!c)return toast("Khoá 2FA không hợp lệ","error");return copy(c,"Đã sao chép mã 2FA (có hiệu lực 30 giây mỗi chu kỳ)")},
@@ -891,7 +919,7 @@ document.addEventListener("change",async e=>{
   else if(t.dataset.state!==undefined){const a=get(t.dataset.state),r=a&&revise(a,{status:t.value,checked:today()});if(r&&await commit([r]))toast("Đã cập nhật, ngày kiểm tra là hôm nay")}
   else if(t.id==="pageAll"){$("#tbl").querySelectorAll("[data-sel]").forEach(c=>t.checked?sel.add(c.dataset.sel):sel.delete(c.dataset.sel));table()}
   else if(t.dataset.sel!==undefined){t.checked?sel.add(t.dataset.sel):sel.delete(t.dataset.sel);table()}
-  else if(t.dataset.col){cols=t.checked?[...cols,t.dataset.col]:cols.filter(c=>c!==t.dataset.col);store.set("cols2",cols);table()}
+  else if(t.dataset.col){cols=t.checked?[...cols,t.dataset.col]:cols.filter(c=>c!==t.dataset.col);store.set("cols3",cols);table()}
   else if(t.dataset.sn||t.dataset.sc){const id=t.dataset.sn||t.dataset.sc,key=t.dataset.sn?"name":"color",val=t.value.trim();if(!val)return;await persistSettings({...settings,statuses:settings.statuses.map(s=>s.id===id?{...s,[key]:val}:s)})}
   else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365)await persistSettings({...settings,staleDays:n})}
 });
