@@ -995,7 +995,7 @@
           if (k === "platform") return pillPlat(a.platform);
           if (k === "uid") {
             const pl = platOf(a);
-            return `<span class="sec"><span style="color:${pl.color};display:inline-flex;align-items:center" title="${pl.name}">${icon(pl.icon)}</span> <button class="link mono" data-act="open" data-v="${u}">${esc(a.platform === "instagram" ? a.igUsername || a.uid : a.uid)}</button>${ib("cpUid", u, "copy", "Chép UID")}</span>${a.platform === "instagram" ? `<small class="muted" style="display:block" title="${esc(igCheckLabel(a))}">${a.igId ? `UID: ${esc(a.igId)} · ` : ""}${esc(igCheckLabel(a))}</small><span style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px"><a class="mini" href="${esc(pl.url(a.igUsername || a.uid))}" target="_blank" rel="noopener noreferrer">Mở profile kiểm tra</a><button class="mini" data-act="confirmIgLive" data-v="${u}" ${canWrite() ? "" : "disabled"} title="Xác nhận bạn đã mở và nhìn thấy đúng hồ sơ">Xác nhận Live</button></span>${a.igConfirmed?.at ? `<small class="muted" style="display:block">Bạn đã xác nhận Live · ${esc(fmtTime(Date.parse(a.igConfirmed.at)))}</small>` : ""}` : ""}`;
+            return `<span class="sec"><button type="button" class="ico" data-act="open" data-v="${u}" style="color:${pl.color};width:22px;height:22px" title="Mở chi tiết ${pl.name}">${icon(pl.icon)}</button> <button class="link mono" data-act="cpUid" data-v="${u}" title="Bấm để sao chép UID">${esc(a.platform === "instagram" ? a.igUsername || a.uid : a.uid)}</button></span>${a.platform === "instagram" && a.status !== "live" && !a.igConfirmed?.at ? `<small class="muted" style="display:block" title="${esc(igCheckLabel(a))}">${a.igId ? `UID: ${esc(a.igId)} · ` : ""}${esc(igCheckLabel(a))}</small><span style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px"><a class="mini" href="${esc(pl.url(a.igUsername || a.uid))}" target="_blank" rel="noopener noreferrer">Mở profile kiểm tra</a><button class="mini" data-act="confirmIgLive" data-v="${u}" ${canWrite() ? "" : "disabled"} title="Xác nhận bạn đã mở và nhìn thấy đúng hồ sơ">Xác nhận Live</button></span>` : ""}`;
           }
           if (SECRETS.includes(k)) {
             if (!Object.keys(secretsOf(a)).length)
@@ -1005,7 +1005,7 @@
             if (!s[k]) return '<span class="muted">—</span>';
             const id = a.uid + "|" + k,
               on = shown.has(id);
-            return `<span class="sec"><span class="mono">${on ? esc(s[k]) : "••••••"}</span>${ib("show", esc(id), on ? "off" : "eye", (on ? "Ẩn " : "Hiện ") + LABEL[k])}${ib("cp", esc(id), "copy", "Chép " + LABEL[k])}${k === "twofa" ? `<button type="button" class="mini mono totp-pill" data-act="code" data-v="${u}" data-totp-uid="${u}" title="Bấm để Copy mã 2FA 6 số" style="padding:2px 7px;gap:5px;border-color:rgba(47,191,113,0.45);background:rgba(47,191,113,0.1);color:#2fbf71;display:inline-flex;align-items:center"><span>🔑</span><span class="totp-code">••••••</span><span class="totp-sec" style="font-size:11px;opacity:.85">--s</span></button>` : ""}</span>`;
+            return `<span class="sec"><span class="mono">${on ? esc(s[k]) : "••••••"}</span>${ib("show", esc(id), on ? "off" : "eye", (on ? "Ẩn " : "Hiện ") + LABEL[k])}${k === "twofa" ? `<button type="button" class="mini mono totp-pill" data-act="code" data-v="${u}" data-totp-uid="${u}" title="Bấm để Copy mã 2FA 6 số" style="padding:2px 7px;gap:5px;border-color:rgba(47,191,113,0.45);background:rgba(47,191,113,0.1);color:#2fbf71;display:inline-flex;align-items:center"><span>🔑</span><span class="totp-code">••••••</span><span class="totp-sec" style="font-size:11px;opacity:.85">--s</span></button>` : ib("cp", esc(id), "copy", "Chép " + LABEL[k])}</span>`;
           }
           if (k === "email" && a.email)
             return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail", u, "copy", "Chép Gmail")}<button class="ico" data-act="inboxTempMailByEmail" data-v="${esc(a.email)}" title="Mở hộp thư &amp; lấy mã OTP" style="color:#2fbf71;width:24px;height:24px">${icon("mail")}</button></span>`;
@@ -4066,7 +4066,10 @@
               status: "live", checked: today(),
               igConfirmed: { at, by: currentUser?.id || "local" },
             }, "Xác nhận Live thủ công", "Xác nhận Live sau khi mở profile");
-            if (r && await commit([r])) toast("Đã lưu xác nhận Live và thời điểm kiểm tra", "success");
+            if (r && await commit([r])) {
+              toast("Đã lưu xác nhận Live và thời điểm kiểm tra", "success");
+              table();
+            }
           },
           checkOneLive: async (uid) => {
             const a = get(uid);
