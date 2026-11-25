@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
@@ -499,7 +499,11 @@
         }
 
         /* put: danh sách bản ghi mới/sửa; del: danh sách uid */
+        let mutationEpoch = 0;
+        const igCheckSources = new WeakMap();
         async function commit(put = [], del = []) {
+          put = put.filter(a => !igCheckSources.has(a) || get(a.uid) === igCheckSources.get(a));
+          if (!put.length && !del.length) return false;
           if (!canWrite()) {
             toast(
               "Bạn không có quyền chỉnh sửa hoặc hệ thống đang lưu",
@@ -507,6 +511,7 @@
             );
             return false;
           }
+          mutationEpoch++;
           if (cloudWorkspace) {
             const generation = authGeneration,
               workspace = cloudWorkspace;
@@ -589,6 +594,7 @@
             if (extra) ch.push(extra);
             if (!ch.length) return null;
           }
+          if (patch.igCheck) igCheckSources.set(a, old);
           a.hist = [
             { t: a.updated, m: ch.join("; ").slice(0, 200) },
             ...(old.hist || []),
@@ -954,7 +960,7 @@
             v.innerHTML = `<div class="tabs" id="tabs" role="group" aria-label="Lọc nhanh"></div><div class="tools filters"><input id="q" class="grow" type="search" placeholder="Tìm UID, Gmail, tên, ghi chú…  ( phím / )" aria-label="Tìm kiếm">
     <select id="fPlatform" aria-label="Lọc nền tảng"><option value="">Mọi nền tảng</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="fStatus" hidden aria-label="Lọc trạng thái"></select>
     <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fStale">Cần kiểm tra</label>
-    <button data-act="checkAllLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Kiểm tra Live/Die tự động cho các tài khoản Facebook">${icon("check")} ⚡ Check Live/Die FB</button>
+    <button data-act="checkAllLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Kiểm tra Live/Die tự động cho các tài khoản Facebook &amp; Instagram">${icon("check")} ⚡ Check Live/Die FB &amp; IG</button>
     <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px;user-select:none" title="Tự động kiểm tra ngầm các nick Facebook chưa check hôm nay khi mở web">
       <input type="checkbox" id="chkAutoBg" ${autoCheckBgEnabled ? "checked" : ""}>
       <span style="color:#2fbf71;font-weight:600">⚡ Tự động quét</span>
@@ -989,7 +995,7 @@
           if (k === "platform") return pillPlat(a.platform);
           if (k === "uid") {
             const pl = platOf(a);
-            return `<span class="sec"><span style="color:${pl.color};display:inline-flex;align-items:center" title="${pl.name}">${icon(pl.icon)}</span> <button class="link mono" data-act="open" data-v="${u}">${u}</button>${ib("cpUid", u, "copy", "Chép UID")}</span>`;
+            return `<span class="sec"><span style="color:${pl.color};display:inline-flex;align-items:center" title="${pl.name}">${icon(pl.icon)}</span> <button class="link mono" data-act="open" data-v="${u}">${esc(a.platform === "instagram" ? a.igUsername || a.uid : a.uid)}</button>${ib("cpUid", u, "copy", "Chép UID")}</span>${a.platform === "instagram" ? `<small class="muted" style="display:block" title="${esc(igCheckLabel(a))}">${a.igId ? `UID: ${esc(a.igId)} · ` : ""}${esc(igCheckLabel(a))}</small>` : ""}`;
           }
           if (SECRETS.includes(k)) {
             if (!Object.keys(secretsOf(a)).length)
@@ -1036,7 +1042,7 @@
             sel.size
               ? `<div class="tools bulk"><b>Đã chọn ${sel.size}</b>
   ${sel.size < rows.length ? `<button class="link" data-act="selAll">Chọn cả ${rows.length}</button>` : ""}
-  <button data-act="bCheckLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:4px">${icon("check")} ⚡ Check ${sel.size} nick FB</button>
+  <button data-act="bCheckLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:4px">${icon("check")} ⚡ Check ${sel.size} nick</button>
   <select id="bPlatform" aria-label="Đổi nền tảng"><option value="">Đổi nền tảng…</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="bStatus" aria-label="Đổi trạng thái">${opts(
     settings.statuses.map((s) => [s.id, s.name]),
     "",
@@ -1961,8 +1967,20 @@
           d.showModal();
         }
 
+        function igResultPatch(res) {
+          const patch = { igCheck: { status: res.status, reason: res.reason || "verified", at: res.checkedAt || new Date().toISOString() } };
+          if (res.status === "live" && res.igId && res.username) Object.assign(patch, { status: "live", checked: today(), igId: res.igId, igUsername: res.username });
+          return patch;
+        }
+        function igCheckLabel(a) {
+          const r = a.igCheck;
+          if (!r) return "Chưa xác minh IG";
+          const label = r.status === "live" ? "Đã xác minh" : r.status === "not_found" ? "Không tìm thấy" : r.reason === "identity_mismatch" ? "Không khớp tài khoản" : "Chưa xác định";
+          return label + " · " + fmtTime(Date.parse(r.at)) + (r.reason ? " · " + r.reason : "");
+        }
         async function checkAccountLive(a) {
           if (!a) return { status: "unknown" };
+          const checkGeneration = authGeneration;
           const plat = a.platform || "facebook";
           if (plat === "facebook") {
             try {
@@ -1987,7 +2005,40 @@
               return { status: "dead", plat };
             }
           } else if (plat === "instagram") {
-            return { status: "manual", plat };
+            try {
+              const cfg = globalThis.MXH_SUPABASE;
+              if (!cfg?.url || !cfg?.key) {
+                return { status: "unknown", plat, reason: "no_supabase" };
+              }
+              const { data, error } = await authClient.auth.getSession();
+              if (error || !data.session?.access_token) return { status: "unknown", plat, reason: "login_required" };
+              const res = await fetch(cfg.url + '/functions/v1/check-ig', {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  apikey: cfg.key,
+                  Authorization: `Bearer ${data.session.access_token}`,
+                },
+                body: JSON.stringify({ username: a.igUsername || a.uid, igId: a.igId || "" }),
+                signal: AbortSignal.timeout(25000),
+              });
+              if (!res.ok) {
+                return { status: "unknown", plat, reason: "fn_" + res.status };
+              }
+              const json = await res.json().catch(() => null);
+              if (checkGeneration !== authGeneration || get(a.uid) !== a) return {status:"unknown",stale:true,reason:"stale_check",plat};
+              if (["live", "not_found", "unknown"].includes(json?.status)) {
+                if (json.status === "live" && (!/^\d+$/.test(json.igId || "") || !json.username || (a.igId && a.igId !== json.igId))) return { status: "unknown", plat, reason: "identity_mismatch" };
+                return { ...json, plat };
+              }
+              return {
+                status: "unknown",
+                plat,
+                reason: json?.reason || "unverified",
+              };
+            } catch {
+              return { status: "unknown", plat, reason: "network" };
+            }
           }
           return { status: "unknown", plat };
         }
@@ -2228,6 +2279,7 @@
             progText.textContent = `Đang kiểm tra ${i + 1}/${total} tài khoản...`;
 
             const res = await checkAccountLive(a);
+            if (res.stale) continue;
             if (stopped) break;
 
             if (res.status === "live") {
@@ -2235,7 +2287,7 @@
               cntL.textContent = live;
               const rev = revise(
                 a,
-                { status: "live", checked: today() },
+                { status: "live", checked: today(), ...(a.platform === "instagram" ? igResultPatch(res) : {}) },
                 "Check Live tự động",
               );
               if (rev) updated.push(rev);
@@ -2249,6 +2301,7 @@
               );
               if (rev) updated.push(rev);
             } else {
+              if (a.platform === "instagram") { const rev = revise(a, igResultPatch(res), "Kiểm tra IG", "IG: " + (res.reason || res.status)); if (rev) updated.push(rev); }
               skip++;
               cntS.textContent = skip;
             }
@@ -2285,13 +2338,13 @@
         }
 
         async function triggerBackgroundScan() {
-          if (!autoCheckBgEnabled || isBgScanning || !ready() || cloudBusy)
+          if (!autoCheckBgEnabled || isBgScanning || !canWrite() || cloudBusy)
             return;
           const currentToday = today();
           const queue = all().filter(
             (a) =>
-              (a.platform || "facebook") === "facebook" &&
-              a.checked !== currentToday,
+              a.platform !== "gmail" &&
+              (a.platform === "instagram" ? (!a.igCheck?.at || Date.now() - Date.parse(a.igCheck.at) > 6 * 60 * 60 * 1000) : a.checked !== currentToday),
           );
           if (!queue.length) {
             updateBgStatus(
@@ -2321,6 +2374,7 @@
             );
 
             const res = await checkAccountLive(a);
+            if (res.stale) continue;
             if (!autoCheckBgEnabled) break;
 
             const oldStatus = a.status;
@@ -2333,11 +2387,15 @@
               newStatus = "dead";
             }
 
-            if (newStatus !== oldStatus || a.checked !== currentToday) {
+            if (
+              a.platform === "instagram" || (res.status !== "unknown" &&
+              (newStatus !== oldStatus || a.checked !== currentToday))
+            ) {
               const rev = revise(
                 a,
-                { status: newStatus, checked: currentToday },
+                a.platform === "instagram" ? igResultPatch(res) : { status: newStatus, checked: currentToday },
                 "Quét ngầm tự động",
+                a.platform === "instagram" ? "IG: " + (res.reason || res.status) : undefined,
               );
               if (rev) {
                 updated.push(rev);
@@ -2369,7 +2427,25 @@
           setTimeout(() => updateBgStatus("", false), 7000);
         }
 
+        let cloudRefreshTimer = null;
+        let refreshingCloud = false;
+        async function refreshMonitoringState() {
+          if (!cloudWorkspace || !ready() || cloudBusy || isBgScanning || refreshingCloud || document.hidden || $("#drawer")?.open || $("#dlg")?.open || sel.size) return;
+          const generation = authGeneration, workspace = cloudWorkspace, epoch = mutationEpoch;
+          refreshingCloud = true;
+          try {
+            const refreshed = MXHCloud.workspace(cloudApi);
+            const next = await refreshed.load();
+            if (generation !== authGeneration || epoch !== mutationEpoch || workspace !== cloudWorkspace || cloudBusy || isBgScanning || $("#drawer")?.open || $("#dlg")?.open || sel.size) return;
+            cloudWorkspace = refreshed;
+            applyCloudState(next);
+            if (route() === "tai-khoan") table();
+          } catch { /* Keep the current view when refreshing fails. */ }
+          finally { refreshingCloud = false; }
+        }
         function startAutoCheckScheduler() {
+          if (cloudRefreshTimer) clearInterval(cloudRefreshTimer);
+          cloudRefreshTimer = setInterval(refreshMonitoringState, 30000);
           if (bgScanTimer) clearInterval(bgScanTimer);
           setTimeout(() => {
             if (autoCheckBgEnabled && ready()) triggerBackgroundScan();
@@ -3063,7 +3139,7 @@
   ${inp("name")}${inp("phone")}${inp("source", "", "full")}
   <label class="full">Ghi chú (không mã hoá)<textarea id="e-note" rows="3" maxlength="500">${esc(a.note)}</textarea></label></div>
   <p class="err" id="eErr" hidden></p><div class="actions">${old ? `<button type="button" class="danger left" data-act="del" data-v="${esc(uid)}">Xoá</button>` : ""}<button type="button" data-act="closeDrawer">Đóng</button><button class="primary" id="eSave">Lưu</button></div></form>
-  ${old ? `<h2 style="margin-top:22px">Lịch sử</h2>${(a.hist || []).map((h) => `<div class="row"><span class="muted mono">${fmtTime(h.t)}</span><span>${esc(h.m)}</span></div>`).join("")}<p><a href="${platOf(a).url(uid)}" target="_blank" rel="noopener" style="color:var(--accent);display:inline-flex;align-items:center;gap:6px">${icon(platOf(a).icon)} Mở trang ${platOf(a).name}</a></p>` : ""}`;
+  ${old ? `<h2 style="margin-top:22px">Lịch sử</h2>${(a.hist || []).map((h) => `<div class="row"><span class="muted mono">${fmtTime(h.t)}</span><span>${esc(h.m)}</span></div>`).join("")}<p><a href="${platOf(a).url(a.platform === "instagram" ? a.igUsername || uid : uid)}" target="_blank" rel="noopener" style="color:var(--accent);display:inline-flex;align-items:center;gap:6px">${icon(platOf(a).icon)} Mở trang ${platOf(a).name}</a></p>` : ""}`;
           $("#eShow").onchange = (e) =>
             d
               .querySelectorAll(".secretIn")
@@ -3985,13 +4061,14 @@
             const a = get(uid);
             if (!a) return;
             const plat = a.platform || "facebook";
-            if (plat === "instagram")
-              return toast(
-                "Instagram vui lòng nhấp vào UID để mở trang cá nhân kiểm tra trực tiếp.",
-                "warn",
-              );
-            toast(`Đang kiểm tra UID ${uid}...`);
+            toast(`Đang kiểm tra ${plat === "instagram" ? "IG" : "UID"} ${uid}...`);
             const res = await checkAccountLive(a);
+            if (plat === "instagram") {
+              if (res.stale) return;
+              const r = revise(a, igResultPatch(res), "Kiểm tra IG", "IG: " + (res.reason || res.status));
+              if (r && await commit([r])) { toast(igCheckLabel({ ...a, ...igResultPatch(res) }), res.status === "live" ? "success" : "error"); table(); }
+              return;
+            }
             if (res.status === "live") {
               const r = revise(
                 a,
@@ -4014,15 +4091,20 @@
                 toast(`🔴 UID ${uid} đã DIE!`, "error");
                 table();
               }
-            } else toast("Không kiểm tra được kết nối với Facebook", "error");
+            } else {
+              toast(
+                plat === "instagram"
+                  ? "Chưa xác minh được IG (cần deploy Edge Function check-ig hoặc bị giới hạn)."
+                  : "Không kiểm tra được kết nối với Facebook",
+                "warn",
+              );
+            }
           },
           checkAllLive: () => {
-            const list = filtered().filter(
-              (a) => (a.platform || "facebook") === "facebook",
-            );
+            const list = filtered().filter((a) => a.platform !== "gmail");
             if (!list.length)
               return toast(
-                "Không có tài khoản Facebook nào trong bộ lọc hiện tại để kiểm tra",
+                "Không có tài khoản nào trong bộ lọc hiện tại để kiểm tra",
                 "error",
               );
             runBatchCheckLive(list);
@@ -4031,10 +4113,10 @@
             const list = [...sel]
               .map(get)
               .filter(Boolean)
-              .filter((a) => (a.platform || "facebook") === "facebook");
+              .filter((a) => a.platform !== "gmail");
             if (!list.length)
               return toast(
-                "Vui lòng chọn ít nhất 1 tài khoản Facebook để kiểm tra",
+                "Vui lòng chọn ít nhất 1 tài khoản để kiểm tra",
                 "error",
               );
             runBatchCheckLive(list);
@@ -4403,6 +4485,7 @@
           }
         }
         async function persistSettings(next) {
+          mutationEpoch++;
           if (!canWrite()) {
             toast(
               "Bạn không có quyền sửa cài đặt hoặc hệ thống đang lưu",

@@ -5,13 +5,13 @@ new vm.Script(js);
 js=js.replace('boot();','globalThis.test={acts,copy,shown,cell,shards,hash,openLocalStore,queue,get,saveState};');
 const nodes=new Map();const node=()=>({style:{},dataset:{},setAttribute(){},addEventListener(){},querySelector(){return null},querySelectorAll(){return []},focus(){},select(){},remove(){},append(){}});
 const context={document:{querySelector:s=>{if(s==='dialog[open]')return null;if(!nodes.has(s))nodes.set(s,node());return nodes.get(s)},addEventListener(){},createElement:node,body:node()},localStorage:{getItem(){return null}},navigator:{clipboard:{async writeText(t){context.copied=t}}},addEventListener(){},structuredClone,TextEncoder,TextDecoder,URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},crypto:require('crypto').webcrypto,location:{hash:''}};
-vm.createContext(context);vm.runInContext(js,context);
+context.window=context;vm.createContext(context);vm.runInContext(js,context);
 (async()=>{
  const {acts,shards,hash,shown}=context.test;
  const a={uid:'181',email:'mail@example.com',sec:{pass:'test-pass',twofa:'JBSWY3DPEHPK3PXP',mailpass:'test-mail'}};shards[hash(a.uid)][a.uid]=a;
  // No table on this test page: eye still changes state and produces feedback.
  nodes.set('#tbl',null);
- await acts.cp('181|pass');assert.equal(context.copied,'test-pass');assert.match(nodes.get('#toast').textContent,/Mật khẩu/);
+ await acts.cp('181|pass');assert.equal(context.copied,'test-pass');assert.match(nodes.get('#toast').innerHTML,/Mật khẩu/);
  await acts.cpUid('181');assert.equal(context.copied,'181');
  await acts.cpMail('181');assert.equal(context.copied,a.email);
  acts.show('181|pass');assert(shown.has('181|pass'));assert(context.test.cell(a,'pass').includes('test-pass'));

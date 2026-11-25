@@ -5,16 +5,35 @@ function harness(){
  const element=()=>({style:{},dataset:{},innerHTML:'',textContent:'',hidden:false,open:false,disabled:false,isConnected:true,scrollLeft:0,setAttribute(){},addEventListener(){},querySelector(){return element()},querySelectorAll(){return []},close(){this.open=false},focus(){}});
  const node=s=>{if(!nodes.has(s))nodes.set(s,element());return nodes.get(s)};
  const handlers={};let reads=0;
- const context={document:{querySelector:node,addEventListener:(event,fn)=>handlers[event]=fn,activeElement:{tagName:'BODY'}},localStorage:{getItem(){reads++;return null},setItem(){throw Error('Local resource writes forbidden')}},navigator:{},addEventListener(){},structuredClone,TextEncoder,TextDecoder,Date,URL,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout(){},location:{hash:'#tai-khoan'},MXHCloud:Cloud};
+ const context={document:{querySelector:node,addEventListener:(event,fn)=>handlers[event]=fn,activeElement:{tagName:'BODY'}},localStorage:{getItem(){reads++;return null},setItem(){throw Error('Local resource writes forbidden')}},navigator:{},addEventListener(){},structuredClone,TextEncoder,TextDecoder,Date,URL,AbortSignal,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},location:{hash:'#tai-khoan'},MXHCloud:Cloud};
  let js=[...fs.readFileSync(require('node:path').join(__dirname,'index.html'),'utf8').matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
- js=js.replace('boot();',`globalThis.T={boot,loadSession,commit,persistSettings,canWrite,acts,get,openAccount,render,setup(api){cloudApi=api},status(){return {mode,currentUser,memberRole,cloudBusy,cloudError,count:all().length}}};`);
- vm.createContext(context);vm.runInContext(js,context);return {context,t:context.T,nodes,node,handlers,reads:()=>reads};
+ js=js.replace('boot();',`globalThis.T={boot,loadSession,commit,persistSettings,canWrite,acts,get,openAccount,render,checkAccountLive,igResultPatch,refreshMonitoringState,setupAuth(client){authClient=client},setup(api){cloudApi=api},status(){return {mode,currentUser,memberRole,cloudBusy,cloudError,count:all().length}}};`);
+ context.window=context;vm.createContext(context);vm.runInContext(js,context);return {context,t:context.T,nodes,node,handlers,reads:()=>reads};
 }
 const session={user:{id:'allowed',email:'member@example.com'},access_token:'jwt'};
 const snapshot=()=>({resources:[{uid:'181',revision:1,data:{uid:'181',status:'new',sec:{pass:'credential'}}}],meta:[]});
 
+test('IG calls use session JWT and unknown result preserves confirmed status',async()=>{
+ const h=harness();const data=snapshot();Object.assign(data.resources[0].data,{platform:'instagram',status:'live',igId:'123'});
+ h.t.setup({membership:async()=>'editor',load:async()=>data});await h.t.loadSession(session);
+ h.context.MXH_SUPABASE={url:'https://example.supabase.co',key:'sb_publishable_public'};
+ h.t.setupAuth({auth:{getSession:async()=>({data:{session:{access_token:'user.jwt.token'}}})}});
+ h.context.fetch=async(url,opts)=>{assert.equal(opts.headers.Authorization,'Bearer user.jwt.token');assert.equal(JSON.parse(opts.body).igId,'123');return {ok:true,json:async()=>({status:'unknown',reason:'rate_limited'})};};
+ const r=await h.t.checkAccountLive(h.t.get('181'));assert.equal(r.status,'unknown');assert.equal(h.t.igResultPatch(r).status,undefined);
+});
+test('late IG lookup is discarded after signout',async()=>{
+ const h=harness();const data=snapshot();data.resources[0].data.platform='instagram';
+ h.t.setup({membership:async()=>'editor',load:async()=>data});await h.t.loadSession(session);
+ h.context.MXH_SUPABASE={url:'https://example.supabase.co',key:'sb_publishable_public'};
+ h.t.setupAuth({auth:{getSession:async()=>({data:{session:{access_token:'user.jwt.token'}}})}});
+ let release;h.context.fetch=()=>new Promise(r=>release=r);
+ const pending=h.t.checkAccountLive(h.t.get('181'));await Promise.resolve();await h.t.loadSession(null);
+ release({ok:true,json:async()=>({status:'live',igId:'123',username:'example'})});
+ assert.equal((await pending).stale,true);assert.equal(h.t.status().count,0);
+});
+
 test('missing config fails closed instead of exposing local resources',async()=>{
- const h=harness();await h.t.boot();assert.equal(h.t.status().mode,'denied');assert.equal(h.t.status().count,0);assert.equal(h.reads(),2);assert(h.node('#btnAdd').disabled);
+ const h=harness();await h.t.boot();assert.equal(h.t.status().mode,'denied');assert.equal(h.t.status().count,0);assert.equal(h.reads(),3);assert(h.node('#btnAdd').disabled);
 });
 test('signed-out visitor sees login and no resources or signup form',async()=>{
  const h=harness();await h.t.loadSession(null);assert.equal(h.t.status().mode,'login');assert.match(h.node('#view').innerHTML,/loginForm/);assert(!h.node('#view').innerHTML.includes('signUp'));assert(h.node('#btnImport').disabled);
