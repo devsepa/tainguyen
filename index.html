@@ -1,5 +1,5 @@
-﻿<!doctype html><html lang="vi"><head><meta charset="UTF-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Kho tài khoản Facebook</title>
+<!doctype html><html lang="vi"><head><meta charset="UTF-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kho tài khoản MXH (Facebook &amp; Instagram)</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
@@ -51,7 +51,7 @@ h2{font-size:14px;margin:0 0 14px;font-weight:600}
 .banner{border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 9%,transparent);border-radius:10px;padding:9px 13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 .view{display:flex;flex-direction:column;gap:16px;min-width:0}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
-.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
 .stat{display:grid;grid-template-columns:minmax(0,1fr) auto;justify-items:start;text-align:left;background:var(--panel);border-radius:14px;padding:16px 18px;gap:4px;white-space:normal}
 .stat .lbl{color:var(--mute);font-size:13px;align-self:center}
 .stat .tile{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent)}
@@ -146,7 +146,7 @@ main{padding-left:0}
 </style>
 
 <div class="app">
-<nav aria-label="Chính"><div class="brand"><span id="logo"></span><div>Kho tài khoản<small>Quản lý Facebook</small></div></div><div id="menu" style="display:contents"></div><div class="vaultbox"><div id="identity"></div><div id="save" role="status"></div></div></nav>
+<nav aria-label="Chính"><div class="brand"><span id="logo"></span><div>Kho tài khoản<small>Facebook &amp; Instagram</small></div></div><div id="menu" style="display:contents"></div><div class="vaultbox"><div id="identity"></div><div id="save" role="status"></div></div></nav>
 <main>
 <header><div class="title"><h1 id="title"></h1><div id="subtitle"></div></div><button id="btnRefresh" hidden>Tải lại</button><button id="btnAuth" hidden>Đăng xuất</button><button id="btnImport">Nhập file</button><button id="btnExport">Xuất file</button><button id="btnAdd" class="primary">+ Thêm tài khoản</button></header>
 <div id="banner" class="banner" hidden></div>
@@ -169,9 +169,9 @@ const SHARDS=64, LIMIT=250000, DAY=864e5;
 const VIEWS={"tong-quan":"Tổng quan","tai-khoan":"Tài khoản","nhom":"Nhóm","lich-su":"Lịch sử","cai-dat":"Cài đặt"};
 const DEF={staleDays:7,statuses:[
 {id:"live",name:"Live",color:"#2fbf71"},{id:"dead",name:"Die",color:"#ef5350"},{id:"new",name:"Chưa kiểm tra",color:"#8b95a7"}]};
-const FIELDS=[["uid","UID"],["pass","Mật khẩu"],["twofa","2FA"],["email","Gmail"],["mailpass","Pass Gmail"],["born","Ngày tạo"],["checked","Kiểm tra gần nhất"],["status","Live/Die"],["name","Tên"],["group","Nhóm"],["tags","Nhãn"],["phone","Số điện thoại"],["source","Nguồn"],["note","Ghi chú"]];
+const FIELDS=[["platform","Nền tảng"],["uid","UID"],["pass","Mật khẩu"],["twofa","2FA"],["email","Gmail"],["mailpass","Pass Gmail"],["born","Ngày tạo"],["checked","Kiểm tra gần nhất"],["status","Live/Die"],["name","Tên"],["group","Nhóm"],["tags","Nhãn"],["phone","Số điện thoại"],["source","Nguồn"],["note","Ghi chú"]];
 const SECRETS=["pass","twofa","mailpass"];
-const ORDER=["uid","pass","twofa","email","mailpass","born","checked","status"];
+const ORDER=["platform","uid","pass","twofa","email","mailpass","born","checked","status"];
 const LABEL=Object.fromEntries(FIELDS);
 const $=s=>document.querySelector(s);
 const PATHS={grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -186,7 +186,16 @@ check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',x:'<circle cx="
 eye:'<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/>',
 off:'<path d="M4 4l16 16M9.5 5.8A10 10 0 0 1 12 5.500c6.500 0 10 6.500 10 6.500a17 17 0 0 1-3 3.700M6 7.500A17 17 0 0 0 2 12s3.500 6.500 10 6.500a10 10 0 0 0 4-.800"/>',
 copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
-key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.500 6.500l4 4"/>'};
+key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.500 6.500l4 4"/>',
+facebook:'<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
+instagram:'<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>'};
+const PLATFORMS={
+  facebook:{id:"facebook",name:"Facebook",color:"#1877f2",icon:"facebook",url:uid=>/^\d+$/.test(uid)?`https://www.facebook.com/profile.php?id=${encodeURIComponent(uid)}`:`https://www.facebook.com/${encodeURIComponent(uid)}`},
+  instagram:{id:"instagram",name:"Instagram",color:"#e1306c",icon:"instagram",url:uid=>`https://www.instagram.com/${encodeURIComponent(uid)}/`}
+};
+const plat=p=>PLATFORMS[p]||PLATFORMS.facebook;
+const platOf=a=>PLATFORMS[a?.platform]||PLATFORMS.facebook;
+const pillPlat=p=>{const pl=plat(p);return `<span class="pill" style="--c:${pl.color};gap:5px">${icon(pl.icon)}${pl.name}</span>`};
 const icon=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${PATHS[n]}</svg>`;
 const ib=(act,v,ic,label)=>`<button class="ico" data-act="${act}" data-v="${v}" title="${label}" aria-label="${label}">${icon(ic)}</button>`;
 const NAVI={"tong-quan":"grid","tai-khoan":"users","nhom":"folder","lich-su":"clock","cai-dat":"gear"};
@@ -221,8 +230,8 @@ function openLocalStore(){
   mode="ready";
 }
 let shards=Array.from({length:SHARDS},()=>({})), settings=structuredClone(DEF), daily={};
-let sel=new Set(), q="", fStatus="", fGroup="", fTag="", fStale=false, page=1, sort={k:"updated",d:-1};
-let per=store.get("per",25), cols=store.get("cols2",ORDER);
+let sel=new Set(), q="", fStatus="", fGroup="", fTag="", fPlatform="", fStale=false, page=1, sort={k:"updated",d:-1};
+let per=store.get("per",25), cols=store.get("cols2",ORDER); if(!cols.includes("platform"))cols=["platform",...cols];
 const ready=()=>mode==="ready"||mode==="demo";
 
 const hash=s=>{let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return (h>>>0)%SHARDS};
@@ -304,9 +313,10 @@ function revise(old,patch,why,extra){
   const a={...old,...patch,updated:Date.now()},ch=[];
   if(!old.added){a.added=a.updated;ch.push(why||"Thêm tài khoản")}
   else{
+    if((old.platform||"facebook")!==(a.platform||"facebook"))ch.push(`Nền tảng: ${plat(old.platform).name} → ${plat(a.platform).name}`);
     if(old.status!==a.status)ch.push(`Trạng thái: ${st(old.status).name} → ${st(a.status).name}`);
     if((old.group||"")!==(a.group||""))ch.push(`Nhóm: ${old.group||"không có"} → ${a.group||"không có"}`);
-    const other=FIELDS.filter(([k])=>!["uid","status","group",...SECRETS].includes(k)&&String(old[k]??"")!==String(a[k]??"")).map(f=>f[1].toLowerCase());
+    const other=FIELDS.filter(([k])=>!["platform","uid","status","group",...SECRETS].includes(k)&&String(old[k]??"")!==String(a[k]??"")).map(f=>f[1].toLowerCase());
     if(other.length)ch.push("Sửa "+other.join(", "));
     if(extra)ch.push(extra);
     if(!ch.length)return null;
@@ -377,7 +387,7 @@ const emptyHtml=`<div class="panel empty">Chưa có tài khoản nào. Thêm th�
 function overview(v,list){
   if(!list.length){v.innerHTML=emptyHtml;return}
   const n=list.length,cnt=id=>list.filter(a=>a.status===id).length,old=list.filter(stale).length,S=settings.statuses;
-  const pct=x=>Math.round(x/n*100);
+  const pct=x=>Math.round(x/n*100),fbCount=list.filter(a=>(a.platform||"facebook")==="facebook").length,igCount=list.filter(a=>a.platform==="instagram").length;
   const days=[...Array(30)].map((_,i)=>{const d=new Date(today()+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-29+i);return d.toISOString().slice(0,10)});
   const sum=c=>Object.values(c).reduce((x,y)=>x+y,0);
   let max=Math.max(1,...days.filter(d=>daily[d]).map(d=>sum(daily[d])));max=Math.ceil(max/2)*2;
@@ -391,7 +401,7 @@ function overview(v,list){
   const feed=list.flatMap(a=>(a.hist||[]).map(x=>({...x,a}))).sort((a,b)=>b.t-a.t).slice(0,6);
   const gs=groups().map(g=>({g,m:list.filter(a=>a.group===g)})).sort((a,b)=>b.m.length-a.m.length).slice(0,6);
   const who=(a,sub)=>`<span class="who"><span class="dot" style="--c:${esc(st(a.status).color)}" title="${esc(st(a.status).name)}"></span><span><button class="link mono" data-act="open" data-v="${esc(a.uid)}">${esc(a.uid)}</button><small>${esc(sub)}</small></span></span>`;
-  v.innerHTML=`<div class="stats">${card("filter","","Tổng tài khoản",n,groups().length+" nhóm","users","#5b8cff")}${stc("live","check")}${stc("dead","x")}${card("stale","","Cần kiểm tra",old,"Quá "+settings.staleDays+" ngày chưa kiểm tra","clock","#e5b53b")}</div>
+  v.innerHTML=`<div class="stats">${card("filter","","Tổng tài khoản",n,groups().length+" nhóm","users","#5b8cff")}${card("pFilter","facebook","Facebook",fbCount,pct(fbCount)+"% tổng số","facebook","#1877f2")}${card("pFilter","instagram","Instagram",igCount,pct(igCount)+"% tổng số","instagram","#e1306c")}${stc("live","check")}${stc("dead","x")}${card("stale","","Cần kiểm tra",old,"Quá "+settings.staleDays+" ngày chưa kiểm tra","clock","#e5b53b")}</div>
   <div class="grid"><section class="panel wide"><div class="head"><h2>Biến động 30 ngày</h2><span class="muted">Số tài khoản theo trạng thái</span></div>
   <div class="chart"><div class="yaxis"><span>${max}</span><span>${max/2}</span><span>0</span></div><div class="trend">${days.map(d=>{const c=daily[d];if(!c)return `<div class="col" data-tip="${dm(d)}: không có thay đổi"></div>`;return `<div class="col" data-tip="${esc(dm(d)+"\n"+S.map(s=>s.name+": "+(c[s.id]||0)).join("\n"))}">${S.filter(s=>c[s.id]).map(s=>`<i style="--c:${esc(s.color)};height:calc(${c[s.id]/max*100}% - 2px)"></i>`).join("")}</div>`}).join("")}</div><div class="axis"><span>${dm(days[0])}</span><span>${dm(days[14])}</span><span>${dm(days[29])}</span></div></div>
   <div class="legend">${S.map(s=>`<span><span class="dot" style="--c:${esc(s.color)}"></span>${esc(s.name)}</span>`).join("")}<span>Cột trống là ngày không có thay đổi.</span></div></section>
@@ -404,16 +414,16 @@ function overview(v,list){
 
 function filtered(){
   const k=norm(q);
-  return all().filter(a=>(!fStatus||a.status===fStatus)&&(!fGroup||(fGroup==="\0"?!a.group:a.group===fGroup))&&(!fTag||(a.tags||[]).includes(fTag))&&(!fStale||stale(a))&&
-    (!k||norm([a.uid,a.name,a.email,a.phone,a.group,a.source,a.note,(a.tags||[]).join(" ")].join(" ")).includes(k)))
-    .sort((a,b)=>{const val=x=>sort.k==="status"?st(x.status).name:sort.k==="tags"?(x.tags||[]).join(","):x[sort.k]??"";const x=val(a),y=val(b);return sort.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
+  return all().filter(a=>(!fStatus||a.status===fStatus)&&(!fPlatform||(a.platform||"facebook")===fPlatform)&&(!fGroup||(fGroup==="\0"?!a.group:a.group===fGroup))&&(!fTag||(a.tags||[]).includes(fTag))&&(!fStale||stale(a))&&
+    (!k||norm([(a.platform||"facebook"),a.uid,a.name,a.email,a.phone,a.group,a.source,a.note,(a.tags||[]).join(" ")].join(" ")).includes(k)))
+    .sort((a,b)=>{const val=x=>sort.k==="status"?st(x.status).name:sort.k==="platform"?platOf(x).name:sort.k==="tags"?(x.tags||[]).join(","):x[sort.k]??"";const x=val(a),y=val(b);return sort.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
 }
 const opts=(arr,cur,first)=>(first!==undefined?`<option value="">${first}</option>`:"")+arr.map(([v,t])=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(t)}</option>`).join("");
 function accounts(v,list){
   if(!list.length){v.innerHTML=emptyHtml;return}
   if(!$("#q")){
     v.innerHTML=`<div class="tabs" id="tabs" role="group" aria-label="Lọc nhanh"></div><div class="tools filters"><input id="q" class="grow" type="search" placeholder="Tìm UID, Gmail, tên, ghi chú…  ( phím / )" aria-label="Tìm kiếm">
-    <select id="fStatus" hidden aria-label="Lọc trạng thái"></select><select id="fGroup" aria-label="Lọc nhóm"></select><select id="fTag" aria-label="Lọc nhãn"></select>
+    <select id="fPlatform" aria-label="Lọc nền tảng"><option value="">Mọi nền tảng</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="fStatus" hidden aria-label="Lọc trạng thái"></select><select id="fGroup" aria-label="Lọc nhóm"></select><select id="fTag" aria-label="Lọc nhãn"></select>
     <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fStale">Cần kiểm tra</label>
     <details><summary>Cột</summary><div class="menu">${FIELDS.map(([k,t])=>`<label style="display:flex;gap:8px"><input type="checkbox" id="col-${k}" data-col="${k}" ${cols.includes(k)?"checked":""} ${k==="uid"?"disabled":""}>${t}</label>`).join("")}</div></details></div><div id="tbl" class="view"></div>`;
     $("#q").value=q;
@@ -421,7 +431,7 @@ function accounts(v,list){
   $("#fStatus").innerHTML=opts(settings.statuses.map(s=>[s.id,s.name]),fStatus,"Mọi trạng thái");
   $("#fGroup").innerHTML=opts([["\0","(Chưa có nhóm)"],...groups().map(g=>[g,g])],fGroup,"Mọi nhóm");
   $("#fTag").innerHTML=opts(tagsAll().map(g=>[g,g]),fTag,"Mọi nhãn");
-  $("#fStale").checked=fStale;
+  $("#fStale").checked=fStale; if($("#fPlatform"))$("#fPlatform").value=fPlatform;
   tabs();table();
 }
 function tabs(){
@@ -430,7 +440,8 @@ function tabs(){
 }
 function cell(a,k){
   const u=esc(a.uid);
-  if(k==="uid")return `<span class="sec"><button class="link mono" data-act="open" data-v="${u}">${u}</button>${ib("cpUid",u,"copy","Chép UID")}</span>`;
+  if(k==="platform")return pillPlat(a.platform);
+  if(k==="uid"){const pl=platOf(a);return `<span class="sec"><span style="color:${pl.color};display:inline-flex;align-items:center" title="${pl.name}">${icon(pl.icon)}</span> <button class="link mono" data-act="open" data-v="${u}">${u}</button>${ib("cpUid",u,"copy","Chép UID")}</span>`}
   if(SECRETS.includes(k)){
     if(!Object.keys(secretsOf(a)).length)return '<span class="muted">—</span>';
     const s=secretsOf(a);if(s.bad)return '<span class="err">Lỗi giải mã</span>';if(!s[k])return '<span class="muted">—</span>';
@@ -449,7 +460,7 @@ function table(){
   const shown=rows.slice((page-1)*per,page*per),show=FIELDS.map(f=>f[0]).filter(k=>cols.includes(k)||k==="uid");
   el.innerHTML=`${sel.size?`<div class="tools bulk"><b>Đã chọn ${sel.size}</b>
   ${sel.size<rows.length?`<button class="link" data-act="selAll">Chọn cả ${rows.length}</button>`:""}
-  <select id="bStatus" aria-label="Đổi trạng thái">${opts(settings.statuses.map(s=>[s.id,s.name]),"","Đổi trạng thái…")}</select>
+  <select id="bPlatform" aria-label="Đổi nền tảng"><option value="">Đổi nền tảng…</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="bStatus" aria-label="Đổi trạng thái">${opts(settings.statuses.map(s=>[s.id,s.name]),"","Đổi trạng thái…")}</select>
   <button data-act="bGroup">Gán nhóm</button><button data-act="bTag">Thêm nhãn</button><button data-act="bCheck">Đánh dấu đã kiểm tra</button><button data-act="bCopy">Sao chép UID</button><button data-act="bExport">Xuất</button><button class="danger" data-act="bDel">Xoá</button><button class="link" data-act="selNone">Bỏ chọn</button></div>`:""}
   <div class="tablewrap"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length&&shown.every(a=>sel.has(a.uid))?"checked":""}></th>${show.map(k=>`<th aria-sort="${sort.k===k?(sort.d>0?"ascending":"descending"):"none"}">${SECRETS.includes(k)?LABEL[k]:`<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k===k?(sort.d>0?" ↑":" ↓"):""}</button>`}</th>`).join("")}<th>Thao tác</th></tr></thead>
   <tbody>${shown.map(a=>`<tr data-uid="${esc(a.uid)}"><td><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid)?"checked":""}></td>${show.map(k=>`<td>${cell(a,k)}</td>`).join("")}<td><button class="mini" data-act="open" data-v="${esc(a.uid)}">${icon("edit")}Sửa</button></td></tr>`).join("")||`<tr><td colspan="${show.length+2}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
@@ -493,18 +504,19 @@ function openAccount(uid){
   if(cloudBusy)return toast("Hãy chờ thao tác lưu hoàn tất","error");
   if(!uid&&!canWrite())return toast("Bạn không có quyền thêm tài khoản","error");
   const old=uid?get(uid):null;if(uid&&!old)return;
-  const a=old||{status:"new"},d=$("#drawer"),before=old?{...secretsOf(old)}:{},baseSec=JSON.stringify(old?.sec||"");
+  const a=old||{status:"new",platform:"facebook"},d=$("#drawer"),before=old?{...secretsOf(old)}:{},baseSec=JSON.stringify(old?.sec||"");
   const val=k=>SECRETS.includes(k)?before[k]:k==="tags"?(a.tags||[]).join(", "):a[k];
   const inp=(k,extra="",cls="")=>`<label class="${cls}">${LABEL[k]}<input id="e-${k}" value="${esc(val(k))}" maxlength="120" autocomplete="off" spellcheck="false" ${extra}></label>`;
   const sec=k=>inp(k,'type="password" class="mono secretIn"');
   d.innerHTML=`<form><h2>${old?"Chỉnh sửa "+esc(a.uid):"Thêm tài khoản"}</h2><div class="form">
+  <label class="full">Nền tảng<select id="e-platform"><option value="facebook" ${(a.platform||"facebook")==="facebook"?"selected":""}>Facebook</option><option value="instagram" ${a.platform==="instagram"?"selected":""}>Instagram</option></select></label>
   ${inp("uid",old?"readonly":"required","full")}${sec("pass")}${sec("twofa")}${inp("email")}${sec("mailpass")}
   <label class="full" style="display:flex;gap:8px"><input type="checkbox" id="eShow">Hiện mật khẩu</label>
   ${inp("born",'type="date"')}${inp("checked",'type="date"')}<label class="full">Live/Die<select id="e-status">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select></label>
   ${inp("name")}${inp("group",'list="gl"')}${inp("tags",'placeholder="cách nhau bằng dấu phẩy"')}${inp("phone")}${inp("source","","full")}
   <label class="full">Ghi chú (không mã hoá)<textarea id="e-note" rows="3" maxlength="500">${esc(a.note)}</textarea></label></div><datalist id="gl">${groups().map(g=>`<option value="${esc(g)}">`).join("")}</datalist>
   <p class="err" id="eErr" hidden></p><div class="actions">${old?`<button type="button" class="danger left" data-act="del" data-v="${esc(uid)}">Xoá</button>`:""}<button type="button" data-act="closeDrawer">Đóng</button><button class="primary" id="eSave">Lưu</button></div></form>
-  ${old?`<h2 style="margin-top:22px">Lịch sử</h2>${(a.hist||[]).map(h=>`<div class="row"><span class="muted mono">${fmtTime(h.t)}</span><span>${esc(h.m)}</span></div>`).join("")}<p><a href="https://www.facebook.com/profile.php?id=${encodeURIComponent(uid)}" target="_blank" rel="noopener" style="color:var(--accent)">Mở trang Facebook</a></p>`:""}`;
+  ${old?`<h2 style="margin-top:22px">Lịch sử</h2>${(a.hist||[]).map(h=>`<div class="row"><span class="muted mono">${fmtTime(h.t)}</span><span>${esc(h.m)}</span></div>`).join("")}<p><a href="${platOf(a).url(uid)}" target="_blank" rel="noopener" style="color:var(--accent);display:inline-flex;align-items:center;gap:6px">${icon(platOf(a).icon)} Mở trang ${platOf(a).name}</a></p>`:""}`;
   $("#eShow").onchange=e=>d.querySelectorAll(".secretIn").forEach(i=>i.type=e.target.checked?"text":"password");
   const form=d.querySelector("form");let saving=false;
   form.onsubmit=async e=>{
@@ -540,7 +552,7 @@ function parseText(text){
     else if(c==="\n"){row.push(f);rows.push(row);row=[];f=""}else if(c!=="\r")f+=c}
   row.push(f);rows.push(row);return rows.filter(r=>r.some(x=>x.trim()));
 }
-const ALIAS={uid:["uid","id","fb id","facebook id"],pass:["pass","password","mat khau","mk","pass fb"],twofa:["2fa","ma 2fa","key 2fa"],email:["gmail","email","mail"],mailpass:["pass gmail","pass mail","passmail","pass email","mat khau gmail","mat khau mail"],born:["ngay tao","ngay tao fb"],checked:["kiem tra gan nhat","lan kiem tra gan nhat","kiem tra lan cuoi","ngay kiem tra"],status:["live/die","trang thai","status"],name:["ten","name","ho ten"],group:["nhom","group"],tags:["nhan","tags","tag"],phone:["so dien thoai","sdt","phone"],source:["nguon","source"],note:["ghi chu","note"]};
+const ALIAS={platform:["nen tang","platform","mxh","mang xa hoi","loai","type","app","kenh"],uid:["uid","id","fb id","facebook id","ig id","instagram id","user","username","tai khoan"],pass:["pass","password","mat khau","mk","pass fb","pass ig"],twofa:["2fa","ma 2fa","key 2fa"],email:["gmail","email","mail"],mailpass:["pass gmail","pass mail","passmail","pass email","mat khau gmail","mat khau mail"],born:["ngay tao","ngay tao fb","ngay tao ig"],checked:["kiem tra gan nhat","lan kiem tra gan nhat","kiem tra lan cuoi","ngay kiem tra"],status:["live/die","trang thai","status"],name:["ten","name","ho ten"],group:["nhom","group"],tags:["nhan","tags","tag"],phone:["so dien thoai","sdt","phone"],source:["nguon","source"],note:["ghi chu","note"]};
 const BLOCK=/(cookie|token)/;
 const guess=h=>Object.keys(ALIAS).find(k=>ALIAS[k].includes(norm(h)))||"";
 const toDate=s=>{s=String(s).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/),y,mo,d;if(m)[,y,mo,d]=m;else if(m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/))[,d,mo,y]=m;else return "";const r=`${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`;return isNaN(Date.parse(r))?"":r};
@@ -558,6 +570,8 @@ function importDialog(){
     for(const r of rows.slice(header?1:0)){
       const v={};map.forEach((k,i)=>{if(!k)return;let x=String(r[i]??"").trim().replace(/^'(?=[=+\-@])/,"");if(x)v[k]=x.slice(0,k==="note"?500:120)});
       if(!/^[A-Za-z0-9._-]{1,60}$/.test(v.uid||"")||v.uid.startsWith("__")){bad++;continue}
+      if(v.platform){const pNorm=norm(v.platform);v.platform=pNorm.includes("ig")||pNorm.includes("insta")?"instagram":"facebook"}
+      else{v.platform=$("#defPlat")?.value||"facebook"}
       if(v.status){const s=settings.statuses.find(s=>norm(s.name)===norm(v.status)||s.id===norm(v.status))||({live:{id:"live"},die:{id:"dead"}})[norm(v.status)];if(s)v.status=s.id;else{delete v.status;unknown++}}
       if(v.tags)v.tags=splitTags(v.tags);
       for(const k of ["born","checked"])if(v[k]){v[k]=toDate(v[k]);if(!v[k])delete v[k]}
@@ -585,7 +599,7 @@ function importDialog(){
     if(!rows||!rows.length){rows=null;$("#map").innerHTML="";return}
     const looks=rows[0].some(x=>guess(x)),hh=$("#hasHead")?$("#hasHead").checked:looks;
     const width=Math.min(30,Math.max(...rows.slice(0,50).map(r=>r.length)));
-    $("#map").innerHTML=`<label style="display:flex;gap:8px;margin-top:12px"><input type="checkbox" id="hasHead" ${hh?"checked":""}>Dòng đầu là tên cột</label><p class="muted">${rows.length-(hh?1:0)} dòng. Chọn trường cho từng cột:</p><div class="tablewrap"><table><thead><tr>${[...Array(width)].map((_,i)=>{const h=hh?String(rows[0][i]??""):"",secret=BLOCK.test(norm(h));const g=hh?guess(h):ORDER[i]||"";return `<th>${esc(h||"Cột "+(i+1))}<br><select data-map="${i}" id="map-${i}" aria-label="Trường cho cột ${i+1}" ${secret?"disabled":""}>${opts(FIELDS,secret?"":g,secret?"Bị chặn":"Bỏ qua")}</select></th>`}).join("")}</tr></thead><tbody>${rows.slice(hh?1:0,(hh?1:0)+3).map(r=>`<tr>${[...Array(width)].map((_,i)=>{const f=hh?guess(rows[0][i])||(BLOCK.test(norm(rows[0][i]))?"pass":""):ORDER[i];return `<td>${SECRETS.includes(f)?"•••":esc(r[i])}</td>`}).join("")}</tr>`).join("")}</tbody></table></div><label style="margin-top:12px">Khi UID đã tồn tại<select id="dup"><option value="skip">Bỏ qua</option><option value="update">Cập nhật các ô có dữ liệu</option></select></label>`;
+    $("#map").innerHTML=`<label style="display:flex;gap:8px;margin-top:12px"><input type="checkbox" id="hasHead" ${hh?"checked":""}>Dòng đầu là tên cột</label><p class="muted">${rows.length-(hh?1:0)} dòng. Chọn trường cho từng cột:</p><div class="tablewrap"><table><thead><tr>${[...Array(width)].map((_,i)=>{const h=hh?String(rows[0][i]??""):"",secret=BLOCK.test(norm(h));const g=hh?guess(h):ORDER[i]||"";return `<th>${esc(h||"Cột "+(i+1))}<br><select data-map="${i}" id="map-${i}" aria-label="Trường cho cột ${i+1}" ${secret?"disabled":""}>${opts(FIELDS,secret?"":g,secret?"Bị chặn":"Bỏ qua")}</select></th>`}).join("")}</tr></thead><tbody>${rows.slice(hh?1:0,(hh?1:0)+3).map(r=>`<tr>${[...Array(width)].map((_,i)=>{const f=hh?guess(rows[0][i])||(BLOCK.test(norm(rows[0][i]))?"pass":""):ORDER[i];return `<td>${SECRETS.includes(f)?"•••":esc(r[i])}</td>`}).join("")}</tr>`).join("")}</tbody></table></div><label style="margin-top:12px">Nền tảng mặc định (nếu không có cột Nền tảng)<select id="defPlat"><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label><label style="margin-top:10px">Khi UID đã tồn tại<select id="dup"><option value="skip">Bỏ qua</option><option value="update">Cập nhật các ô có dữ liệu</option></select></label>`;
     $("#hasHead").onchange=preview;
   };
   $("#paste").oninput=e=>{rows=parseText(e.target.value);preview()};
@@ -609,7 +623,7 @@ async function save(filename,data){
   try{await downloads.save({filename,data})}catch(e){if(e.code!=="declined")toast("Chưa tải được file. Hãy thử lại sau.")}
 }
 const safe=v=>/^[=+\-@\t\r]/.test(v)?"'"+v:v;
-const matrix=(list,keys,secrets)=>[keys.map(k=>LABEL[k]),...list.map(a=>keys.map(k=>k==="status"?st(a.status).name:k==="tags"?(a.tags||[]).join(", "):SECRETS.includes(k)?secrets.get(a.uid)?.[k]||"":String(a[k]??"")))];
+const matrix=(list,keys,secrets)=>[keys.map(k=>LABEL[k]),...list.map(a=>keys.map(k=>k==="platform"?platOf(a).name:k==="status"?st(a.status).name:k==="tags"?(a.tags||[]).join(", "):SECRETS.includes(k)?secrets.get(a.uid)?.[k]||"":String(a[k]??"")))];
 const csv=m=>"\ufeff"+m.map(r=>r.map(c=>`"${safe(c).replace(/"/g,'""')}"`).join(",")).join("\r\n");
 function exportDialog(onlySel){
   const picked=onlySel?[...sel]:(route()==="tai-khoan"?filtered():all()).map(a=>a.uid);
@@ -618,7 +632,7 @@ function exportDialog(onlySel){
     const go=async()=>{
       const list=picked.map(get).filter(Boolean),secrets=new Map();
       if(withS)for(const a of list)secrets.set(a.uid,secretsOf(a));
-      const keys=FIELDS.map(x=>x[0]).filter(k=>withS||!SECRETS.includes(k)),name=`tai-khoan-fb-${today()}.${f}`;
+      const keys=FIELDS.map(x=>x[0]).filter(k=>withS||!SECRETS.includes(k)),name=`tai-khoan-${fPlatform||"mxh"}-${today()}.${f}`;
       if(f==="txt"){const cut=ORDER.filter(k=>keys.includes(k)),m=matrix(list,cut,secrets);if(m.some(r=>r.some(c=>c.includes("|")))){toast("Có dữ liệu chứa dấu |. Hãy xuất CSV hoặc Excel.");return}save(name,m.map(r=>r.map(c=>c.replace(/[|\r\n]/g," ")).join("|")).join("\r\n"))}
       else if(f==="csv")save(name,csv(matrix(list,keys,secrets)));
       else{if(!window.XLSX){toast("Chưa tải được thư viện Excel. Hãy chọn CSV.");return}const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(matrix(list,keys,secrets)),"Tài khoản");save(name,XLSX.write(wb,{type:"array",bookType:"xlsx"}))}
@@ -628,7 +642,7 @@ function exportDialog(onlySel){
 }
 ;
 const go=h=>{if(location.hash==="#"+h)render();else location.hash=h};
-const resetF=()=>{q=fStatus=fGroup=fTag="";fStale=false;page=1};
+const resetF=()=>{q=fStatus=fGroup=fTag=fPlatform="";fStale=false;page=1};
 const bulk=async(fn,msg)=>{const put=[...sel].map(get).filter(Boolean).map(a=>revise(a,fn(a))).filter(Boolean);if(await commit(put))toast(msg)};
 const acts={
  add:()=>openAccount(),import:importDialog,export:()=>exportDialog(),open:openAccount,
@@ -638,7 +652,7 @@ const acts={
  cpUid:u=>copy(u,"Đã sao chép UID"),cpMail:u=>copy(get(u)?.email,"Đã sao chép Gmail"),
  code:async u=>{const c=await totp(secretsOf(get(u)).twofa||"");if(!c)return toast("Khoá 2FA không hợp lệ","error");return copy(c,"Đã sao chép mã 2FA (có hiệu lực 30 giây mỗi chu kỳ)")},
  del:u=>ask("Xoá tài khoản","Xoá tài khoản này?",async()=>{if(!await commit([],[u]))return false;$("#drawer").close();toast("Đã xoá tài khoản")}),
- filter:v=>{resetF();fStatus=v;go("tai-khoan")},stale:()=>{resetF();fStale=true;go("tai-khoan")},
+ filter:v=>{resetF();fStatus=v;go("tai-khoan")},pFilter:v=>{resetF();fPlatform=v;go("tai-khoan")},stale:()=>{resetF();fStale=true;go("tai-khoan")},
  gOpen:v=>{resetF();fGroup=v;go("tai-khoan")},
  reset:()=>{resetF();render()},tab:v=>{fStatus=v;page=1;tabs();table()},
  sort:k=>{sort={k,d:sort.k===k?-sort.d:1};table()},prev:()=>{page--;table()},next:()=>{page++;table()},
@@ -667,11 +681,13 @@ $("#btnAdd").onclick=()=>openAccount();$("#btnImport").onclick=importDialog;$("#
 document.addEventListener("input",e=>{if(e.target.id==="q"){q=e.target.value;page=1;table()}});
 document.addEventListener("change",async e=>{
   const t=e.target;
-  if(t.id==="fStatus"){fStatus=t.value;page=1;tabs();table()}
+  if(t.id==="fPlatform"){fPlatform=t.value;page=1;table()}
+  else if(t.id==="fStatus"){fStatus=t.value;page=1;tabs();table()}
   else if(t.id==="fGroup"){fGroup=t.value;page=1;table()}
   else if(t.id==="fTag"){fTag=t.value;page=1;table()}
   else if(t.id==="fStale"){fStale=t.checked;page=1;table()}
   else if(t.id==="per"){per=+t.value;store.set("per",per);page=1;table()}
+  else if(t.id==="bPlatform"&&t.value)bulk(()=>({platform:t.value}),"Đã đổi nền tảng");
   else if(t.id==="bStatus"&&t.value)bulk(()=>({status:t.value,checked:today()}),"Đã đổi trạng thái");
   else if(t.dataset.state!==undefined){const a=get(t.dataset.state),r=a&&revise(a,{status:t.value,checked:today()});if(r&&await commit([r]))toast("Đã cập nhật, ngày kiểm tra là hôm nay")}
   else if(t.id==="pageAll"){$("#tbl").querySelectorAll("[data-sel]").forEach(c=>t.checked?sel.add(c.dataset.sel):sel.delete(c.dataset.sel));table()}
