@@ -534,9 +534,9 @@ function gmailView(v,list){
     <thead><tr>
       <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length&&shownRows.every(a=>selGmail.has(a.uid))?"checked":""}></th>
       <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Gmail &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
-      <th style="min-width:200px">Mật khẩu</th>
-      <th>Ghi chú</th>
-      <th style="width:230px">Sao chép &amp; Thao tác</th>
+      <th style="min-width:180px">Mật khẩu</th>
+      <th style="min-width:240px">Ghi chú (Nhấp để sửa)</th>
+      <th style="min-width:220px">Sao chép &amp; Thao tác</th>
     </tr></thead>
     <tbody>
       ${shownRows.map(a=>{
@@ -546,7 +546,7 @@ function gmailView(v,list){
         const timeLabel=isTimeNote?a.note:fmtTime(a.updated||a.added);
         const displayNote=isTimeNote?"":a.note;
         const hasKey=isUrlPass||/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(pass.trim())||isEdu||/temp/i.test(a.note||"");
-        return `<tr data-guid="${u}" title="Nhấp vào dòng để chỉnh sửa">
+        return `<tr data-guid="${u}">
           <td><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid)?"checked":""}></td>
           <td>
             <div style="display:flex;flex-direction:column;gap:2px">
@@ -555,11 +555,12 @@ function gmailView(v,list){
             </div>
           </td>
           <td>${pass?`<span class="sec"><span class="mono">${on?esc(pass):"••••••••"}</span>${ib("show",esc(passId),on?"off":"eye",on?"Ẩn ":"Hiện ")}${ib("cpText",esc(pass),"copy","Chép mật khẩu")}${isUrlPass?`<a href="${esc(pass.trim())}" target="_blank" rel="noopener noreferrer" class="link" style="margin-left:4px;display:inline-flex;align-items:center;color:var(--accent)" title="Mở link hòm thư ảo" onclick="event.stopPropagation()">${icon("ext")}</a>`:""}</span>`:'<span class="muted">—</span>'}</td>
-          <td><span class="muted" style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:320px">${esc(displayNote)||"—"}</span></td>
           <td>
+            <input type="text" data-note-guid="${u}" value="${esc(displayNote)}" placeholder="— Nhấp để thêm ghi chú..." title="Nhấp vào để sửa ghi chú, nhấn Enter hoặc bấm ra ngoài để lưu" style="background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;width:100%;max-width:280px;color:var(--fg);font-size:12.5px;transition:all .15s" onfocus="this.style.background='var(--raise)';this.style.borderColor='var(--accent)';this.style.borderStyle='solid'" onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.borderStyle='dashed'">
+          </td>
+          <td style="white-space:nowrap">
             <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
-            ${hasKey?`<button class="mini" data-act="inboxTempMail" data-v="${u}" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600" title="Mở hộp thư &amp; đọc mã OTP">${icon("mail")} Hộp thư &amp; OTP</button>`:""}
-            ${isEdu?`<a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px;color:var(--ink)" title="Mở TempMail Edu" onclick="event.stopPropagation()">${icon("ext")} Edu</a>`:""}
+            <button class="mini" data-act="inboxTempMail" data-v="${u}" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600" title="Mở hộp thư &amp; đọc mã OTP">${icon("mail")} Hộp thư &amp; OTP</button>
             <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Gmail">${icon("x")}</button>
           </td>
         </tr>`;
@@ -759,7 +760,17 @@ async function openTempMailInbox(uid){
   if(!a)return toast("Không tìm thấy thông tin tài khoản","error");
   const email=a.email,emailUuid=extractEmailUuid(a);
   if(!emailUuid){
-    return toast("Tài khoản này không có Access Key hòm thư ảo","error");
+    return prompt_("Nhập Access Key / Link hòm thư","Dán mã Key hoặc Link hòm thư của "+email,[],async val=>{
+      if(!val)return;
+      const m=val.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+      if(!m)return toast("Mã key không hợp lệ","error");
+      const url=val.startsWith("http")?val:`https://tempamail.com/access?key=${m[0]}`;
+      const r=revise(a,{sec:{pass:url},pass:url},"Cập nhật Access Key");
+      if(r&&await commit([r])){
+        toast("Đã lưu Access Key");
+        openTempMailInbox(uid);
+      }
+    });
   }
 
   const d=$("#dlg");
@@ -1247,8 +1258,6 @@ document.addEventListener("click",async e=>{
   if(b){e.preventDefault();if(b.disabled)return;try{const action=acts[b.dataset.act];if(!action)throw new Error("Missing action");await action(b.dataset.v)}catch{toast("Thao tác thất bại. Vui lòng thử lại.","error")}return}
   const tr=e.target.closest("tr[data-uid]");
   if(tr&&!e.target.closest("input,button,select,a,td:first-child,.sec"))openAccount(tr.dataset.uid);
-  const gtr=e.target.closest("tr[data-guid]");
-  if(gtr&&!e.target.closest("input,button,select,a,td:first-child,.sec"))openGmail(gtr.dataset.guid);
 });
 for(const d of [$("#dlg"),$("#drawer")])d.addEventListener("close",()=>{if(!d.open)d.innerHTML=""});
 $("#btnAdd").onclick=()=>{if(route()==="gmail")openGmail();else openAccount()};
@@ -1260,7 +1269,14 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",async e=>{
   const t=e.target;
-  if(t.id==="pageAllGmail"){$("#view").querySelectorAll("[data-gsel]").forEach(c=>t.checked?selGmail.add(c.dataset.gsel):selGmail.delete(c.dataset.gsel));render()}
+  if(t.dataset.noteGuid!==undefined){
+    const a=get(t.dataset.noteGuid);
+    if(a&&String(a.note||"").trim()!==t.value.trim()){
+      const r=revise(a,{note:t.value.trim()},"Cập nhật ghi chú");
+      if(r&&await commit([r]))toast("Đã lưu ghi chú");
+    }
+  }
+  else if(t.id==="pageAllGmail"){$("#view").querySelectorAll("[data-gsel]").forEach(c=>t.checked?selGmail.add(c.dataset.gsel):selGmail.delete(c.dataset.gsel));render()}
   else if(t.dataset.gsel!==undefined){t.checked?selGmail.add(t.dataset.gsel):selGmail.delete(t.dataset.gsel);render()}
   else if(t.id==="perGmail"){perGmail=+t.value;pageGmail=1;render()}
   else if(t.id==="fPlatform"){fPlatform=t.value;page=1;table()}
@@ -1277,7 +1293,10 @@ document.addEventListener("change",async e=>{
   else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365)await persistSettings({...settings,staleDays:n})}
 });
 document.addEventListener("keydown",e=>{
-  if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
+  if(e.key==="Enter"&&e.target.dataset.noteGuid!==undefined){
+    e.target.blur();
+  }
+  else if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
     if(route()==="gmail"&&$("#qGmail")){e.preventDefault();$("#qGmail").focus()}
     else if($("#q")){e.preventDefault();$("#q").focus()}
   }
