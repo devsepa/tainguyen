@@ -1,0 +1,36 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync(require('node:path').join(__dirname,'index.html'),'utf8');
+let js=[...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
+new vm.Script(js);
+js=js.replace('boot();','globalThis.test={acts,copy,shown,cell,shards,hash,openLocalStore,queue,get,saveState};');
+const nodes=new Map();const node=()=>({style:{},dataset:{},setAttribute(){},addEventListener(){},querySelector(){return null},querySelectorAll(){return []},focus(){},select(){},remove(){},append(){}});
+const context={document:{querySelector:s=>{if(s==='dialog[open]')return null;if(!nodes.has(s))nodes.set(s,node());return nodes.get(s)},addEventListener(){},createElement:node,body:node()},localStorage:{getItem(){return null}},navigator:{clipboard:{async writeText(t){context.copied=t}}},addEventListener(){},structuredClone,TextEncoder,TextDecoder,URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},crypto:require('crypto').webcrypto,location:{hash:''}};
+vm.createContext(context);vm.runInContext(js,context);
+(async()=>{
+ const {acts,shards,hash,shown}=context.test;
+ const a={uid:'181',email:'mail@example.com',sec:{pass:'test-pass',twofa:'JBSWY3DPEHPK3PXP',mailpass:'test-mail'}};shards[hash(a.uid)][a.uid]=a;
+ // No table on this test page: eye still changes state and produces feedback.
+ nodes.set('#tbl',null);
+ await acts.cp('181|pass');assert.equal(context.copied,'test-pass');assert.match(nodes.get('#toast').textContent,/Mật khẩu/);
+ await acts.cpUid('181');assert.equal(context.copied,'181');
+ await acts.cpMail('181');assert.equal(context.copied,a.email);
+ acts.show('181|pass');assert(shown.has('181|pass'));assert(context.test.cell(a,'pass').includes('test-pass'));
+ acts.show('181|pass');assert(!shown.has('181|pass'));assert(!context.test.cell(a,'pass').includes('test-pass'));
+ await acts.code('181');assert.match(context.copied,/^\d{6}$/);
+ a.sec.twofa='bad';await acts.code('181');assert.equal(nodes.get('#toast').dataset.type,'error');
+ await acts.cp('missing|pass');assert.equal(nodes.get('#toast').dataset.type,'error');
+ context.navigator.clipboard.writeText=async()=>{throw Error('denied')};context.document.execCommand=()=>true;
+ assert.equal(await context.test.copy('fallback'),true);
+ context.document.execCommand=()=>false;assert.equal(await context.test.copy('denied'),false);assert.equal(nodes.get('#toast').dataset.type,'error');
+ const storage=new Map();context.localStorage.getItem=k=>storage.get(k)||null;context.localStorage.setItem=(k,v)=>storage.set(k,v);
+ context.test.openLocalStore();
+ context.test.queue('shards/s'+hash(a.uid),()=>({a:{[a.uid]:a}}));
+ await new Promise(r=>setImmediate(r));
+ assert(storage.get('mxh.resources.v1').includes('test-pass'));
+ context.test.openLocalStore();assert.equal(context.test.get(a.uid).email,a.email);
+ context.test.saveState();assert.match(nodes.get('#save').textContent,/trình duyệt/);
+ context.localStorage.setItem=()=>{throw Error('storage denied')};
+ context.test.queue('meta/settings',()=>({staleDays:9}));await new Promise(r=>setImmediate(r));
+ assert.match(nodes.get('#save').innerHTML,/Lỗi lưu/);assert.equal(nodes.get('#toast').dataset.type,'error');
+ console.log('PASS: interactions; local save and reload; persisted credentials; failed writes report an error');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,5 @@
+.local/
+supabase/grant-admin.sql
+supabase/verify.sql
+*-payload.json
+node_modules/

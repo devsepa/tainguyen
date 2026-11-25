@@ -38,6 +38,9 @@ nav a .num{margin-left:auto;font-size:11.5px;background:var(--raise);border-radi
 .vaultbox{margin-top:auto;border:1px solid var(--line);border-radius:11px;padding:12px;display:grid;gap:3px;background:var(--panel)}
 #vstate{font-weight:600;font-size:13px;display:flex;align-items:center}
 #save{font-size:12px;color:var(--mute)}
+#identity{font-size:11px;color:var(--mute);overflow-wrap:anywhere;margin-bottom:6px}
+.login-panel{width:min(440px,100%);margin:48px auto;padding:28px}
+.login-panel label{margin-top:14px}.login-panel button{margin-top:20px;width:100%}
 main{padding:0 0 90px 24px;min-width:0;display:flex;flex-direction:column;gap:16px}
 header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:18px 0 16px;border-bottom:1px solid var(--line)}
 .title{margin-right:auto;min-width:0}
@@ -143,9 +146,9 @@ main{padding-left:0}
 </style>
 
 <div class="app">
-<nav aria-label="Chính"><div class="brand"><span id="logo"></span><div>Kho tài khoản<small>Quản lý Facebook</small></div></div><div id="menu" style="display:contents"></div><div class="vaultbox"><div id="save" role="status"></div></div></nav>
+<nav aria-label="Chính"><div class="brand"><span id="logo"></span><div>Kho tài khoản<small>Quản lý Facebook</small></div></div><div id="menu" style="display:contents"></div><div class="vaultbox"><div id="identity"></div><div id="save" role="status"></div></div></nav>
 <main>
-<header><div class="title"><h1 id="title"></h1><div id="subtitle"></div></div><button id="btnImport">Nhập file</button><button id="btnExport">Xuất file</button><button id="btnAdd" class="primary">+ Thêm tài khoản</button></header>
+<header><div class="title"><h1 id="title"></h1><div id="subtitle"></div></div><button id="btnRefresh" hidden>Tải lại</button><button id="btnAuth" hidden>Đăng xuất</button><button id="btnImport">Nhập file</button><button id="btnExport">Xuất file</button><button id="btnAdd" class="primary">+ Thêm tài khoản</button></header>
 <div id="banner" class="banner" hidden></div>
 <div id="view" class="view"></div>
 </main>
@@ -153,9 +156,12 @@ main{padding-left:0}
 <div id="tip" hidden></div>
 <dialog id="dlg"></dialog>
 <dialog id="drawer" class="drawer"></dialog>
-<div id="toast" hidden role="status"></div>
+<div id="toast" popover="manual" hidden role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
+<script src="./supabase-store.js"></script>
 <script>
 (()=>{
 "use strict";
@@ -193,6 +199,9 @@ const fmtTime=t=>new Date(t).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-di
 const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 
 let db=null,downloads=null,mode="loading",localMode=false;
+let authClient=null,cloudApi=null,cloudWorkspace=null,currentUser=null,memberRole=null;
+let cloudBusy=false,cloudError="",authGeneration=0;
+const canWrite=()=>ready()&&!cloudBusy&&(localMode||["editor","admin"].includes(memberRole));
 const LOCAL_DATA_KEY="mxh.resources.v1";
 function openLocalStore(){
   const raw=localStorage.getItem(LOCAL_DATA_KEY);
@@ -249,10 +258,11 @@ async function run(path,j){
 }
 function saveState(){
   const el=$("#save"),v=[...jobs.values()];
+  if(!localMode){el.textContent=cloudBusy?"Đang lưu lên Supabase…":cloudError?"Chưa lưu được · "+cloudError:mode==="login"?"Cần đăng nhập":mode==="denied"?"Chưa được cấp quyền":mode==="loading"?"Đang kết nối Supabase…":"Đã lưu trên Supabase";return}
   if(v.some(j=>j.failed)){el.innerHTML='<span class="err">Lỗi lưu.</span> <button class="link" data-act="retry">Thử lại</button>';return}
   el.textContent=mode==="loading"?"Đang tải dữ liệu…":mode==="denied"?"Không thể mở kho dữ liệu":v.some(j=>j.busy||j.dirty)?"Đang lưu…":localMode?"Đã lưu trên trình duyệt này":"Đã lưu online";
 }
-addEventListener("beforeunload",e=>{if([...jobs.values()].some(j=>j.busy||j.dirty)){e.preventDefault();e.returnValue=""}});
+addEventListener("beforeunload",e=>{if(cloudBusy||[...jobs.values()].some(j=>j.busy||j.dirty)){e.preventDefault();e.returnValue=""}});
 const pending=p=>{const j=jobs.get(p);return j&&(j.busy||j.dirty)};
 const saveShard=i=>queue("shards/s"+i,()=>({a:shards[i]}));
 const saveSettings=()=>queue("meta/settings",()=>settings);
@@ -264,7 +274,22 @@ function snapshotDay(){
 }
 
 /* put: danh sách bản ghi mới/sửa; del: danh sách uid */
-function commit(put=[],del=[]){
+async function commit(put=[],del=[]){
+  if(!canWrite()){toast("Bạn không có quyền chỉnh sửa hoặc hệ thống đang lưu","error");return false}
+  if(cloudWorkspace){
+    const generation=authGeneration,workspace=cloudWorkspace;
+    cloudBusy=true;cloudError="";saveState();
+    try{
+      const state=await workspace.commit(put,del,today());
+      if(generation!==authGeneration)return false;
+      applyCloudState(state);return true;
+    }catch(error){
+      if(generation!==authGeneration)return false;
+      applyCloudState(workspace.state());
+      cloudError=error.code==="40001"?"Dữ liệu đã đổi. Bấm Tải lại để cập nhật.":error.status===401||error.code==="42501"?"Phiên đăng nhập hoặc quyền truy cập đã thay đổi.":"Kiểm tra kết nối rồi thử lại.";
+      toast((error.committed?`Đã lưu một phần (${error.committed} mục). `:"")+cloudError,"error");return false;
+    }finally{if(generation===authGeneration){cloudBusy=false;render()}}
+  }
   const next=new Map(),edit=i=>{if(!next.has(i))next.set(i,{...shards[i]});return next.get(i)};
   for(const u of del)delete edit(hash(u))[u];
   for(const a of put)edit(hash(a.uid))[a.uid]=a;
@@ -330,16 +355,21 @@ function render(){
   $("#subtitle").textContent=SUB[r]+" · "+new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"});
   $("#logo").innerHTML=icon("users");$("#tip").hidden=true;
   $("#menu").innerHTML=Object.entries(VIEWS).map(([k,v])=>`<a href="#${k}" ${k===r?'aria-current="page"':''}>${icon(NAVI[k])}${v}${k==="tai-khoan"&&ready()?`<span class="num">${list.length}</span>`:""}</a>`).join("");
-  for(const id of ["#btnAdd","#btnImport"])$(id).disabled=!ready();
+  for(const id of ["#btnAdd","#btnImport"])$(id).disabled=!canWrite();
+  $("#btnRefresh").hidden=!currentUser;$("#btnRefresh").disabled=cloudBusy;
+  $("#btnAuth").hidden=!currentUser;$("#btnAuth").disabled=cloudBusy;
+  $("#identity").textContent=currentUser?currentUser.email+(memberRole?" · "+({admin:"Quản trị",editor:"Chỉnh sửa",viewer:"Chỉ xem"})[memberRole]:""):"Kho riêng · Chỉ dành cho thành viên";
   $("#btnExport").disabled=!ready()||!list.length;
   $("#btnImport").innerHTML=icon("up")+"Nhập file";$("#btnExport").innerHTML=icon("down")+"Xuất file";$("#btnAdd").innerHTML=icon("plus")+"Thêm tài khoản";
   const b=$("#banner");
-  b.hidden=mode!=="denied";
-  b.innerHTML=mode==="denied"?"Trang này chỉ dành cho chủ sở hữu. Hãy đăng nhập đúng tài khoản.":"";
+  b.hidden=!cloudError&&mode!=="denied";
+  b.textContent=cloudError||(mode==="denied"?"Tài khoản chưa được cấp quyền vào kho. Liên hệ chủ kho để được thêm.":"");
   for(const u of sel)if(!get(u))sel.delete(u);
   const v=$("#view");
-  if(!ready()){v.innerHTML=`<div class="panel empty">${mode==="loading"?"Đang tải dữ liệu…":"Không có dữ liệu để hiển thị."}</div>`;saveState();return}
+  if(mode==="login"){renderLogin(v);saveState();return}
+  if(!ready()){v.innerHTML=`<div class="panel empty">${mode==="loading"?"Đang tải dữ liệu…":"Không thể mở kho dữ liệu."}</div>`;saveState();return}
   ({"tong-quan":overview,"tai-khoan":accounts,"nhom":groupsView,"lich-su":history,"cai-dat":config})[r](v,list);
+  if(!canWrite())for(const el of v.querySelectorAll('input[data-sn],input[data-sc],#staleDays,select[data-state],button[data-act="sAdd"],button[data-act="sDel"],button[data-act="wipe"],button[data-act="gRename"],button[data-act="add"],button[data-act="import"]'))el.disabled=true;
   saveState();
 }
 const emptyHtml=`<div class="panel empty">Chưa có tài khoản nào. Thêm thủ công hoặc nhập từ file CSV, Excel.<div><button class="primary" data-act="add">+ Thêm tài khoản</button><button data-act="import">Nhập file</button></div></div>`;
@@ -408,7 +438,7 @@ function cell(a,k){
     return `<span class="sec"><span class="mono">${on?esc(s[k]):"••••••"}</span>${ib("show",esc(id),on?"off":"eye",(on?"Ẩn ":"Hiện ")+LABEL[k])}${ib("cp",esc(id),"copy","Chép "+LABEL[k])}${k==="twofa"?ib("code",u,"key","Lấy mã 6 số"):""}</span>`;
   }
   if(k==="email"&&a.email)return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail",u,"copy","Chép Gmail")}</span>`;
-  if(k==="status")return `<select class="state" style="--c:${esc(st(a.status).color)}" data-state="${u}" id="state-${u}" aria-label="Trạng thái ${u}">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select>`;
+  if(k==="status")return `<select class="state" ${canWrite()?"":"disabled"} style="--c:${esc(st(a.status).color)}" data-state="${u}" id="state-${u}" aria-label="Trạng thái ${u}">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select>`;
   if(k==="tags")return (a.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
   if(k==="checked"||k==="born")return fmt(a[k]&&a[k]+"T00:00:00")+(k==="checked"&&stale(a)?' <span title="Quá hạn kiểm tra" style="color:var(--warn)">●</span>':"");
   return esc(a[k])||'<span class="muted">—</span>';
@@ -439,12 +469,12 @@ function config(v){
   if(v.querySelector("#cfg input:focus"))return;
   v.innerHTML=`<section class="panel" id="cfg"><h2>Trạng thái</h2>${settings.statuses.map(s=>`<div class="tools" style="margin-bottom:8px"><input type="color" id="c-${esc(s.id)}" data-sc="${esc(s.id)}" value="${esc(s.color)}" aria-label="Màu"><input id="n-${esc(s.id)}" data-sn="${esc(s.id)}" value="${esc(s.name)}" maxlength="30" aria-label="Tên trạng thái">${DEF.statuses.some(d=>d.id===s.id)?"":`<button class="danger" data-act="sDel" data-v="${esc(s.id)}">Xoá</button>`}</div>`).join("")}<button data-act="sAdd">+ Thêm trạng thái</button></section>
   <section class="panel"><h2>Nhắc kiểm tra</h2><label style="max-width:260px">Báo quá hạn sau (ngày)<input id="staleDays" type="number" min="1" max="365" value="${settings.staleDays}"></label></section>
-  <section class="panel"><h2>Dữ liệu</h2><div class="tools"><button data-act="export">Xuất toàn bộ</button><button data-act="template">Tải file mẫu CSV</button><button class="danger" data-act="wipe">Xoá toàn bộ tài khoản</button></div><p class="muted">Ghi chú, Gmail và các trường khác không được mã hoá. Đừng ghi mật khẩu vào đó.</p></section>`;
+  <section class="panel"><h2>Dữ liệu</h2><div class="tools"><button data-act="export">Xuất toàn bộ</button><button data-act="template">Tải file mẫu CSV</button>${cloudWorkspace&&canWrite()?'<button data-act="migrate">Chuyển dữ liệu cũ từ trình duyệt</button>':''}<button class="danger" data-act="wipe">Xoá toàn bộ tài khoản</button></div><p class="muted">Kho Supabase chỉ dành cho người được cấp quyền. Xuất file để giữ bản sao lưu riêng.</p></section>`;
 }
 
 /* ---------- hộp thoại ---------- */
 let toastT;
-function toast(m,type="success"){const t=$("#toast");t.textContent=m||"Thao tác hoàn tất";t.dataset.type=type;t.style.border="1px solid var(--"+(type==="error"?"danger":"ok")+")";t.setAttribute("role",type==="error"?"alert":"status");t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,4500)}
+function toast(m,type="success"){const t=$("#toast");t.textContent=m||"Thao tác hoàn tất";t.dataset.type=type;t.style.border="1px solid var(--"+(type==="error"?"danger":"ok")+")";t.setAttribute("role",type==="error"?"alert":"status");t.hidden=false;try{t.showPopover?.()}catch{}clearTimeout(toastT);toastT=setTimeout(()=>{try{t.hidePopover?.()}catch{}t.hidden=true},4500)}
 function dialog(html,onOk){
   const d=$("#dlg");d.innerHTML=`<form>${html}<p class="err" id="dErr" hidden></p><div class="actions"><button type="button" data-act="close">Huỷ</button><button class="primary" id="dOk">Xác nhận</button></div></form>`;
   const form=d.querySelector("form");
@@ -459,8 +489,11 @@ const prompt_=(title,label,list,fn)=>dialog(`<h2>${esc(title)}</h2><label>${esc(
 const splitTags=s=>[...new Set(String(s||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean))].slice(0,12);
 
 function openAccount(uid){
+  if(!ready())return;
+  if(cloudBusy)return toast("Hãy chờ thao tác lưu hoàn tất","error");
+  if(!uid&&!canWrite())return toast("Bạn không có quyền thêm tài khoản","error");
   const old=uid?get(uid):null;if(uid&&!old)return;
-  const a=old||{status:"new"},d=$("#drawer"),before=old?{...secretsOf(old)}:{},baseSec=old?.sec||"";
+  const a=old||{status:"new"},d=$("#drawer"),before=old?{...secretsOf(old)}:{},baseSec=JSON.stringify(old?.sec||"");
   const val=k=>SECRETS.includes(k)?before[k]:k==="tags"?(a.tags||[]).join(", "):a[k];
   const inp=(k,extra="",cls="")=>`<label class="${cls}">${LABEL[k]}<input id="e-${k}" value="${esc(val(k))}" maxlength="120" autocomplete="off" spellcheck="false" ${extra}></label>`;
   const sec=k=>inp(k,'type="password" class="mono secretIn"');
@@ -475,7 +508,7 @@ function openAccount(uid){
   $("#eShow").onchange=e=>d.querySelectorAll(".secretIn").forEach(i=>i.type=e.target.checked?"text":"password");
   const form=d.querySelector("form");let saving=false;
   form.onsubmit=async e=>{
-    e.preventDefault();if(saving)return;const v={};for(const [k] of FIELDS)v[k]=$("#e-"+k).value.trim();v.tags=splitTags(v.tags);
+    e.preventDefault();if(saving||!canWrite())return;const v={};for(const [k] of FIELDS)v[k]=$("#e-"+k).value.trim();v.tags=splitTags(v.tags);
     const err=m=>{const el=form.querySelector("#eErr");el.textContent=m;el.hidden=false};
     if(!/^[A-Za-z0-9._-]{1,60}$/.test(v.uid)||v.uid.startsWith("__"))return err("UID chỉ gồm chữ không dấu, số, dấu chấm, gạch (tối đa 60 ký tự).");
     const sv={};for(const k of SECRETS){sv[k]=v[k];delete v[k]}
@@ -484,19 +517,20 @@ function openAccount(uid){
     try{
       if(changed.length)v.sec=await seal(v.uid,sv);
       if(!form.isConnected)return;
-      if(!old&&get(v.uid))return err("UID này đã có trong danh sách.");
+      if((!old||v.uid!==uid)&&get(v.uid))return err("UID này đã có trong danh sách.");
       if(old&&!get(uid))return err("Tài khoản này vừa bị xoá ở nơi khác.");
-      if(old&&changed.length&&(get(uid).sec||"")!==baseSec)return err("Mật khẩu vừa được sửa ở nơi khác. Hãy đóng và mở lại.");
+      if(old&&changed.length&&JSON.stringify(get(uid).sec||"")!==baseSec)return err("Thông tin vừa được sửa ở nơi khác. Hãy đóng và mở lại.");
       const r=revise(old?get(uid):{},v,undefined,changed.length?"Đổi "+changed.map(k=>LABEL[k].toLowerCase()).join(", "):"");
-      if(!r||commit([r])){d.close();d.innerHTML="";toast(r?"Đã lưu tài khoản":"Không có gì thay đổi");hydrate()}
+      if(!r||await commit([r],old&&uid!==v.uid?[uid]:[])){d.close();d.innerHTML="";toast(r?"Đã lưu tài khoản":"Không có gì thay đổi");hydrate()}
     }finally{saving=false}
   };
+  if(!canWrite())for(const el of d.querySelectorAll('input:not(#eShow),select,textarea,#eSave,button[data-act="del"]'))el.disabled=true;
   if(!d.open)d.showModal();
 }
 
 /* ---------- nhập / xuất ---------- */
 function parseText(text){
-  text=text.replace(/^ï»¿/,"");
+  text=text.replace(/^\ufeff/,"");
   const first=text.split(/\r?\n/).find(l=>l.trim())||"";
   const delim=["\t","|",";",","].map(d=>[d,first.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
   const rows=[];let row=[],f="",quoted=false;
@@ -512,6 +546,7 @@ const guess=h=>Object.keys(ALIAS).find(k=>ALIAS[k].includes(norm(h)))||"";
 const toDate=s=>{s=String(s).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/),y,mo,d;if(m)[,y,mo,d]=m;else if(m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/))[,d,mo,y]=m;else return "";const r=`${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`;return isNaN(Date.parse(r))?"":r};
 
 function importDialog(){
+  if(!canWrite())return toast("Bạn không có quyền nhập dữ liệu","error");
   let rows=null;
   const d=dialog(`<h2>Nhập tài khoản</h2><p class="muted">Chọn file CSV, TXT, Excel hoặc dán danh sách. Nếu không có dòng tên cột, thứ tự mặc định là <span class="mono">uid|pass|2fa|gmail|pass gmail|ngày tạo|kiểm tra gần nhất|live/die</span>.</p>
   <label>File<input type="file" id="file" accept=".csv,.txt,.xlsx,.xls"></label><label style="margin-top:10px">Hoặc dán vào đây<textarea id="paste" rows="5" class="mono" placeholder="uid|pass|2fa|gmail|pass gmail|ngày tạo"></textarea></label><div id="map"></div>`,async d=>{
@@ -532,7 +567,7 @@ function importDialog(){
       let extra="";
       if(Object.keys(sv).length){
         let prev={};
-        if(old?.sec)prev=secretsOf(old);
+        if(old)prev=secretsOf(old);
         if(Object.keys(sv).some(k=>sv[k]!==prev[k])){v.sec=await seal(v.uid,{...prev,...sv});extra="Đổi "+Object.keys(sv).filter(k=>sv[k]!==prev[k]).map(k=>LABEL[k].toLowerCase()).join(", ")}
         if(!d.open)return false;
       }
@@ -542,7 +577,7 @@ function importDialog(){
       put.set(v.uid,n);
     }
     if(!put.size)return `Không có gì để nhập. Bỏ qua ${skip} dòng trùng hoặc không đổi, ${bad} dòng UID không hợp lệ.`;
-    if(!commit([...put.values()]))return "Dữ liệu vượt quá dung lượng. Hãy chia nhỏ file.";
+    if(!await commit([...put.values()]))return cloudError||"Chưa lưu được dữ liệu. Hãy kiểm tra rồi thử lại.";
     hydrate();
     toast(`Thêm ${add}, cập nhật ${up}, bỏ qua ${skip}, UID lỗi ${bad}${unknown?`, trạng thái lạ ${unknown}`:""}`);
   });
@@ -568,7 +603,9 @@ function importDialog(){
   };
 }
 async function save(filename,data){
-  if(!downloads){toast("Không tải file được ở chế độ xem này.");return}
+  if(!downloads){
+    try{const blob=new Blob([data],{type:filename.endsWith('.xlsx')?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);toast("Đã tạo file tải xuống")}catch{toast("Không tải được file","error")}return;
+  }
   try{await downloads.save({filename,data})}catch(e){if(e.code!=="declined")toast("Chưa tải được file. Hãy thử lại sau.")}
 }
 const safe=v=>/^[=+\-@\t\r]/.test(v)?"'"+v:v;
@@ -592,7 +629,7 @@ function exportDialog(onlySel){
 ;
 const go=h=>{if(location.hash==="#"+h)render();else location.hash=h};
 const resetF=()=>{q=fStatus=fGroup=fTag="";fStale=false;page=1};
-const bulk=(fn,msg)=>{const put=[...sel].map(get).filter(Boolean).map(a=>revise(a,fn(a))).filter(Boolean);if(commit(put))toast(msg)};
+const bulk=async(fn,msg)=>{const put=[...sel].map(get).filter(Boolean).map(a=>revise(a,fn(a))).filter(Boolean);if(await commit(put))toast(msg)};
 const acts={
  add:()=>openAccount(),import:importDialog,export:()=>exportDialog(),open:openAccount,
  close:()=>$("#dlg").close(),closeDrawer:()=>$("#drawer").close(),
@@ -600,18 +637,23 @@ const acts={
  cp:id=>{const [u,k]=id.split("|");return copy(secretsOf(get(u))[k],"Đã sao chép "+LABEL[k])},
  cpUid:u=>copy(u,"Đã sao chép UID"),cpMail:u=>copy(get(u)?.email,"Đã sao chép Gmail"),
  code:async u=>{const c=await totp(secretsOf(get(u)).twofa||"");if(!c)return toast("Khoá 2FA không hợp lệ","error");return copy(c,"Đã sao chép mã 2FA (có hiệu lực 30 giây mỗi chu kỳ)")},
- del:u=>ask("Xoá tài khoản","Xoá tài khoản này?",()=>commit([],[u])),
+ del:u=>ask("Xoá tài khoản","Xoá tài khoản này?",async()=>{if(!await commit([],[u]))return false;$("#drawer").close();toast("Đã xoá tài khoản")}),
  filter:v=>{resetF();fStatus=v;go("tai-khoan")},stale:()=>{resetF();fStale=true;go("tai-khoan")},
  gOpen:v=>{resetF();fGroup=v;go("tai-khoan")},
  reset:()=>{resetF();render()},tab:v=>{fStatus=v;page=1;tabs();table()},
  sort:k=>{sort={k,d:sort.k===k?-sort.d:1};table()},prev:()=>{page--;table()},next:()=>{page++;table()},
  selAll:()=>{filtered().forEach(a=>sel.add(a.uid));table()},selNone:()=>{sel.clear();table()},
  bCopy:()=>copy([...sel].join("\n")),bExport:()=>exportDialog(true),
- bDel:()=>ask("Xoá tài khoản","Xoá các tài khoản đã chọn?",()=>{const ids=[...sel];sel.clear();commit([],ids)}),
+ bDel:()=>ask("Xoá tài khoản","Xoá các tài khoản đã chọn?",async()=>{if(!await commit([],[...sel]))return false;sel.clear();render();toast("Đã xoá tài khoản đã chọn")}),
  bCheck:()=>bulk(()=>({checked:today()}),"Đã cập nhật"),
  bGroup:()=>prompt_("Gán nhóm","Tên nhóm",groups(),n=>bulk(()=>({group:n}),"Đã gán nhóm")),
  bTag:()=>prompt_("Thêm nhãn","Nhãn",tagsAll(),n=>bulk(a=>({tags:[...new Set([...(a.tags||[]),...splitTags(n)])]}),"Đã thêm nhãn")),
- wipe:()=>ask("Xoá toàn bộ","Xoá toàn bộ tài khoản?",()=>commit([],all().map(a=>a.uid))),
+ wipe:()=>ask("Xoá toàn bộ","Xoá toàn bộ tài khoản?",async()=>{if(!await commit([],all().map(a=>a.uid)))return false;toast("Đã xoá toàn bộ tài khoản")}),
+ migrate:migrateLocal,
+ gRename:g=>prompt_("Đổi tên nhóm","Tên nhóm mới",groups(),async n=>{if(!n)return "Hãy nhập tên nhóm";if(!await commit(all().filter(a=>a.group===g).map(a=>revise(a,{group:n})).filter(Boolean)))return false;toast("Đã đổi tên nhóm")}),
+ sAdd:()=>prompt_("Thêm trạng thái","Tên trạng thái",[],async name=>{if(!name)return "Hãy nhập tên trạng thái";return persistSettings({...settings,statuses:[...settings.statuses,{id:crypto.randomUUID(),name:name.slice(0,30),color:"#8b95a7"}]})}),
+ sDel:id=>{if(all().some(a=>a.status===id))return toast("Hãy đổi trạng thái các tài khoản đang dùng trước khi xoá","error");return ask("Xoá trạng thái","Xoá trạng thái này?",()=>persistSettings({...settings,statuses:settings.statuses.filter(s=>s.id!==id)}))},
+ template:()=>save("mau-tai-khoan.csv",csv([FIELDS.map(f=>f[1])])),
  retry:()=>{for(const [p,j] of jobs)if(j.failed){j.failed=false;run(p,j)}}
 };
 document.addEventListener("click",async e=>{
@@ -623,7 +665,7 @@ document.addEventListener("click",async e=>{
 for(const d of [$("#dlg"),$("#drawer")])d.addEventListener("close",()=>{if(!d.open)d.innerHTML=""});
 $("#btnAdd").onclick=()=>openAccount();$("#btnImport").onclick=importDialog;$("#btnExport").onclick=()=>exportDialog();
 document.addEventListener("input",e=>{if(e.target.id==="q"){q=e.target.value;page=1;table()}});
-document.addEventListener("change",e=>{
+document.addEventListener("change",async e=>{
   const t=e.target;
   if(t.id==="fStatus"){fStatus=t.value;page=1;tabs();table()}
   else if(t.id==="fGroup"){fGroup=t.value;page=1;table()}
@@ -631,12 +673,12 @@ document.addEventListener("change",e=>{
   else if(t.id==="fStale"){fStale=t.checked;page=1;table()}
   else if(t.id==="per"){per=+t.value;store.set("per",per);page=1;table()}
   else if(t.id==="bStatus"&&t.value)bulk(()=>({status:t.value,checked:today()}),"Đã đổi trạng thái");
-  else if(t.dataset.state!==undefined){const a=get(t.dataset.state),r=a&&revise(a,{status:t.value,checked:today()});if(r&&commit([r]))toast("Đã cập nhật, ngày kiểm tra là hôm nay")}
+  else if(t.dataset.state!==undefined){const a=get(t.dataset.state),r=a&&revise(a,{status:t.value,checked:today()});if(r&&await commit([r]))toast("Đã cập nhật, ngày kiểm tra là hôm nay")}
   else if(t.id==="pageAll"){$("#tbl").querySelectorAll("[data-sel]").forEach(c=>t.checked?sel.add(c.dataset.sel):sel.delete(c.dataset.sel));table()}
   else if(t.dataset.sel!==undefined){t.checked?sel.add(t.dataset.sel):sel.delete(t.dataset.sel);table()}
   else if(t.dataset.col){cols=t.checked?[...cols,t.dataset.col]:cols.filter(c=>c!==t.dataset.col);store.set("cols2",cols);table()}
-  else if(t.dataset.sn||t.dataset.sc){const id=t.dataset.sn||t.dataset.sc,key=t.dataset.sn?"name":"color",val=t.value.trim();if(!val)return;settings={...settings,statuses:settings.statuses.map(s=>s.id===id?{...s,[key]:val}:s)};saveSettings();toast("Đã lưu cài đặt")}
-  else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365){settings={...settings,staleDays:n};saveSettings();toast("Đã lưu cài đặt")}}
+  else if(t.dataset.sn||t.dataset.sc){const id=t.dataset.sn||t.dataset.sc,key=t.dataset.sn?"name":"color",val=t.value.trim();if(!val)return;await persistSettings({...settings,statuses:settings.statuses.map(s=>s.id===id?{...s,[key]:val}:s)})}
+  else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365)await persistSettings({...settings,staleDays:n})}
 });
 document.addEventListener("keydown",e=>{if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$("#q")){e.preventDefault();$("#q").focus()}});
 document.addEventListener("pointermove",e=>{
@@ -646,36 +688,107 @@ document.addEventListener("pointermove",e=>{
 });
 addEventListener("hashchange",()=>{$("#view").innerHTML="";render()});
 
-/* ---------- khởi động ---------- */
+/* ---------- đăng nhập và kho Supabase ---------- */
+function applyCloudState(state){
+  shards=Array.from({length:SHARDS},()=>({}));
+  for(const row of state.resources)shards[hash(row.uid)][row.uid]=row.data;
+  settings=state.meta.find(row=>row.key==='settings')?.data||structuredClone(DEF);
+  daily=state.meta.find(row=>row.key==='daily')?.data?.days||{};
+}
+function clearPrivateData(){
+  shards=Array.from({length:SHARDS},()=>({}));settings=structuredClone(DEF);daily={};
+  shown.clear();sel.clear();jobs.clear();cloudWorkspace=null;memberRole=null;cloudBusy=false;
+  for(const id of ['#dlg','#drawer']){const d=$(id);if(d.open)d.close();d.innerHTML=''}
+}
+function renderLogin(v){
+  v.innerHTML=`<section class="panel login-panel"><h2>Đăng nhập kho tài nguyên</h2><p class="muted">Chỉ tài khoản được chủ kho cấp quyền mới xem và thao tác được dữ liệu.</p><form id="loginForm"><label>Email<input id="loginEmail" type="email" autocomplete="username" required maxlength="254"></label><label>Mật khẩu đăng nhập<input id="loginPassword" type="password" autocomplete="current-password" required></label><p id="loginError" class="err" role="alert" hidden></p><button class="primary" id="loginSubmit">Đăng nhập</button></form></section>`;
+  $('#loginForm').onsubmit=async e=>{
+    e.preventDefault();const button=$('#loginSubmit'),error=$('#loginError');
+    if(button.disabled)return;button.disabled=true;button.textContent='Đang đăng nhập…';error.hidden=true;
+    const password=$('#loginPassword');
+    try{
+      const result=await authClient.auth.signInWithPassword({email:$('#loginEmail').value.trim(),password:password.value});
+      password.value='';if(result.error)throw result.error;
+      await loadSession(result.data.session);
+    }catch{error.textContent='Đăng nhập thất bại. Kiểm tra email, mật khẩu và kết nối mạng.';error.hidden=false;password.value=''}
+    finally{if(button.isConnected){button.disabled=false;button.textContent='Đăng nhập'}}
+  };
+}
+async function loadSession(session,force=false){
+  if(session&&currentUser?.id===session.user.id&&!force&&(mode==='ready'||mode==='loading'))return;
+  const generation=++authGeneration;
+  clearPrivateData();currentUser=session?.user||null;cloudError='';
+  if(!session){mode='login';render();return}
+  mode='loading';render();
+  try{
+    const role=await cloudApi.membership(session.user.id);
+    if(generation!==authGeneration)return;
+    if(!['viewer','editor','admin'].includes(role)){mode='denied';render();return}
+    const workspace=MXHCloud.workspace(cloudApi),state=await workspace.load();
+    if(generation!==authGeneration)return;
+    cloudWorkspace=workspace;memberRole=role;applyCloudState(state);mode='ready';render();
+  }catch{
+    if(generation!==authGeneration)return;
+    mode='denied';cloudError='Không tải được kho Supabase. Kiểm tra kết nối rồi bấm Tải lại.';render();
+  }
+}
+async function persistSettings(next){
+  if(!canWrite()){toast('Bạn không có quyền sửa cài đặt hoặc hệ thống đang lưu','error');return false}
+  if(!cloudWorkspace){settings=next;saveSettings();return true}
+  const generation=authGeneration,workspace=cloudWorkspace;
+  cloudBusy=true;cloudError='';saveState();
+  try{const state=await workspace.settings(next);if(generation!==authGeneration)return false;applyCloudState(state);toast('Đã lưu cài đặt');return true}
+  catch(error){if(generation!==authGeneration)return false;cloudError=error.code==='40001'?'Cài đặt đã đổi ở nơi khác. Bấm Tải lại.':'Không lưu được cài đặt. Kiểm tra kết nối.';toast(cloudError,'error');return false}
+  finally{if(generation===authGeneration){cloudBusy=false;render()}}
+}
+function migrateLocal(){
+  if(!canWrite())return toast('Bạn không có quyền nhập dữ liệu','error');
+  let saved;
+  try{saved=JSON.parse(localStorage.getItem(LOCAL_DATA_KEY)||'{}')}catch{return toast('Không đọc được dữ liệu cũ','error')}
+  const rows=[];
+  for(let i=0;i<SHARDS;i++)for(const a of Object.values(saved['shards/s'+i]?.a||{})){
+    if(a.sample||get(a.uid))continue;
+    if(!/^[A-Za-z0-9._-]{1,60}$/.test(a.uid||'')||a.uid.startsWith('__'))return toast('Dữ liệu cũ có UID không hợp lệ','error');
+    if(a.sec&&typeof a.sec==='string')return toast('Dữ liệu cũ còn mã hoá. Hãy xuất từ bản cũ rồi nhập lại.','error');
+    rows.push(a);
+  }
+  if(!rows.length)return toast('Không có tài khoản cũ cần chuyển trên trình duyệt này');
+  ask('Chuyển dữ liệu lên Supabase',`Chuyển ${rows.length} tài khoản chưa có trong kho? Bỏ qua UID trùng, giữ nguyên bản cũ trên trình duyệt.`,async()=>{
+    if(!await commit(rows))return false;toast('Đã chuyển dữ liệu lên Supabase');
+  });
+}
 async function boot(){
   render();
-  const c=window.claude;
-  const [d,u,dl]=c?.use?await Promise.all([c.use("db"),c.use("user"),c.use("downloads")]):[null,null,null];
-  downloads=dl;
-  const owner=u?await u.isOwner():null;
-  if(owner===false){mode="denied";render();return}
-  if(!d){
-    if(c?.use){mode="denied";render();$("#banner").textContent="Không kết nối được kho dữ liệu. Hãy đăng nhập rồi mở lại trang.";return}
-    try{openLocalStore();render()}catch{mode="denied";render();$("#banner").hidden=false;$("#banner").textContent="Không mở được dữ liệu đã lưu. Hãy kiểm tra quyền lưu trữ của trình duyệt; dữ liệu cũ chưa bị xoá.";toast("Không thể mở kho lưu trữ trên trình duyệt","error")}
-    return;
-  }
-  db=d;
-  const got={};
-  const slow=setTimeout(()=>{const b=$("#banner");b.hidden=false;b.textContent="Chưa kết nối được kho dữ liệu. Trang sẽ tự hiển thị khi kết nối xong."},10000);
-  const fail=()=>{clearTimeout(slow);mode="loading";render();const b=$("#banner");b.hidden=false;b.textContent="Mất kết nối với kho dữ liệu. Hãy tải lại trang.";$("#save").textContent="Mất kết nối"};
-  const done=(key,snap)=>{
-    if(!snap.metadata.fromCache)got[key]=true;
-    if(mode==="loading"&&got.s&&got.set&&got.day){mode="ready";clearTimeout(slow)}
-    render();hydrate();
-  };
-  db.collection("shards").onSnapshot(s=>{
-    const found=new Map(s.docs.map(x=>[x.id,x.data().a||{}]));
-    shards=shards.map((cur,i)=>pending("shards/s"+i)?cur:(found.get("s"+i)||{}));
-    done("s",s);
-  },fail);
-  db.doc("meta/settings").onSnapshot(s=>{if(!pending("meta/settings"))settings=s.exists?structuredClone(s.data()):structuredClone(DEF);done("set",s)},fail);
-  db.doc("meta/daily").onSnapshot(s=>{if(!pending("meta/daily"))daily=s.exists?structuredClone(s.data().days||{}):{};done("day",s)},fail);
+  try{
+    if(!globalThis.MXH_SUPABASE||!globalThis.supabase?.createClient||!globalThis.MXHCloud)throw Error('Missing configuration');
+    authClient=supabase.createClient(MXH_SUPABASE.url,MXH_SUPABASE.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+    cloudApi=MXHCloud.create({...MXH_SUPABASE,getToken:async()=>{
+      const {data,error}=await authClient.auth.getSession();
+      if(error||!data.session)throw Object.assign(Error('Session expired'),{status:401});
+      return data.session.access_token;
+    }});
+    $('#btnAuth').onclick=async()=>{
+      if(cloudBusy)return;
+      const {error}=await authClient.auth.signOut({scope:'local'});
+      if(error)return toast('Đăng xuất thất bại. Hãy thử lại.','error');
+      await loadSession(null);toast('Đã đăng xuất');
+    };
+    $('#btnRefresh').onclick=async()=>{
+      if(cloudBusy)return;
+      if($('#drawer').open||$('#dlg').open)return toast('Hãy lưu hoặc đóng bảng đang sửa trước khi tải lại','error');
+      const {data,error}=await authClient.auth.getSession();
+      if(error)return toast('Không kiểm tra được phiên đăng nhập','error');
+      await loadSession(data.session,true);
+    };
+    authClient.auth.onAuthStateChange((event,session)=>{
+      if(event==='SIGNED_OUT'){loadSession(null);return}
+      if(event==='SIGNED_IN')setTimeout(()=>loadSession(session),0);
+    });
+    const {data,error}=await authClient.auth.getSession();if(error)throw error;
+    await loadSession(data.session);
+  }catch{mode='denied';cloudError='Chưa kết nối được dịch vụ đăng nhập. Kiểm tra mạng rồi tải lại trang.';render()}
 }
+
 boot();
 })();
 </script>
