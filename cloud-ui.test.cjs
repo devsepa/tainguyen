@@ -13,6 +13,16 @@ function harness(){
 const session={user:{id:'allowed',email:'member@example.com'},access_token:'jwt'};
 const snapshot=()=>({resources:[{uid:'181',revision:1,data:{uid:'181',status:'new',sec:{pass:'credential'}}}],meta:[]});
 
+test('manual IG Live confirmation persists timestamp and preserves automatic result',async()=>{
+ const h=harness(),data=snapshot();Object.assign(data.resources[0].data,{platform:'instagram',status:'dead',igCheck:{status:'unknown',reason:'upstream_404'}});
+ let saved;h.t.setup({membership:async()=>'editor',load:async()=>data,apply:async(r)=>{saved=r[0].data;return {resources:[{uid:'181',revision:2}],meta:[{key:'daily',revision:3}]};}});
+ await h.t.loadSession(session);await h.t.acts.confirmIgLive('181');
+ assert.equal(h.t.get('181').status,'live');assert(saved.igConfirmed.at);assert.equal(saved.igConfirmed.by,'allowed');assert.equal(saved.igCheck.reason,'upstream_404');assert.match(saved.hist[0].m,/Xác nhận Live/);
+});
+test('viewer cannot manually confirm IG Live',async()=>{
+ const h=harness(),data=snapshot();data.resources[0].data.platform='instagram';h.t.setup({membership:async()=>'viewer',load:async()=>data,apply:()=>{throw Error('must not write')}});await h.t.loadSession(session);await h.t.acts.confirmIgLive('181');assert.equal(h.t.get('181').status,'new');
+});
+
 test('IG calls use session JWT and unknown result preserves confirmed status',async()=>{
  const h=harness();const data=snapshot();Object.assign(data.resources[0].data,{platform:'instagram',status:'live',igId:'123'});
  h.t.setup({membership:async()=>'editor',load:async()=>data});await h.t.loadSession(session);

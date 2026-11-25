@@ -995,7 +995,7 @@
           if (k === "platform") return pillPlat(a.platform);
           if (k === "uid") {
             const pl = platOf(a);
-            return `<span class="sec"><span style="color:${pl.color};display:inline-flex;align-items:center" title="${pl.name}">${icon(pl.icon)}</span> <button class="link mono" data-act="open" data-v="${u}">${esc(a.platform === "instagram" ? a.igUsername || a.uid : a.uid)}</button>${ib("cpUid", u, "copy", "Chép UID")}</span>${a.platform === "instagram" ? `<small class="muted" style="display:block" title="${esc(igCheckLabel(a))}">${a.igId ? `UID: ${esc(a.igId)} · ` : ""}${esc(igCheckLabel(a))}</small>` : ""}`;
+            return `<span class="sec"><span style="color:${pl.color};display:inline-flex;align-items:center" title="${pl.name}">${icon(pl.icon)}</span> <button class="link mono" data-act="open" data-v="${u}">${esc(a.platform === "instagram" ? a.igUsername || a.uid : a.uid)}</button>${ib("cpUid", u, "copy", "Chép UID")}</span>${a.platform === "instagram" ? `<small class="muted" style="display:block" title="${esc(igCheckLabel(a))}">${a.igId ? `UID: ${esc(a.igId)} · ` : ""}${esc(igCheckLabel(a))}</small><span style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px"><a class="mini" href="${esc(pl.url(a.igUsername || a.uid))}" target="_blank" rel="noopener noreferrer">Mở profile kiểm tra</a><button class="mini" data-act="confirmIgLive" data-v="${u}" ${canWrite() ? "" : "disabled"} title="Xác nhận bạn đã mở và nhìn thấy đúng hồ sơ">Xác nhận Live</button></span>${a.igConfirmed?.at ? `<small class="muted" style="display:block">Bạn đã xác nhận Live · ${esc(fmtTime(Date.parse(a.igConfirmed.at)))}</small>` : ""}` : ""}`;
           }
           if (SECRETS.includes(k)) {
             if (!Object.keys(secretsOf(a)).length)
@@ -4056,6 +4056,17 @@
               if (rev) await commit([rev]);
             }
             openTempMailInbox(gm.uid);
+          },
+          confirmIgLive: async (uid) => {
+            if (!canWrite()) return toast("Bạn không có quyền chỉnh sửa hoặc hệ thống đang lưu", "error");
+            const a = get(uid);
+            if (!a || a.platform !== "instagram") return;
+            const at = new Date().toISOString();
+            const r = revise(a, {
+              status: "live", checked: today(),
+              igConfirmed: { at, by: currentUser?.id || "local" },
+            }, "Xác nhận Live thủ công", "Xác nhận Live sau khi mở profile");
+            if (r && await commit([r])) toast("Đã lưu xác nhận Live và thời điểm kiểm tra", "success");
           },
           checkOneLive: async (uid) => {
             const a = get(uid);
