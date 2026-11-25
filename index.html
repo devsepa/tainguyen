@@ -164,7 +164,7 @@ main{padding-left:0}
 (()=>{
 "use strict";
 const SHARDS=64, LIMIT=250000, DAY=864e5;
-const VIEWS={"tong-quan":"Tổng quan","tai-khoan":"Tài khoản","lich-su":"Lịch sử","cai-dat":"Cài đặt"};
+const VIEWS={"tong-quan":"Tổng quan","tai-khoan":"Tài khoản MXH","gmail":"Kho Gmail","lich-su":"Lịch sử","cai-dat":"Cài đặt"};
 const DEF={staleDays:7,statuses:[
 {id:"live",name:"Live",color:"#2fbf71"},{id:"dead",name:"Die",color:"#ef5350"},{id:"new",name:"Chưa kiểm tra",color:"#8b95a7"}]};
 const FIELDS=[["platform","Nền tảng"],["uid","UID"],["pass","Mật khẩu"],["twofa","2FA"],["email","Gmail"],["mailpass","Pass Gmail"],["born","Ngày tạo"],["checked","Kiểm tra gần nhất"],["status","Live/Die"],["name","Tên"],["phone","Số điện thoại"],["source","Nguồn"],["note","Ghi chú"]];
@@ -186,7 +186,8 @@ off:'<path d="M4 4l16 16M9.5 5.8A10 10 0 0 1 12 5.500c6.500 0 10 6.500 10 6.500a
 copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
 key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.500 6.500l4 4"/>',
 facebook:'<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
-instagram:'<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>'};
+instagram:'<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>',
+mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>'};
 const PLATFORMS={
   facebook:{id:"facebook",name:"Facebook",color:"#1877f2",icon:"facebook",url:uid=>/^\d+$/.test(uid)?`https://www.facebook.com/profile.php?id=${encodeURIComponent(uid)}`:`https://www.facebook.com/${encodeURIComponent(uid)}`},
   instagram:{id:"instagram",name:"Instagram",color:"#e1306c",icon:"instagram",url:uid=>`https://www.instagram.com/${encodeURIComponent(uid)}/`}
@@ -196,8 +197,8 @@ const platOf=a=>PLATFORMS[a?.platform]||PLATFORMS.facebook;
 const pillPlat=p=>{const pl=plat(p);return `<span class="pill" style="--c:${pl.color};gap:5px">${icon(pl.icon)}${pl.name}</span>`};
 const icon=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${PATHS[n]}</svg>`;
 const ib=(act,v,ic,label)=>`<button class="ico" data-act="${act}" data-v="${v}" title="${label}" aria-label="${label}">${icon(ic)}</button>`;
-const NAVI={"tong-quan":"grid","tai-khoan":"users","lich-su":"clock","cai-dat":"gear"};
-const SUB={"tong-quan":"Tình hình kho tài khoản","tai-khoan":"Tra cứu, cập nhật và thao tác hàng loạt","lich-su":"Các thay đổi gần đây","cai-dat":"Trạng thái, bảo mật và dữ liệu"};
+const NAVI={"tong-quan":"grid","tai-khoan":"users","gmail":"mail","lich-su":"clock","cai-dat":"gear"};
+const SUB={"tong-quan":"Tình hình kho tài nguyên","tai-khoan":"Tra cứu, cập nhật tài khoản Facebook & Instagram","gmail":"Lưu trữ tài khoản Gmail, mật khẩu và ghi chú","lich-su":"Các thay đổi gần đây","cai-dat":"Trạng thái, bảo mật và dữ liệu"};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const norm=s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/gi,"d").toLowerCase().trim();
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
@@ -230,6 +231,29 @@ function openLocalStore(){
 let shards=Array.from({length:SHARDS},()=>({})), settings=structuredClone(DEF), daily={};
 let sel=new Set(), q="", fStatus="", fPlatform="", fStale=false, page=1, sort={k:"updated",d:-1};
 let per=store.get("per",25), cols=store.get("cols2",ORDER).filter(c=>!["group","tags"].includes(c)); if(!cols.includes("platform"))cols=["platform",...cols];
+let qGmail="", sortGmail={k:"updated",d:-1}, pageGmail=1, perGmail=25, selGmail=new Set();
+function makeGmailUid(email){
+  const clean='gm_'+String(email||'').trim().toLowerCase().replace('@','_at_').replace(/[^A-Za-z0-9._-]/g,'_');
+  return clean.slice(0,60);
+}
+function parseGmailText(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean),items=[];
+  for(const line of lines){
+    let parts;
+    if(line.includes('|'))parts=line.split('|');
+    else if(line.includes(':')&&!line.startsWith('http'))parts=line.split(':');
+    else if(line.includes('\t'))parts=line.split('\t');
+    else if(line.includes(','))parts=line.split(',');
+    else if(line.includes(' '))parts=line.split(/\s+/);
+    else parts=[line];
+    const email=parts[0]?.trim();
+    if(!email||!email.includes('@'))continue;
+    const pass=parts[1]?.trim()||'';
+    const note=parts.slice(2).join('|').trim();
+    items.push({email,pass,note});
+  }
+  return items;
+}
 const ready=()=>mode==="ready"||mode==="demo";
 
 const hash=s=>{let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return (h>>>0)%SHARDS};
@@ -360,13 +384,21 @@ function render(){
   $("#title").textContent=VIEWS[r];
   $("#subtitle").textContent=SUB[r]+" · "+new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"});
   $("#logo").innerHTML=icon("users");$("#tip").hidden=true;
-  $("#menu").innerHTML=Object.entries(VIEWS).map(([k,v])=>`<a href="#${k}" ${k===r?'aria-current="page"':''}>${icon(NAVI[k])}${v}${k==="tai-khoan"&&ready()?`<span class="num">${list.length}</span>`:""}</a>`).join("");
+  $("#menu").innerHTML=Object.entries(VIEWS).map(([k,v])=>`<a href="#${k}" ${k===r?'aria-current="page"':''}>${icon(NAVI[k])}${v}${k==="tai-khoan"&&ready()?`<span class="num">${list.filter(a=>a.platform!=="gmail").length}</span>`:k==="gmail"&&ready()?`<span class="num">${list.filter(a=>a.platform==="gmail").length}</span>`:""}</a>`).join("");
   for(const id of ["#btnAdd","#btnImport"])$(id).disabled=!canWrite();
   $("#btnRefresh").hidden=!currentUser;$("#btnRefresh").disabled=cloudBusy;
   $("#btnAuth").hidden=!currentUser;$("#btnAuth").disabled=cloudBusy;
   $("#identity").textContent=currentUser?currentUser.email+(memberRole?" · "+({admin:"Quản trị",editor:"Chỉnh sửa",viewer:"Chỉ xem"})[memberRole]:""):"Kho riêng · Chỉ dành cho thành viên";
   $("#btnExport").disabled=!ready()||!list.length;
-  $("#btnImport").innerHTML=icon("up")+"Nhập file";$("#btnExport").innerHTML=icon("down")+"Xuất file";$("#btnAdd").innerHTML=icon("plus")+"Thêm tài khoản";
+  if(r==="gmail"){
+    $("#btnAdd").innerHTML=icon("plus")+"Thêm Gmail";
+    $("#btnImport").innerHTML=icon("up")+"Nhập text/file";
+    $("#btnExport").innerHTML=icon("down")+"Xuất Gmail";
+  }else{
+    $("#btnAdd").innerHTML=icon("plus")+"Thêm tài khoản";
+    $("#btnImport").innerHTML=icon("up")+"Nhập file";
+    $("#btnExport").innerHTML=icon("down")+"Xuất file";
+  }
   const b=$("#banner");
   b.hidden=!cloudError&&mode!=="denied";
   b.textContent=cloudError||(mode==="denied"?"Tài khoản chưa được cấp quyền vào kho. Liên hệ chủ kho để được thêm.":"");
@@ -374,7 +406,7 @@ function render(){
   const v=$("#view");
   if(mode==="login"){renderLogin(v);saveState();return}
   if(!ready()){v.innerHTML=`<div class="panel empty">${mode==="loading"?"Đang tải dữ liệu…":"Không thể mở kho dữ liệu."}</div>`;saveState();return}
-  ({"tong-quan":overview,"tai-khoan":accounts,"lich-su":history,"cai-dat":config})[r](v,list);
+  ({"tong-quan":overview,"tai-khoan":accounts,"gmail":gmailView,"lich-su":history,"cai-dat":config})[r](v,list);
   if(!canWrite())for(const el of v.querySelectorAll('input[data-sn],input[data-sc],#staleDays,select[data-state],button[data-act="sAdd"],button[data-act="sDel"],button[data-act="wipe"],button[data-act="gRename"],button[data-act="add"],button[data-act="import"]'))el.disabled=true;
   saveState();
 }
@@ -383,7 +415,7 @@ const emptyHtml=`<div class="panel empty">Chưa có tài khoản nào. Thêm th�
 function overview(v,list){
   if(!list.length){v.innerHTML=emptyHtml;return}
   const n=list.length,cnt=id=>list.filter(a=>a.status===id).length,old=list.filter(stale).length,S=settings.statuses;
-  const pct=x=>Math.round(x/n*100),fbCount=list.filter(a=>(a.platform||"facebook")==="facebook").length,igCount=list.filter(a=>a.platform==="instagram").length;
+  const pct=x=>n?Math.round(x/n*100):0,fbCount=list.filter(a=>(a.platform||"facebook")==="facebook").length,igCount=list.filter(a=>a.platform==="instagram").length,gmCount=list.filter(a=>a.platform==="gmail").length;
   const days=[...Array(30)].map((_,i)=>{const d=new Date(today()+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-29+i);return d.toISOString().slice(0,10)});
   const sum=c=>Object.values(c).reduce((x,y)=>x+y,0);
   let max=Math.max(1,...days.filter(d=>daily[d]).map(d=>sum(daily[d])));max=Math.ceil(max/2)*2;
@@ -396,7 +428,7 @@ function overview(v,list){
   const alerts=list.filter(a=>!["live","new"].includes(a.status)).sort((a,b)=>b.updated-a.updated);
   const feed=list.flatMap(a=>(a.hist||[]).map(x=>({...x,a}))).sort((a,b)=>b.t-a.t).slice(0,6);
   const who=(a,sub)=>`<span class="who"><span class="dot" style="--c:${esc(st(a.status).color)}" title="${esc(st(a.status).name)}"></span><span><button class="link mono" data-act="open" data-v="${esc(a.uid)}">${esc(a.uid)}</button><small>${esc(sub)}</small></span></span>`;
-  v.innerHTML=`<div class="stats">${card("filter","","Tổng tài khoản",n,fbCount+" FB · "+igCount+" IG","users","#5b8cff")}${card("pFilter","facebook","Facebook",fbCount,pct(fbCount)+"% tổng số","facebook","#1877f2")}${card("pFilter","instagram","Instagram",igCount,pct(igCount)+"% tổng số","instagram","#e1306c")}${stc("live","check")}${stc("dead","x")}${card("stale","","Cần kiểm tra",old,"Quá "+settings.staleDays+" ngày chưa kiểm tra","clock","#e5b53b")}</div>
+  v.innerHTML=`<div class="stats">${card("filter","","Tổng tài nguyên",n,`${fbCount} FB · ${igCount} IG · ${gmCount} Mail`,"users","#5b8cff")}${card("pFilter","facebook","Facebook",fbCount,pct(fbCount)+"% MXH","facebook","#1877f2")}${card("pFilter","instagram","Instagram",igCount,pct(igCount)+"% MXH","instagram","#e1306c")}${card("gTab","","Kho Gmail",gmCount,"Lưu trữ Email & Pass","mail","#ea4335")}${stc("live","check")}${stc("dead","x")}${card("stale","","Cần kiểm tra",old,"Quá "+settings.staleDays+" ngày chưa kiểm tra","clock","#e5b53b")}</div>
   <div class="grid"><section class="panel wide"><div class="head"><h2>Biến động 30 ngày</h2><span class="muted">Số tài khoản theo trạng thái</span></div>
   <div class="chart"><div class="yaxis"><span>${max}</span><span>${max/2}</span><span>0</span></div><div class="trend">${days.map(d=>{const c=daily[d];if(!c)return `<div class="col" data-tip="${dm(d)}: không có thay đổi"></div>`;return `<div class="col" data-tip="${esc(dm(d)+"\n"+S.map(s=>s.name+": "+(c[s.id]||0)).join("\n"))}">${S.filter(s=>c[s.id]).map(s=>`<i style="--c:${esc(s.color)};height:calc(${c[s.id]/max*100}% - 2px)"></i>`).join("")}</div>`}).join("")}</div><div class="axis"><span>${dm(days[0])}</span><span>${dm(days[14])}</span><span>${dm(days[29])}</span></div></div>
   <div class="legend">${S.map(s=>`<span><span class="dot" style="--c:${esc(s.color)}"></span>${esc(s.name)}</span>`).join("")}<span>Cột trống là ngày không có thay đổi.</span></div></section>
@@ -408,7 +440,7 @@ function overview(v,list){
 
 function filtered(){
   const k=norm(q);
-  return all().filter(a=>(!fStatus||a.status===fStatus)&&(!fPlatform||(a.platform||"facebook")===fPlatform)&&(!fStale||stale(a))&&
+  return all().filter(a=>a.platform!=="gmail"&&(!fStatus||a.status===fStatus)&&(!fPlatform||(a.platform||"facebook")===fPlatform)&&(!fStale||stale(a))&&
     (!k||norm([(a.platform||"facebook"),a.uid,a.name,a.email,a.phone,a.source,a.note].join(" ")).includes(k)))
     .sort((a,b)=>{const val=x=>sort.k==="status"?st(x.status).name:sort.k==="platform"?platOf(x).name:x[sort.k]??"";const x=val(a),y=val(b);return sort.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
 }
@@ -458,10 +490,150 @@ function table(){
   <div class="tools" style="justify-content:space-between"><span class="muted">${rows.length} kết quả · trang ${page}/${pages}</span><span class="tools"><select id="per" aria-label="Số dòng mỗi trang">${opts([25,50,100].map(n=>[String(n),n+" dòng"]),String(per))}</select><button data-act="prev" ${page<=1?"disabled":""}>Trước</button><button data-act="next" ${page>=pages?"disabled":""}>Sau</button></span></div>`;
   el.querySelector(".tablewrap").scrollLeft=sx;
 }
-function groupsView(v,list){
-  if(!list.length){v.innerHTML=emptyHtml;return}
-  const names=[...groups(),...(list.some(a=>!a.group)?[""]:[])];
-  v.innerHTML=`<div class="two">${names.map(g=>{const m=list.filter(a=>(a.group||"")===g),live=m.filter(a=>a.status==="live").length;return `<section class="panel"><h2>${esc(g||"Chưa có nhóm")} <span class="muted">· ${m.length} tài khoản · ${Math.round(live/m.length*100)}% hoạt động</span></h2>${settings.statuses.map(s=>{const c=m.filter(a=>a.status===s.id).length;return c?`<div class="bar" style="--c:${esc(s.color)}"><span><span class="dot"></span>${esc(s.name)}</span><span class="track"><i style="width:${c/m.length*100}%"></i></span><span class="num">${c}</span></div>`:""}).join("")}<div class="tools" style="margin-top:10px"><button data-act="gOpen" data-v="${esc(g||"\u0001")}">Xem danh sách</button>${g?`<button data-act="gRename" data-v="${esc(g)}">Đổi tên</button>`:""}</div></section>`}).join("")}</div><p class="muted">Tạo nhóm mới bằng cách nhập tên nhóm khi thêm, sửa hoặc gán hàng loạt.</p>`;
+function filteredGmail(){
+  const k=norm(qGmail);
+  return all().filter(a=>a.platform==="gmail"&&(!k||norm([a.email,secretsOf(a).pass,a.note].join(" ")).includes(k)))
+    .sort((a,b)=>{const val=x=>sortGmail.k==="updated"?x.updated||0:x[sortGmail.k]??"";const x=val(a),y=val(b);return sortGmail.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
+}
+function gmailView(v,list){
+  const gList=list.filter(a=>a.platform==="gmail");
+  if(!gList.length&&!qGmail){
+    v.innerHTML=`<div class="panel empty">Chưa có tài khoản Gmail nào trong kho. Dán danh sách text / file TXT hoặc thêm thủ công.<div><button class="primary" data-act="addGmail">+ Thêm Gmail</button><button data-act="importGmail">${icon("up")} Nhập text / file TXT</button></div></div>`;
+    return;
+  }
+  const rows=filteredGmail(),pages=Math.max(1,Math.ceil(rows.length/perGmail));
+  pageGmail=Math.min(pageGmail,pages);
+  const shownRows=rows.slice((pageGmail-1)*perGmail,pageGmail*perGmail);
+  v.innerHTML=`<div class="tools filters">
+    <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ Gmail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Gmail">
+    <button class="primary" data-act="addGmail">+ Thêm Gmail</button>
+    <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>
+  </div>
+  ${selGmail.size?`<div class="tools bulk"><b>Đã chọn ${selGmail.size}</b>
+    ${selGmail.size<rows.length?`<button class="link" data-act="selAllGmail">Chọn cả ${rows.length}</button>`:""}
+    <button data-act="bCopyMail">Chép danh sách Email</button>
+    <button data-act="bCopyMailPass">Chép dạng Mail|Pass</button>
+    <button data-act="bExportGmail">Xuất file</button>
+    <button class="danger" data-act="bDelGmail">Xoá</button>
+    <button class="link" data-act="selNoneGmail">Bỏ chọn</button>
+  </div>`:""}
+  <div class="tablewrap"><table>
+    <thead><tr>
+      <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length&&shownRows.every(a=>selGmail.has(a.uid))?"checked":""}></th>
+      <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Gmail ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
+      <th style="min-width:200px">Mật khẩu</th>
+      <th>Ghi chú</th>
+      <th style="width:140px"><button data-act="sortGmail" data-v="updated">Thời gian ${sortGmail.k==="updated"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
+      <th style="width:180px">Sao chép nhanh</th>
+    </tr></thead>
+    <tbody>
+      ${shownRows.map(a=>{
+        const u=esc(a.uid),email=esc(a.email||""),pass=secretsOf(a).pass||"",passId=a.uid+"|pass",on=shown.has(passId);
+        return `<tr data-guid="${u}" title="Nhấp vào dòng để chỉnh sửa">
+          <td><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid)?"checked":""}></td>
+          <td><span class="sec"><span style="color:#ea4335;display:inline-flex;align-items:center" title="Gmail">${icon("mail")}</span> <b>${email}</b> ${ib("cpText",email,"copy","Chép Gmail")}</span></td>
+          <td>${pass?`<span class="sec"><span class="mono">${on?esc(pass):"••••••••"}</span>${ib("show",esc(passId),on?"off":"eye",on?"Ẩn ":"Hiện ")}${ib("cpText",esc(pass),"copy","Chép mật khẩu")}</span>`:'<span class="muted">—</span>'}</td>
+          <td><span class="muted" style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:320px">${esc(a.note)||"—"}</span></td>
+          <td class="muted mono">${fmtTime(a.updated||a.added)}</td>
+          <td>
+            <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
+            <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Gmail">${icon("x")}</button>
+          </td>
+        </tr>`;
+      }).join("")||`<tr><td colspan="6" class="empty">Không tìm thấy tài khoản Gmail khớp từ khoá. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
+    </tbody>
+  </table></div>
+  <div class="tools" style="justify-content:space-between">
+    <span class="muted">${rows.length} tài khoản Gmail · trang ${pageGmail}/${pages}</span>
+    <span class="tools">
+      <select id="perGmail" aria-label="Số dòng mỗi trang">${opts([25,50,100,200].map(n=>[String(n),n+" dòng"]),String(perGmail))}</select>
+      <button data-act="prevGmail" ${pageGmail<=1?"disabled":""}>Trước</button>
+      <button data-act="nextGmail" ${pageGmail>=pages?"disabled":""}>Sau</button>
+    </span>
+  </div>`;
+}
+
+function openGmail(uid){
+  if(!ready())return;
+  if(cloudBusy)return toast("Hãy chờ thao tác lưu hoàn tất","error");
+  if(!uid&&!canWrite())return toast("Bạn không có quyền thêm Gmail","error");
+  const old=uid?get(uid):null,curPass=old?(secretsOf(old).pass||""):"";
+  dialog(`<h2>${old?"Chỉnh sửa Gmail":"Thêm tài khoản Gmail"}</h2>
+    <label>Địa chỉ Gmail<input id="g-email" type="email" value="${esc(old?.email||"")}" placeholder="user@gmail.com" ${old?"readonly":""} required autocomplete="off"></label>
+    <label style="margin-top:10px">Mật khẩu<input id="g-pass" type="text" class="mono" value="${esc(curPass)}" placeholder="Nhập mật khẩu" autocomplete="off"></label>
+    <label style="margin-top:10px">Ghi chú (Note)<textarea id="g-note" rows="3" placeholder="Ghi chú thêm (khôi phục, dự án, ngày tạo…)">${esc(old?.note||"")}</textarea></label>`,
+    async d=>{
+      const email=$("#g-email").value.trim().toLowerCase(),pass=$("#g-pass").value.trim(),note=$("#g-note").value.trim();
+      if(!email||!email.includes('@'))return "Vui lòng nhập địa chỉ Gmail hợp lệ.";
+      const targetUid=old?old.uid:makeGmailUid(email);
+      if(!old&&get(targetUid))return "Địa chỉ Gmail này đã có trong kho.";
+      const record={uid:targetUid,email,platform:"gmail",sec:{pass},pass,note,status:old?.status||"live",added:old?.added||Date.now(),updated:Date.now()};
+      if(!await commit([record]))return cloudError||"Không lưu được Gmail.";
+      toast(old?"Đã cập nhật Gmail":"Đã thêm Gmail mới");
+    }
+  );
+}
+
+function importGmailDialog(){
+  if(!canWrite())return toast("Bạn không có quyền nhập dữ liệu","error");
+  let parsed=[];
+  const d=dialog(`<h2>Nhập tài khoản Gmail</h2>
+    <p class="muted">Dán danh sách text hoặc chọn file TXT / CSV. Hỗ trợ các định dạng: <span class="mono">email|pass|note</span> hoặc <span class="mono">email:pass:note</span> hoặc <span class="mono">email pass note</span>.</p>
+    <label>Dán danh sách vào đây<textarea id="pasteGmail" rows="6" class="mono" placeholder="user1@gmail.com|pass123|ghi chú nếu có&#10;user2@gmail.com|pass456&#10;user3@gmail.com:pass789"></textarea></label>
+    <label style="margin-top:10px">Hoặc chọn file TXT / CSV<input type="file" id="fileGmail" accept=".txt,.csv"></label>
+    <div id="previewGmail" style="margin-top:12px"></div>
+    <label style="margin-top:10px">Khi Gmail đã tồn tại trong kho<select id="dupGmail"><option value="update">Cập nhật mật khẩu &amp; ghi chú mới</option><option value="skip">Bỏ qua</option></select></label>`,
+    async d=>{
+      if(!parsed.length)return "Chưa có tài khoản Gmail nào hợp lệ để nhập.";
+      const update=$("#dupGmail").value==="update",put=new Map();
+      let add=0,up=0,skip=0;
+      for(const item of parsed){
+        const uid=makeGmailUid(item.email),old=get(uid);
+        if(old&&!update){skip++;continue}
+        const record={uid,email:item.email,platform:"gmail",sec:{pass:item.pass},pass:item.pass,note:item.note||(old?.note||""),status:old?.status||"live",added:old?.added||Date.now(),updated:Date.now()};
+        if(old)up++;else add++;
+        put.set(uid,record);
+      }
+      if(!put.size)return `Không có gì để nhập. Bỏ qua ${skip} tài khoản đã có.`;
+      if(!await commit([...put.values()]))return cloudError||"Chưa lưu được dữ liệu. Vui lòng thử lại.";
+      toast(`Đã nhập xong: Thêm mới ${add}, Cập nhật ${up}${skip?`, Bỏ qua ${skip}`:""}`);
+      go("gmail");
+    }
+  );
+  const updatePreview=()=>{
+    const el=$("#previewGmail");if(!el)return;
+    if(!parsed.length){el.innerHTML="";return}
+    el.innerHTML=`<p class="muted">Đã nhận diện <b>${parsed.length}</b> tài khoản Gmail hợp lệ:</p>
+    <div class="tablewrap" style="max-height:180px"><table>
+      <thead><tr><th>STT</th><th>Gmail</th><th>Mật khẩu</th><th>Ghi chú</th></tr></thead>
+      <tbody>${parsed.slice(0,50).map((x,i)=>`<tr><td class="muted">${i+1}</td><td><b>${esc(x.email)}</b></td><td class="mono">${esc(x.pass||"—")}</td><td class="muted">${esc(x.note||"—")}</td></tr>`).join("")}
+      ${parsed.length>50?`<tr><td colspan="4" class="muted" style="text-align:center">… và ${parsed.length-50} tài khoản khác</td></tr>`:""}
+      </tbody></table></div>`;
+  };
+  $("#pasteGmail").oninput=e=>{parsed=parseGmailText(e.target.value);updatePreview()};
+  $("#fileGmail").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    try{const text=await f.text();$("#pasteGmail").value=text;parsed=parseGmailText(text);updatePreview()}catch{toast("Không đọc được file TXT này","error")}
+  };
+}
+
+function exportGmailDialog(onlySel){
+  const picked=onlySel?[...selGmail]:filteredGmail().map(a=>a.uid);
+  if(!picked.length)return toast("Không có tài khoản Gmail nào để xuất","error");
+  dialog(`<h2>Xuất ${picked.length} tài khoản Gmail</h2>
+    <label>Định dạng xuất<select id="xgf">
+      <option value="txt_pipe">TXT (email|pass)</option>
+      <option value="txt_full">TXT (email|pass|note)</option>
+      <option value="csv">CSV (Excel, Google Sheets)</option>
+    </select></label>`,
+    ()=>{
+      const f=$("#xgf").value,list=picked.map(get).filter(Boolean);
+      const name=`gmail-list-${today()}.${f.startsWith('txt')?'txt':'csv'}`;
+      if(f==="txt_pipe"){save(name,list.map(a=>`${a.email}|${secretsOf(a).pass||""}`).join("\r\n"))}
+      else if(f==="txt_full"){save(name,list.map(a=>`${a.email}|${secretsOf(a).pass||""}|${a.note||""}`).join("\r\n"))}
+      else{save(name,csv([["Email","Mật khẩu","Ghi chú","Thời gian"],...list.map(a=>[a.email,secretsOf(a).pass||"",a.note||"",fmtTime(a.updated||a.added)])]))}
+    }
+  );
 }
 function history(v,list){
   const h=list.flatMap(a=>(a.hist||[]).map(x=>({...x,a}))).sort((a,b)=>b.t-a.t).slice(0,200);
@@ -655,20 +827,62 @@ const acts={
  sAdd:()=>prompt_("Thêm trạng thái","Tên trạng thái",[],async name=>{if(!name)return "Hãy nhập tên trạng thái";return persistSettings({...settings,statuses:[...settings.statuses,{id:crypto.randomUUID(),name:name.slice(0,30),color:"#8b95a7"}]})}),
  sDel:id=>{if(all().some(a=>a.status===id))return toast("Hãy đổi trạng thái các tài khoản đang dùng trước khi xoá","error");return ask("Xoá trạng thái","Xoá trạng thái này?",()=>persistSettings({...settings,statuses:settings.statuses.filter(s=>s.id!==id)}))},
  template:()=>save("mau-tai-khoan.csv",csv([FIELDS.map(f=>f[1])])),
- retry:()=>{for(const [p,j] of jobs)if(j.failed){j.failed=false;run(p,j)}}
+ retry:()=>{for(const [p,j] of jobs)if(j.failed){j.failed=false;run(p,j)}},
+ gTab:()=>go("gmail"),
+ addGmail:()=>openGmail(),
+ importGmail:()=>importGmailDialog(),
+ exportGmail:()=>exportGmailDialog(),
+ selAllGmail:()=>{filteredGmail().forEach(a=>selGmail.add(a.uid));render()},
+ selNoneGmail:()=>{selGmail.clear();render()},
+ sortGmail:k=>{sortGmail={k,d:sortGmail.k===k?-sortGmail.d:1};render()},
+ prevGmail:()=>{pageGmail--;render()},
+ nextGmail:()=>{pageGmail++;render()},
+ resetGmail:()=>{qGmail="";pageGmail=1;render()},
+ cpMailPass:u=>{
+   const a=get(u);if(!a)return toast("Không tìm thấy tài khoản","error");
+   const p=secretsOf(a).pass||"";
+   return copy(`${a.email}|${p}`,`Đã chép: ${a.email}|${p}`);
+ },
+ cpText:t=>copy(t,"Đã sao chép"),
+ bCopyMail:()=>{
+   const list=[...selGmail].map(get).filter(Boolean).map(a=>a.email);
+   return copy(list.join("\n"),`Đã chép ${list.length} địa chỉ Email`);
+ },
+ bCopyMailPass:()=>{
+   const list=[...selGmail].map(get).filter(Boolean).map(a=>`${a.email}|${secretsOf(a).pass||""}`);
+   return copy(list.join("\n"),`Đã chép ${list.length} tài khoản (email|pass)`);
+ },
+ bExportGmail:()=>exportGmailDialog(true),
+ bDelGmail:()=>ask("Xoá Gmail",`Xoá ${selGmail.size} tài khoản Gmail đã chọn?`,async()=>{
+   if(!await commit([],[...selGmail]))return false;
+   selGmail.clear();render();toast("Đã xoá các tài khoản Gmail đã chọn");
+ }),
+ delGmail:u=>ask("Xoá Gmail","Xoá tài khoản Gmail này?",async()=>{
+   if(!await commit([],[u]))return false;render();toast("Đã xoá Gmail");
+ })
 };
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");
   if(b){e.preventDefault();if(b.disabled)return;try{const action=acts[b.dataset.act];if(!action)throw new Error("Missing action");await action(b.dataset.v)}catch{toast("Thao tác thất bại. Vui lòng thử lại.","error")}return}
   const tr=e.target.closest("tr[data-uid]");
   if(tr&&!e.target.closest("input,button,select,a,td:first-child,.sec"))openAccount(tr.dataset.uid);
+  const gtr=e.target.closest("tr[data-guid]");
+  if(gtr&&!e.target.closest("input,button,select,a,td:first-child,.sec"))openGmail(gtr.dataset.guid);
 });
 for(const d of [$("#dlg"),$("#drawer")])d.addEventListener("close",()=>{if(!d.open)d.innerHTML=""});
-$("#btnAdd").onclick=()=>openAccount();$("#btnImport").onclick=importDialog;$("#btnExport").onclick=()=>exportDialog();
-document.addEventListener("input",e=>{if(e.target.id==="q"){q=e.target.value;page=1;table()}});
+$("#btnAdd").onclick=()=>{if(route()==="gmail")openGmail();else openAccount()};
+$("#btnImport").onclick=()=>{if(route()==="gmail")importGmailDialog();else importDialog()};
+$("#btnExport").onclick=()=>{if(route()==="gmail")exportGmailDialog();else exportDialog()};
+document.addEventListener("input",e=>{
+  if(e.target.id==="q"){q=e.target.value;page=1;table()}
+  else if(e.target.id==="qGmail"){qGmail=e.target.value;pageGmail=1;render()}
+});
 document.addEventListener("change",async e=>{
   const t=e.target;
-  if(t.id==="fPlatform"){fPlatform=t.value;page=1;table()}
+  if(t.id==="pageAllGmail"){$("#view").querySelectorAll("[data-gsel]").forEach(c=>t.checked?selGmail.add(c.dataset.gsel):selGmail.delete(c.dataset.gsel));render()}
+  else if(t.dataset.gsel!==undefined){t.checked?selGmail.add(t.dataset.gsel):selGmail.delete(t.dataset.gsel);render()}
+  else if(t.id==="perGmail"){perGmail=+t.value;pageGmail=1;render()}
+  else if(t.id==="fPlatform"){fPlatform=t.value;page=1;table()}
   else if(t.id==="fStatus"){fStatus=t.value;page=1;tabs();table()}
   else if(t.id==="fStale"){fStale=t.checked;page=1;table()}
   else if(t.id==="per"){per=+t.value;store.set("per",per);page=1;table()}
@@ -681,7 +895,12 @@ document.addEventListener("change",async e=>{
   else if(t.dataset.sn||t.dataset.sc){const id=t.dataset.sn||t.dataset.sc,key=t.dataset.sn?"name":"color",val=t.value.trim();if(!val)return;await persistSettings({...settings,statuses:settings.statuses.map(s=>s.id===id?{...s,[key]:val}:s)})}
   else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365)await persistSettings({...settings,staleDays:n})}
 });
-document.addEventListener("keydown",e=>{if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$("#q")){e.preventDefault();$("#q").focus()}});
+document.addEventListener("keydown",e=>{
+  if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
+    if(route()==="gmail"&&$("#qGmail")){e.preventDefault();$("#qGmail").focus()}
+    else if($("#q")){e.preventDefault();$("#q").focus()}
+  }
+});
 document.addEventListener("pointermove",e=>{
   const t=e.target.closest?.("[data-tip]"),tip=$("#tip");if(!t){tip.hidden=true;return}
   tip.textContent=t.dataset.tip;tip.hidden=false;
@@ -698,7 +917,7 @@ function applyCloudState(state){
 }
 function clearPrivateData(){
   shards=Array.from({length:SHARDS},()=>({}));settings=structuredClone(DEF);daily={};
-  shown.clear();sel.clear();jobs.clear();cloudWorkspace=null;memberRole=null;cloudBusy=false;
+  shown.clear();sel.clear();selGmail.clear();qGmail="";jobs.clear();cloudWorkspace=null;memberRole=null;cloudBusy=false;
   for(const id of ['#dlg','#drawer']){const d=$(id);if(d.open)d.close();d.innerHTML=''}
 }
 function renderLogin(v){
