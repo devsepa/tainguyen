@@ -568,11 +568,14 @@ function gmailView(v,list){
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-weight:600;color:var(--fg);margin-bottom:4px;display:flex;align-items:center;gap:6px">
-            <span style="color:#7b42ff;display:inline-flex">${icon("bolt")}</span> <b>Kho Temp Mail Cloud — TempMail.cloud:</b>
+            <span style="color:#7b42ff;display:inline-flex">${icon("bolt")}</span> <b>Kho TempMail.cloud (Có Email &amp; Password gửi khách đăng nhập):</b>
           </div>
-          <div style="font-size:12.5px;color:var(--mute)">Cơ chế <b>Email | Password | Date</b>: Có mật khẩu riêng để đăng nhập lại hộp thư tại <a href="https://tempmail.cloud/" target="_blank" style="color:var(--accent);text-decoration:underline">https://tempmail.cloud/</a>.</div>
+          <div style="font-size:12.5px;color:var(--mute)">Khách hàng của bạn truy cập <a href="https://tempmail.cloud/" target="_blank" style="color:var(--accent);text-decoration:underline">https://tempmail.cloud/</a>, nhập email &amp; mật khẩu là tự mở hòm thư xem mã OTP.</div>
         </div>
-        <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:5px 12px;border-radius:7px;color:var(--fg);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail.cloud">${icon("ext")} Mở TempMail.cloud</a>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="primary mini" data-act="guideCloudMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600;padding:6px 14px">${icon("bolt")} Tạo Mail Gửi Khách</button>
+          <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:5px 12px;border-radius:7px;color:var(--fg);text-decoration:none;font-size:12px;font-weight:500">${icon("ext")} Mở Web</a>
+        </div>
       </div>
     </div>`;
   }
@@ -587,12 +590,13 @@ function gmailView(v,list){
       <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
   } else if(mailSubTab==="cloud"){
-    actionBtns=`<button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#078df5,#7b42ff);border:none;font-weight:600">${icon("bolt")} Tạo Mail TempMail.cloud</button>
+    actionBtns=`<button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail TempMail.cloud (Gửi khách)</button>
+      <button data-act="quickPasteCloudMail" style="background:rgba(47,191,113,0.15);border-color:rgba(47,191,113,0.4);color:#2fbf71;font-weight:600">${icon("up")} 📋 Dán từ Clipboard &amp; Lưu</button>
       <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
   } else {
     actionBtns=`<button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail .EDU</button>
-      <button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#078df5,#7b42ff);border:none;font-weight:600">${icon("bolt")} Tạo TempMail.cloud</button>
+      <button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail TempMail.cloud</button>
       <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
   }
@@ -949,181 +953,81 @@ function genTempMailDialog(){
   d.showModal();
 }
 
+const genCloudMailDialog=()=>guideCloudMailDialog();
+
 function guideCloudMailDialog(){
   const d=$("#dlg");
-
-  const buildBookmarklet=(count=10)=>{
-    return `javascript:(async()=>{const n=prompt("Số lượng mail TempMail.cloud cần tạo:","${count}")||"${count}";const num=Math.min(50,Math.max(1,parseInt(n)||10));const box=document.createElement("div");box.style.cssText="position:fixed;top:20px;right:20px;z-index:9999999;background:#0e1320;color:#e8edf7;padding:16px 20px;border-radius:12px;border:1px solid #7b42ff;box-shadow:0 12px 36px rgba(0,0,0,0.6);font-family:sans-serif;font-size:13px;min-width:280px";box.innerHTML='<b style=\\"color:#a855f7;font-size:14px\\">⚡ Đang tự động tạo '+num+' tài khoản...</b><div id=\\"prog\\" style=\\"margin-top:8px;color:#2fbf71\\">0 / '+num+'</div>';document.body.appendChild(box);let res=[];for(let i=1;i<=num;i++){try{const r=await fetch('/api/mailboxes',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(x=>x.json());if(r&&r.mailbox){const d=new Date().toISOString().slice(0,19).replace('T',' ');res.push(r.mailbox.email+' | '+(r.password||'')+' | '+d);document.getElementById('prog').textContent=i+' / '+num+' - '+r.mailbox.email;}}catch(e){console.error(e);}}if(res.length){await navigator.clipboard.writeText(res.join('\\n'));box.innerHTML='<b style=\\"color:#2fbf71;font-size:14px\\">✅ Đã tạo &amp; sao chép '+res.length+' tài khoản!</b><div style=\\"margin-top:6px;font-size:12px;color:#8e9bb5\\">Đã copy vào Clipboard. Hãy quay lại web Quản Lý Kho và bấm Lưu.</div>';setTimeout(()=>box.remove(),5000);}else{box.innerHTML='<b style=\\"color:#ef5350\\">❌ Lỗi tạo mail.</b>';setTimeout(()=>box.remove(),3000);}})();`;
+  const buildBmCode=(count=10)=>{
+    return `(async()=>{if(!location.hostname.includes("tempmail.cloud")){alert("⚠️ Bạn hãy mở trang web https://tempmail.cloud/ trước rồi mới bấm Bookmark này nhé!\\n\\n(Đang chuyển hướng sang web TempMail.cloud...)");location.href="https://tempmail.cloud/";return;}const n=prompt("Số lượng tài khoản TempMail.cloud muốn tạo:","${count}")||"${count}";const num=Math.min(50,Math.max(1,parseInt(n)||10));const box=document.createElement("div");box.style.cssText="position:fixed;top:20px;right:20px;z-index:9999999;background:#0e1320;color:#e8edf7;padding:16px 20px;border-radius:12px;border:2px solid #7b42ff;box-shadow:0 12px 36px rgba(0,0,0,0.85);font-family:sans-serif;font-size:13px;min-width:300px;line-height:1.5";box.innerHTML='<div style=\\"font-size:14px;font-weight:700;color:#a855f7\\">⚡ Đang tạo '+num+' tài khoản TempMail.cloud...</div><div id=\\"prog\\" style=\\"margin-top:8px;color:#2fbf71;font-weight:600\\">Đang khởi tạo...</div>';document.body.appendChild(box);let res=[];for(let i=1;i<=num;i++){try{const r=await fetch('/api/mailboxes',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(x=>x.json());if(r&&r.mailbox&&r.password){const d=new Date().toISOString().slice(0,19).replace('T',' ');res.push(r.mailbox.email+' | '+r.password+' | '+d);document.getElementById('prog').textContent=i+' / '+num+' - '+r.mailbox.email;}}catch(e){console.error(e);}await new Promise(s=>setTimeout(s,220));}if(res.length){const txt=res.join('\\n');try{await navigator.clipboard.writeText(txt);}catch(err){const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.top='-9999px';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');ta.remove();}box.innerHTML='<div style=\\"font-size:15px;font-weight:700;color:#2fbf71\\">✅ Đã tạo &amp; chép '+res.length+' tài khoản!</div><div style=\\"margin-top:8px;font-size:12.5px;color:#cbd5e1\\">Đã copy vào Clipboard dạng <b>email | pass | date</b>.<br>👉 Hãy quay lại tab <b>Quản Lý Kho</b> và bấm <b>[📋 Dán từ Clipboard &amp; Lưu]</b>!</div>';setTimeout(()=>box.remove(),8000);}else{box.innerHTML='<div style=\\"font-size:14px;font-weight:700;color:#ef4444\\">❌ Không tạo được mail. Hãy F5 trang TempMail.cloud và thử lại.</div>';setTimeout(()=>box.remove(),4000);}})();`;
   };
 
-  d.innerHTML=`<form style="display:grid;gap:14px">
+  d.innerHTML=`<form style="display:grid;gap:12px;max-height:85vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
-      <div>
-        <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
-          <span style="color:#7b42ff">${icon("bolt")}</span> Tạo &amp; Lấy Mail TempMail.cloud Hàng Loạt
-        </h2>
-        <div style="font-size:12px;color:var(--mute);margin-top:3px">Hỗ trợ tự động tạo hàng loạt có đầy đủ <b>Email + Mật khẩu riêng</b></div>
-      </div>
+      <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
+        <span style="color:#7b42ff">${icon("bolt")}</span> Tạo Mail TempMail.cloud (Gửi Cho Khách)
+      </h2>
       <button type="button" class="ico" data-act="close">${icon("x")}</button>
     </div>
 
-    <div style="display:flex;gap:6px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--line)">
-      <button type="button" id="tabAutoMode" class="primary" style="flex:1;background:var(--raise);border:1px solid var(--accent);color:var(--fg);font-size:12.5px;padding:7px 10px;border-radius:7px">⚡ 1. Tạo Hàng Loạt (Tự Động)</button>
-      <button type="button" id="tabPasteMode" style="flex:1;background:none;border:1px solid transparent;color:var(--mute);font-size:12.5px;padding:7px 10px;border-radius:7px">📋 2. Nhập / Đọc từ Clipboard</button>
+    <div style="background:rgba(123,66,255,0.08);border:1px solid rgba(123,66,255,0.25);border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.6">
+      <b style="color:#c084fc">🌟 Ưu điểm khi dùng TempMail.cloud gửi cho khách:</b><br>
+      Khách hàng của bạn có thể trực tiếp vào trang web <a href="https://tempmail.cloud/" target="_blank" style="color:var(--accent);text-decoration:underline">https://tempmail.cloud/</a>, nhập đúng <b>Email &amp; Mật khẩu</b> để tự mở hòm thư và xem mã xác nhận OTP mà không cần bạn hỗ trợ!
     </div>
 
-    <!-- PANE 1: AUTO GEN -->
-    <div id="paneAuto" style="display:grid;gap:12px">
-      <div style="background:rgba(123,66,255,0.08);border:1px solid rgba(123,66,255,0.25);border-radius:10px;padding:12px 14px;font-size:12.5px;line-height:1.6">
-        <div style="font-weight:600;color:#c084fc;margin-bottom:4px;display:flex;align-items:center;gap:6px">
-          ${icon("bolt")} Cơ chế tạo tài khoản TempMail.cloud:
-        </div>
-        Do máy chủ <b>tempmail.cloud</b> chặn gọi trực tiếp từ web khác (chính sách CORS), công cụ cung cấp giải pháp <b>1-Click Siêu Tốc</b> để bạn tạo 10 - 50 mail chỉ trong 2 giây!
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+      <div style="font-weight:700;font-size:13px;color:var(--fg);margin-bottom:6px">
+        ⚡ Cách tạo 10 - 50 tài khoản siêu tốc (Chỉ mất 3 giây):
       </div>
+      <ol style="margin:0 0 10px 18px;padding:0;font-size:12.5px;line-height:1.7;color:var(--mute)">
+        <li>Kéo nút màu tím bên dưới thả lên <b>thanh Dấu trang (Bookmark)</b> của trình duyệt (chỉ cần kéo 1 lần).</li>
+        <li>Bấm <b>[Mở TempMail.cloud]</b> và bấm vào Bookmark đó trên thanh trình duyệt.</li>
+        <li>Tool sẽ tự tạo và copy danh sách vào Clipboard. Quay lại đây bấm <b>[Dán từ Clipboard &amp; Lưu]</b> là xong!</li>
+      </ol>
 
-      <label>Số lượng tài khoản muốn tạo:
-        <input type="number" id="tmCloudCount" min="1" max="50" value="10" style="margin-top:4px">
-      </label>
-
-      <div style="display:grid;gap:8px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px">
-        <div style="font-size:12.5px;font-weight:600;color:var(--fg)">⚡ Phương pháp 1: Mở Web &amp; Tự Động Chạy (Khuyên Dùng)</div>
-        <div style="font-size:12px;color:var(--mute)">Bấm nút dưới đây sẽ tự động copy script tạo nhanh và mở trang TempMail.cloud. Sang web đó bạn chỉ cần mở Console (F12) dán vào (hoặc bấm Bookmark):</div>
-        
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-          <button type="button" class="primary" id="btnCloud1Click" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600;padding:8px 16px">
-            🚀 1-Click: Mở Web &amp; Chép Script Tạo Nhanh
-          </button>
-          <a id="lnkBookmarklet" href="#" class="link" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.06);border:1px dashed var(--accent);border-radius:7px;padding:6px 12px;font-size:12px;color:var(--accent);text-decoration:none" title="Kéo nút này thả lên thanh Dấu trang (Bookmarks) của trình duyệt để dùng mãi mãi">
-            ★ Kéo vào Bookmark
-          </a>
-        </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <a id="btnDragBmCloud" href="#" class="link" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#7b42ff,#078df5);border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;color:#fff;text-decoration:none;font-weight:700;box-shadow:0 4px 12px rgba(123,66,255,0.3)" title="Kéo nút này thả lên thanh Bookmark (Ctrl+Shift+B nếu chưa thấy thanh)">★ ⚡ Kéo vào Bookmark để tạo nhanh</a>
+        <button type="button" class="mini" id="btnCopyBmCloudCode" style="font-weight:600;padding:6px 12px">📋 Copy mã F12 Console</button>
+        <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="link" style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-size:12.5px;font-weight:600">${icon("ext")} Mở TempMail.cloud</a>
       </div>
-
-      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between">
-        <span style="font-size:12px;color:var(--mute)">Hoặc bạn muốn thử gửi lệnh trực tiếp:</span>
-        <button type="button" class="mini" id="btnTryDirectFetch" style="border-color:var(--line)">⚡ Thử tạo trực tiếp từ app</button>
-      </div>
-
-      <div id="tmCloudStatus" style="font-size:12.5px;color:var(--accent);min-height:18px"></div>
-      <div id="tmCloudLog" style="display:none;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-height:130px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;color:#00ffc4"></div>
     </div>
 
-    <!-- PANE 2: PASTE / CLIPBOARD -->
-    <div id="panePaste" style="display:none;grid-gap:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <label style="margin:0">Danh sách tài khoản (định dạng <span class="mono">email | pass | date</span>):</label>
-        <button type="button" class="mini primary" id="btnReadClipboard" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:700">📋 Tự động đọc từ Clipboard</button>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px">
+      <label style="margin:0;font-weight:600">Dán danh sách tài khoản (<span class="mono">email | pass | date</span>):</label>
+      <button type="button" class="mini primary" id="btnQuickPasteClipDialog" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:700">📋 Dán từ Clipboard</button>
+    </div>
 
-      <textarea id="tmCloudPaste" rows="7" class="mono" placeholder="user1@pemoteusonourweb.sbs | pass123 | 2026-11-25 21:00:00&#10;user2@imlimikom.store | pass456 | 2026-11-25 21:00:00" style="margin-top:4px"></textarea>
-      
-      <div id="tmPasteSummary" style="font-size:12px;color:var(--mute)"></div>
+    <textarea id="tmCloudPasteDialog" rows="5" class="mono" placeholder="user1@domain.online | pass123 | 2026-11-26 00:00:00&#10;user2@imlimikom.store | pass456 | 2026-11-26 00:00:00" style="margin-top:2px;font-size:12px"></textarea>
+    <div id="tmPasteInfoDialog" style="font-size:12px;color:var(--mute);min-height:16px"></div>
 
-      <div class="actions" style="margin-top:6px">
-        <button type="button" data-act="close">Đóng</button>
-        <button type="button" class="primary" id="btnImportCloudList" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">📥 Lưu vào Tab TempMail.cloud</button>
-      </div>
+    <div class="actions">
+      <button type="button" data-act="close">Đóng</button>
+      <button type="button" class="primary" id="btnImportCloudListDialog" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">📥 Lưu vào Tab Temp Mail Cloud</button>
     </div>
   </form>`;
 
-  const tabAuto=d.querySelector("#tabAutoMode"),tabPaste=d.querySelector("#tabPasteMode");
-  const paneAuto=d.querySelector("#paneAuto"),panePaste=d.querySelector("#panePaste");
-  const inputCount=d.querySelector("#tmCloudCount"),btn1Click=d.querySelector("#btnCloud1Click"),lnkBookmarklet=d.querySelector("#lnkBookmarklet"),btnTryDirect=d.querySelector("#btnTryDirectFetch");
-  const statusEl=d.querySelector("#tmCloudStatus"),logEl=d.querySelector("#tmCloudLog");
-  const txtPaste=d.querySelector("#tmCloudPaste"),btnClipboard=d.querySelector("#btnReadClipboard"),pasteSummary=d.querySelector("#tmPasteSummary"),btnImport=d.querySelector("#btnImportCloudList");
+  const txtPaste=d.querySelector("#tmCloudPasteDialog"),btnPaste=d.querySelector("#btnQuickPasteClipDialog"),pasteInfo=d.querySelector("#tmPasteInfoDialog"),btnImport=d.querySelector("#btnImportCloudListDialog");
+  const btnCopyCode=d.querySelector("#btnCopyBmCloudCode"),btnDragBm=d.querySelector("#btnDragBmCloud");
 
-  const switchTab=(mode)=>{
-    if(mode==="auto"){
-      paneAuto.style.display="grid";panePaste.style.display="none";
-      tabAuto.style.border="1px solid var(--accent)";tabAuto.style.color="var(--fg)";tabAuto.style.background="var(--raise)";
-      tabPaste.style.border="1px solid transparent";tabPaste.style.color="var(--mute)";tabPaste.style.background="none";
-    }else{
-      paneAuto.style.display="none";panePaste.style.display="grid";
-      tabPaste.style.border="1px solid var(--accent)";tabPaste.style.color="var(--fg)";tabPaste.style.background="var(--raise)";
-      tabAuto.style.border="1px solid transparent";tabAuto.style.color="var(--mute)";tabAuto.style.background="none";
-    }
-  };
+  btnDragBm.href="javascript:"+buildBmCode(10);
 
-  tabAuto.onclick=()=>switchTab("auto");
-  tabPaste.onclick=()=>switchTab("paste");
-
-  const updateBookmarkletHref=()=>{
-    const cnt=Math.max(1,Math.min(50,parseInt(inputCount.value)||10));
-    lnkBookmarklet.href=buildBookmarklet(cnt);
-  };
-  inputCount.oninput=updateBookmarkletHref;
-  updateBookmarkletHref();
-
-  btn1Click.onclick=async()=>{
-    const cnt=Math.max(1,Math.min(50,parseInt(inputCount.value)||10));
-    const code=buildBookmarklet(cnt);
+  btnCopyCode.onclick=async()=>{
+    const code=buildBmCode(10);
     await navigator.clipboard.writeText(code);
     playChime("success");
-    toast(`Đã chép mã script tạo ${cnt} tài khoản! Đang mở TempMail.cloud...`,"success");
-    window.open("https://tempmail.cloud/","_blank");
-    
-    statusEl.innerHTML=`<span style="color:#2fbf71">✅ Đã copy script tạo ${cnt} mail vào bộ nhớ tạm!</span>`;
-    logEl.style.display="block";
-    logEl.textContent=`👉 HƯỚNG DẪN 2 GIÂY TRÊN TAB TEMPMALL.CLOUD VỪA MỞ:\n1. Nhấn phím F12 (hoặc click chuột phải -> Inspect/Kiểm tra)\n2. Chọn thẻ Console -> Nhấn Ctrl + V rồi gõ Enter\n3. Tool sẽ tự động tạo ${cnt} mail trong 1.5 giây và copy sẵn vào Clipboard!\n4. Quay lại đây, chọn thẻ [📋 Nhập / Đọc từ Clipboard] và bấm 'Lưu vào Tab TempMail.cloud'.`;
+    toast("Đã chép mã script! Mở tab TempMail.cloud -> nhấn F12 -> chọn thẻ Console -> nhấn Ctrl + V rồi gõ Enter.","success");
   };
 
-  btnTryDirect.onclick=async()=>{
-    const cnt=Math.max(1,Math.min(50,parseInt(inputCount.value)||10));
-    btnTryDirect.disabled=true;
-    statusEl.textContent=`Đang thử kết nối máy chủ TempMail.cloud...`;
-    logEl.style.display="block";logEl.textContent="";
-    const created=[];
-    try{
-      for(let i=1;i<=cnt;i++){
-        statusEl.textContent=`Đang tạo [${i}/${cnt}]...`;
-        const res=await fetch("https://tempmail.cloud/api/mailboxes",{
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:"{}"
-        });
-        if(res.status===403){
-          throw new Error("CORS_BROWSER_REQUIRED");
-        }
-        const data=await res.json();
-        if(data&&data.mailbox){
-          const email=data.mailbox.email,pass=data.password||"";
-          const targetUid=makeGmailUid(email);
-          const note=`[TempMail.cloud] ${email.split('@')[1]||''}`;
-          created.push({
-            uid:targetUid,email,platform:"gmail",sec:{pass},pass,note,status:"live",added:Date.now(),updated:Date.now()
-          });
-          logEl.textContent+=`[${i}/${cnt}] ${email} | ${pass}\n`;
-        }
-        await new Promise(r=>setTimeout(r,250));
-      }
-    }catch(err){
-      statusEl.innerHTML=`<span style="color:#f0625f">⚠️ Trình duyệt bị máy chủ TempMail.cloud chặn CORS (browser_required).</span>`;
-      logEl.textContent+=`\n💡 Giải pháp chuẩn: Hãy dùng nút tím [🚀 1-Click: Mở Web & Chép Script] ở trên. Bạn chỉ cần chạy script trên tab TempMail.cloud là tạo xong ${cnt} tài khoản ngay lập tức!\n`;
-      btnTryDirect.disabled=false;
-      return;
-    }
-    btnTryDirect.disabled=false;
-    if(created.length){
-      statusEl.innerHTML=`<span style="color:#2fbf71">✅ Đã tạo thành công ${created.length} mail! Đang lưu...</span>`;
-      await commit(created);
-      toast(`Đã lưu ${created.length} tài khoản vào tab TempMail.cloud!`);
-      d.close();
-    }
-  };
-
-  btnClipboard.onclick=async()=>{
+  btnPaste.onclick=async()=>{
     try{
       const clipText=await navigator.clipboard.readText();
-      if(!clipText){
-        return toast("Bộ nhớ tạm (Clipboard) đang trống","error");
-      }
+      if(!clipText)return toast("Bộ nhớ tạm (Clipboard) đang trống","error");
       txtPaste.value=clipText.trim();
-      const lines=clipText.split(/\r?\n/).filter(l=>l.includes('@'));
+      const count=clipText.split(/\r?\n/).filter(l=>l.includes('@')).length;
       playChime("success");
-      toast(`Đã đọc ${lines.length} dòng tài khoản từ Clipboard!`);
-      pasteSummary.innerHTML=`<span style="color:#2fbf71">✓ Phát hiện <b>${lines.length}</b> dòng tài khoản hợp lệ.</span>`;
-    }catch(e){
-      toast("Không thể truy cập Clipboard tự động. Vui lòng nhấn Ctrl + V để dán thủ công.","warn");
+      toast(`Đã đọc ${count} dòng tài khoản từ Clipboard!`);
+      pasteInfo.innerHTML=`<span style="color:#2fbf71">✓ Phát hiện <b>${count}</b> dòng tài khoản hợp lệ.</span>`;
+    }catch{
+      toast("Vui lòng bấm Ctrl + V vào ô bên dưới","warn");
     }
   };
 
@@ -1153,7 +1057,8 @@ function guideCloudMailDialog(){
     }
     if(!created.length)return toast("Không tìm thấy dòng email|pass hợp lệ","error");
     await commit(created);
-    toast(`Đã thêm ${created.length} tài khoản vào tab TempMail.cloud!`);
+    playChime("success");
+    toast(`Đã thêm ${created.length} tài khoản vào tab Temp Mail Cloud!`);
     d.close();
   };
 
@@ -1986,7 +1891,44 @@ const acts={
    if(!await commit([],[u]))return false;render();toast("Đã xoá Gmail");
  }),
  genTempMail:()=>genTempMailDialog(),
+ genCloudMail:()=>genCloudMailDialog(),
  guideCloudMail:()=>guideCloudMailDialog(),
+ quickPasteCloudMail:async()=>{
+   try{
+     const clipText=await navigator.clipboard.readText();
+     if(!clipText||!clipText.includes('@')){
+       return toast("Bộ nhớ tạm chưa có danh sách email|pass. Hãy bấm [Tạo Mail TempMail.cloud] trước!","warn");
+     }
+     const lines=clipText.trim().split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+     const created=[];
+     for(const line of lines){
+       let parts=line.includes('|')?line.split('|'):line.includes(':')?line.split(':'):line.split(/\s+/);
+       const email=parts[0]?.trim();
+       if(!email||!email.includes('@'))continue;
+       const pass=parts[1]?.trim()||'';
+       const note=parts.slice(2).join('|').trim()||`[TempMail.cloud] ${email.split('@')[1]||''}`;
+       const targetUid=makeGmailUid(email);
+       created.push({
+         uid:targetUid,
+         email,
+         platform:"gmail",
+         sec:{pass},
+         pass,
+         note,
+         status:"live",
+         added:Date.now(),
+         updated:Date.now()
+       });
+     }
+     if(!created.length)return toast("Không tìm thấy định dạng email|pass trong Clipboard","error");
+     await commit(created);
+     playChime("success");
+     toast(`✅ Đã lưu ${created.length} tài khoản TempMail.cloud từ Clipboard vào kho!`,"success");
+     render();
+   }catch{
+     guideCloudMailDialog();
+   }
+ },
  inboxTempMail:u=>openTempMailInbox(u),
  inboxTempMailByEmail:async email=>{
    if(!email)return toast("Tài khoản chưa có email","error");
