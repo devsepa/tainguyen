@@ -928,6 +928,57 @@
           0 12px 36px rgba(0, 0, 0, 0.5),
           0 0 22px rgba(240, 98, 95, 0.35);
       }
+      @keyframes mailPopupIn {
+        from {
+          opacity: 0;
+          transform: translateX(24px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0) scale(1);
+        }
+      }
+      #mailNotifStack {
+        position: fixed;
+        top: auto;
+        left: auto;
+        right: 20px;
+        bottom: 20px;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        width: min(360px, calc(100vw - 24px));
+        display: grid;
+        gap: 10px;
+        z-index: 9999998;
+        pointer-events: none;
+      }
+      #mailNotifStack[hidden] {
+        display: none;
+      }
+      .mail-popup {
+        pointer-events: auto;
+        background: rgba(18, 25, 41, 0.97);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        color: var(--fg);
+        border: 1px solid #2fbf71;
+        border-radius: 12px;
+        padding: 12px 14px;
+        box-shadow:
+          0 14px 38px rgba(0, 0, 0, 0.55),
+          0 0 22px rgba(47, 191, 113, 0.28);
+        display: grid;
+        gap: 8px;
+        animation: mailPopupIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .mail-popup.no-otp {
+        border-color: var(--accent);
+        box-shadow:
+          0 14px 38px rgba(0, 0, 0, 0.55),
+          0 0 22px rgba(91, 140, 255, 0.25);
+      }
       #tip {
         position: fixed;
         pointer-events: none;
@@ -1246,6 +1297,7 @@
     <dialog id="dlg"></dialog>
     <dialog id="drawer" class="drawer"></dialog>
     <div id="toast" popover="manual" hidden role="status"></div>
+    <div id="mailNotifStack" popover="manual" hidden aria-live="polite"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
@@ -2480,43 +2532,137 @@
           return null;
         }
 
+        let sharedAudioCtx = null;
+        function getAudioCtx() {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (!AudioCtx) return null;
+          if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+            sharedAudioCtx = new AudioCtx();
+          }
+          if (sharedAudioCtx.state === "suspended") {
+            sharedAudioCtx.resume().catch(() => {});
+          }
+          return sharedAudioCtx;
+        }
+        ["pointerdown", "keydown"].forEach((evt) => {
+          window.addEventListener(
+            evt,
+            () => {
+              try {
+                getAudioCtx();
+              } catch {}
+            },
+            { passive: true },
+          );
+        });
+
         function playChime(type = "success") {
           try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-            const ctx = new AudioCtx();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            const now = ctx.currentTime;
-            if (type === "otp") {
-              osc.type = "triangle";
-              osc.frequency.setValueAtTime(523.25, now);
-              osc.frequency.setValueAtTime(659.25, now + 0.09);
-              osc.frequency.setValueAtTime(1046.5, now + 0.18);
-              gain.gain.setValueAtTime(0.09, now);
-              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-              osc.start(now);
-              osc.stop(now + 0.45);
-            } else if (type === "error") {
-              osc.type = "sawtooth";
-              osc.frequency.setValueAtTime(220, now);
-              osc.frequency.exponentialRampToValueAtTime(140, now + 0.16);
-              gain.gain.setValueAtTime(0.07, now);
-              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-              osc.start(now);
-              osc.stop(now + 0.2);
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            const trigger = () => {
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              const now = ctx.currentTime;
+              if (type === "otp") {
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.09);
+                osc.frequency.setValueAtTime(1046.5, now + 0.18);
+                gain.gain.setValueAtTime(0.16, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+              } else if (type === "mail") {
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(659.25, now);
+                osc.frequency.setValueAtTime(880, now + 0.11);
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+                osc.start(now);
+                osc.stop(now + 0.36);
+              } else if (type === "error") {
+                osc.type = "sawtooth";
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(140, now + 0.16);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+              } else {
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(587.33, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+                osc.start(now);
+                osc.stop(now + 0.26);
+              }
+            };
+            if (ctx.state === "suspended") {
+              ctx.resume().then(trigger).catch(() => {});
             } else {
-              osc.type = "sine";
-              osc.frequency.setValueAtTime(587.33, now);
-              osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-              gain.gain.setValueAtTime(0.07, now);
-              gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
-              osc.start(now);
-              osc.stop(now + 0.26);
+              trigger();
             }
           } catch (e) {}
+        }
+
+        function showMailCornerPopup({ email, subject, from, otp }) {
+          const stack = $("#mailNotifStack");
+          if (!stack) return;
+          stack.hidden = false;
+          try {
+            if (!stack.matches(":popover-open")) stack.showPopover?.();
+          } catch {}
+
+          const card = document.createElement("div");
+          card.className = "mail-popup" + (otp ? "" : " no-otp");
+          card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <div style="font-size:12px;font-weight:700;color:${otp ? "#2fbf71" : "var(--accent)"};display:flex;align-items:center;gap:6px">
+                <span>${otp ? "🔥 CÓ MÃ OTP MỚI" : "📬 THƯ MỚI ĐẾN"}</span>
+              </div>
+              <button type="button" class="mini" data-close-popup style="padding:2px 7px;font-size:11px;line-height:1.2" title="Đóng">✕</button>
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--fg);line-height:1.35;word-break:break-word">${esc(subject || "(Không có tiêu đề)")}</div>
+            <div style="font-size:11.5px;color:var(--mute);word-break:break-all">
+              ${from ? `Từ: <span style="color:var(--fg)">${esc(from)}</span> · ` : ""}Đến: <span style="color:var(--fg)">${esc(email)}</span>
+            </div>
+            ${
+              otp
+                ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(47,191,113,0.12);border:1px solid #2fbf71;border-radius:8px;padding:7px 10px">
+                    <span style="font-size:19px;font-weight:800;letter-spacing:3px;color:#2fbf71;font-family:var(--mono)">${esc(otp)}</span>
+                    <button type="button" class="primary" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:700;padding:5px 10px;border-radius:6px;font-size:12px" onclick="copyOtp(this,'${esc(otp)}')">📋 Copy OTP</button>
+                  </div>`
+                : ""
+            }
+          `;
+
+          const removeCard = () => {
+            if (!card.isConnected) return;
+            card.remove();
+            if (!stack.children.length) {
+              try {
+                stack.hidePopover?.();
+              } catch {}
+              stack.hidden = true;
+            }
+          };
+
+          let timer = setTimeout(removeCard, 8000);
+          card.addEventListener("mouseenter", () => clearTimeout(timer));
+          card.addEventListener("mouseleave", () => {
+            clearTimeout(timer);
+            timer = setTimeout(removeCard, 4000);
+          });
+          card.querySelector("[data-close-popup]").onclick = removeCard;
+
+          stack.prepend(card);
+          while (stack.children.length > 3) {
+            stack.lastElementChild.remove();
+          }
         }
 
         function requestNotificationPermission() {
@@ -2532,11 +2678,17 @@
           if (!("Notification" in window)) return;
           if (Notification.permission === "granted") {
             try {
-              const notif = new Notification("📬 MÃ OTP MỚI: " + otp, {
-                body: `[${email}] ${subject || "Mã xác nhận vừa gửi đến"}\n(Đã tự động sao chép mã vào Clipboard)`,
+              const title = otp
+                ? "📬 MÃ OTP MỚI: " + otp
+                : "📬 Thư mới đến: " + email;
+              const body = otp
+                ? `[${email}] ${subject || "Mã xác nhận vừa gửi đến"}\n(Đã tự động sao chép mã vào Clipboard)`
+                : `[${email}] ${subject || "Bạn có thư mới"}`;
+              const notif = new Notification(title, {
+                body,
                 icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232fbf71'><path d='M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z'/></svg>",
-                requireInteraction: true,
-                tag: "otp-" + otp,
+                requireInteraction: Boolean(otp),
+                tag: otp ? "otp-" + otp : "mail-" + email,
               });
               notif.onclick = () => {
                 window.focus();
@@ -3535,7 +3687,9 @@
 
           let clientUuid = "unknown",
             isFetching = false,
-            seenMsgIds = new Set();
+            isInitialLoad = true,
+            seenMsgIds = new Set(),
+            openMsgIds = new Set();
 
           const stopPolling = () => {
             if (inboxPollInterval) {
@@ -3588,11 +3742,18 @@
                 }),
               });
               const data = await res.json();
-              const messages = (data && data.messages) || [];
+              const rawMessages = (data && data.messages) || [];
+              const messages = [...rawMessages].sort((a, b) => {
+                const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+                if (tb !== ta) return tb - ta;
+                return Number(b.id || 0) - Number(a.id || 0);
+              });
 
               statusEl.innerHTML = `<span style="color:#2fbf71">●</span> Lắng nghe thư (Lần cuối: ${new Date().toLocaleTimeString("vi-VN")})`;
 
               if (!messages.length) {
+                isInitialLoad = false;
                 listEl.innerHTML = `<div style="text-align:center;padding:32px 10px;background:rgba(255,255,255,0.02);border:1px dashed var(--line);border-radius:10px;color:var(--mute)">
           <div style="font-size:26px;margin-bottom:8px">📬</div>
           <b style="color:var(--fg);font-size:14px">Hộp thư đang trống</b>
@@ -3602,9 +3763,7 @@
               }
 
               let html = "";
-              let newOtpDetected = false;
-              let latestNewOtp = null,
-                latestSubj = "";
+              const newMessages = [];
               for (const m of messages) {
                 const fromRaw =
                   typeof m.from === "object"
@@ -3617,13 +3776,10 @@
                   ? new Date(m.created_at).toLocaleString("vi-VN")
                   : "";
                 const msgId = "msg_" + m.id;
+                const isOpen = openMsgIds.has(msgId);
 
-                if (otp && !seenMsgIds.has(m.id)) {
-                  newOtpDetected = true;
-                  if (!latestNewOtp) {
-                    latestNewOtp = otp;
-                    latestSubj = subject;
-                  }
+                if (!seenMsgIds.has(m.id)) {
+                  newMessages.push({ otp, subject, fromRaw });
                 }
                 seenMsgIds.add(m.id);
 
@@ -3633,7 +3789,7 @@
               <div style="font-weight:600;color:var(--fg);font-size:13.5px">${esc(subject)}</div>
               <div style="font-size:11.5px;color:var(--mute);margin-top:2px">Từ: <span style="color:var(--fg)">${esc(fromRaw)}</span> · ${esc(time)}</div>
             </div>
-            <button type="button" class="mini" data-toggle-msg="${msgId}" style="align-self:flex-start">👁️ Xem nội dung</button>
+            <button type="button" class="mini" data-toggle-msg="${msgId}" style="align-self:flex-start">${isOpen ? "Ẩn nội dung" : "👁️ Xem nội dung"}</button>
           </div>
 
           ${
@@ -3650,36 +3806,52 @@
               : ""
           }
 
-          <div id="${msgId}" style="display:none;margin-top:8px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;max-height:300px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px">
+          <div id="${msgId}" style="display:${isOpen ? "block" : "none"};margin-top:8px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;max-height:300px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px">
             <div style="font-family:inherit;word-break:break-word">${body}</div>
           </div>
         </div>`;
               }
 
-              if (newOtpDetected) {
-                playChime("otp");
-                if (latestNewOtp) {
+              const latestOtpItem = newMessages.find((item) => item.otp);
+              const notifyTarget = !isInitialLoad
+                ? newMessages[0]
+                : latestOtpItem || null;
+              isInitialLoad = false;
+
+              if (notifyTarget) {
+                playChime(notifyTarget.otp ? "otp" : "mail");
+                showMailCornerPopup({
+                  email,
+                  subject: notifyTarget.subject,
+                  from: notifyTarget.fromRaw,
+                  otp: notifyTarget.otp,
+                });
+                if (notifyTarget.otp) {
                   try {
-                    navigator.clipboard.writeText(latestNewOtp);
-                    toast(
-                      `🔥 Đã nhận & tự động sao chép mã OTP: ${latestNewOtp}`,
-                      "success",
-                    );
+                    navigator.clipboard
+                      ?.writeText(notifyTarget.otp)
+                      .catch(() => {});
                   } catch (e) {}
-                  notifyDesktopOtp(latestNewOtp, email, latestSubj);
+                  toast(
+                    `🔥 Đã nhận & tự động sao chép mã OTP: ${notifyTarget.otp}`,
+                    "success",
+                    true,
+                  );
                 }
+                notifyDesktopOtp(notifyTarget.otp, email, notifyTarget.subject);
               }
 
               listEl.innerHTML = html;
 
               listEl.querySelectorAll("[data-toggle-msg]").forEach((btn) => {
                 btn.onclick = () => {
-                  const target = listEl.querySelector(
-                    "#" + btn.dataset.toggleMsg,
-                  );
+                  const msgKey = btn.dataset.toggleMsg;
+                  const target = listEl.querySelector("#" + msgKey);
                   if (target) {
                     const isHidden = target.style.display === "none";
                     target.style.display = isHidden ? "block" : "none";
+                    if (isHidden) openMsgIds.add(msgKey);
+                    else openMsgIds.delete(msgKey);
                     btn.textContent = isHidden
                       ? "Ẩn nội dung"
                       : "👁️ Xem nội dung";
@@ -3912,7 +4084,7 @@
 
         /* ---------- hộp thoại ---------- */
         let toastT;
-        function toast(m, type = "success") {
+        function toast(m, type = "success", silent = false) {
           const t = $("#toast");
           if (!t) return;
           const ic = type === "error" ? "✕" : type === "warn" ? "⚠️" : "✓";
@@ -3923,7 +4095,7 @@
           try {
             t.showPopover?.();
           } catch {}
-          playChime(type === "error" ? "error" : "success");
+          if (!silent) playChime(type === "error" ? "error" : "success");
           clearTimeout(toastT);
           toastT = setTimeout(() => {
             try {
