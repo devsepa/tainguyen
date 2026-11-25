@@ -1,0 +1,686 @@
+﻿<!doctype html><html lang="vi"><head><meta charset="UTF-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Kho tài khoản Facebook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sidebar cố định + topbar + lưới KPI, biểu đồ, danh sách; chi tiết trượt từ phải. Chỉ giao diện tối. */
+:root{color-scheme:dark;--bg:#0a0e17;--side:#0e1320;--panel:#121929;--raise:#1a2338;--line:#232e47;--fg:#e8edf7;--mute:#8e9bb5;--accent:#5b8cff;--accent-ink:#07112b;--danger:#f0625f;--ok:#2fbf71;--warn:#e5b53b;
+--sans:"Be Vietnam Pro",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 11px;min-width:0;max-width:100%}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);padding:0}
+input[type=color]{padding:2px;width:44px;height:36px}
+textarea{width:100%;resize:vertical}
+button{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;white-space:nowrap;font-weight:500}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.danger{color:var(--danger)}
+button.link{background:none;border:0;padding:0;color:var(--accent)}
+button.mini{padding:3px 9px;font-size:12px}
+button.ico{width:27px;height:27px;padding:0;background:none;border-color:transparent;color:var(--mute)}
+button.ico:hover:not(:disabled){color:var(--fg);background:var(--raise);border-color:var(--line)}
+svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%;padding-right:max(16px,env(safe-area-inset-right,0px));padding-left:max(16px,env(safe-area-inset-left,0px))}
+nav{background:var(--side);border-right:1px solid var(--line);margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:20px 14px 20px max(14px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:4px;position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100vh}
+.brand{display:flex;gap:11px;align-items:center;padding:0 6px 22px;font-weight:700;line-height:1.3}
+.brand span{width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.brand span svg.i{width:21px;height:21px}
+.brand small{display:block;font-weight:400;color:var(--mute);font-size:12px}
+nav a{color:var(--mute);text-decoration:none;padding:9px 11px;border-radius:9px;display:flex;align-items:center;gap:11px;font-weight:500}
+nav a:hover{color:var(--fg);background:var(--panel)}
+nav a[aria-current]{background:color-mix(in srgb,var(--accent) 17%,transparent);color:var(--fg);font-weight:600}
+nav a[aria-current] svg{color:var(--accent)}
+nav a .num{margin-left:auto;font-size:11.5px;background:var(--raise);border-radius:99px;padding:0 8px}
+.vaultbox{margin-top:auto;border:1px solid var(--line);border-radius:11px;padding:12px;display:grid;gap:3px;background:var(--panel)}
+#vstate{font-weight:600;font-size:13px;display:flex;align-items:center}
+#save{font-size:12px;color:var(--mute)}
+main{padding:0 0 90px 24px;min-width:0;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:18px 0 16px;border-bottom:1px solid var(--line)}
+.title{margin-right:auto;min-width:0}
+h1{font-size:22px;margin:0;line-height:1.3}
+#subtitle{color:var(--mute);font-size:12.5px}
+h2{font-size:14px;margin:0 0 14px;font-weight:600}
+.head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.banner{border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 9%,transparent);border-radius:10px;padding:9px 13px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.view{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.stat{display:grid;grid-template-columns:minmax(0,1fr) auto;justify-items:start;text-align:left;background:var(--panel);border-radius:14px;padding:16px 18px;gap:4px;white-space:normal}
+.stat .lbl{color:var(--mute);font-size:13px;align-self:center}
+.stat .tile{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent)}
+.stat b{grid-column:1/-1;font-size:32px;line-height:1.15}
+.stat small{grid-column:1/-1;color:var(--mute);font-weight:400}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:7px;flex:none}
+.pill{display:inline-flex;align-items:center;padding:2px 10px;border-radius:99px;background:color-mix(in srgb,var(--c) 15%,transparent);font-size:12px;white-space:nowrap}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.wide{grid-column:span 2}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:16px}
+.donut{position:relative;width:180px;margin:0 auto 14px}
+.donut svg{display:block;width:100%;transform:rotate(-90deg)}
+.donut circle{fill:none;stroke-width:13}
+.donut div{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.donut b{font-size:28px;line-height:1.2}
+.donut small{color:var(--mute)}
+.keys{display:grid;gap:2px}
+.keys button{justify-content:space-between;background:none;border-color:transparent;padding:5px 8px;font-weight:400}
+.chart{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px}
+.yaxis{display:flex;flex-direction:column;justify-content:space-between;height:210px;text-align:right;color:var(--mute);font-size:11.5px;margin-block:-8px;height:226px}
+.trend{display:flex;align-items:flex-end;gap:2px;height:210px;background:linear-gradient(var(--line),var(--line)) top/100% 1px no-repeat,linear-gradient(var(--line),var(--line)) center/100% 1px no-repeat;border-bottom:1px solid var(--line)}
+.col{flex:1;display:flex;flex-direction:column-reverse;align-items:center;gap:2px;height:100%;min-width:0}
+.col:hover{background:color-mix(in srgb,var(--fg) 6%,transparent)}
+.col i{display:block;width:min(70%,22px);background:var(--c);min-height:2px}
+.col i:last-child{border-radius:4px 4px 0 0}
+.axis{grid-column:2;display:flex;justify-content:space-between;color:var(--mute);font-size:11.5px;margin-top:6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--mute);margin-top:10px}
+.bar{display:grid;grid-template-columns:130px minmax(0,1fr) 56px;gap:10px;align-items:center;padding:5px 0}
+.track{display:flex;gap:2px;height:8px;background:var(--bg);border-radius:5px;overflow:hidden}
+.track i{display:block;height:100%;background:var(--c)}
+.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--mute)}
+.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.row:first-of-type{border-top:0}
+.row>span{min-width:0;overflow-wrap:anywhere}
+.who{display:flex;gap:11px;align-items:center}
+.who small{display:block;color:var(--mute)}
+.big{font-size:30px;font-weight:700;line-height:1.2}
+.muted{color:var(--mute)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools .grow{flex:1 1 220px}
+.filters{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{border-radius:99px;background:none;padding:5px 13px}
+.tabs button[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 20%,transparent);border-color:var(--accent)}
+.bulk{background:var(--raise);border:1px solid var(--accent);border-radius:12px;padding:9px 12px}
+.tablewrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+th:first-child,td:first-child{padding-left:14px}
+th{color:var(--mute);font-weight:500;font-size:12px;background:var(--side)}
+th button{background:none;border:0;padding:0;color:inherit}
+tbody tr{cursor:pointer}
+tbody tr:hover,tbody tr:hover td:last-child{background:var(--raise)!important}
+tr:last-child td{border-bottom:0}
+#tbl th:last-child,#tbl td:last-child:not(.empty){position:sticky;right:0;box-shadow:-1px 0 0 var(--line);text-align:center}
+#tbl td:last-child:not(.empty){background:var(--panel)}
+.mono{font-family:var(--mono);font-size:12.5px}
+.tag{font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:1px 7px;margin-right:4px;color:var(--mute)}
+.empty{text-align:center;padding:48px 16px;color:var(--mute)}
+.empty div{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.sec{display:inline-flex;gap:1px;align-items:center}
+.sec>:first-child{margin-right:5px}
+select.state{padding:3px 8px;font-size:12px;border-radius:99px;border-color:color-mix(in srgb,var(--c) 70%,transparent);background:color-mix(in srgb,var(--c) 16%,var(--panel))}
+details{position:relative}
+summary{cursor:pointer;list-style:none;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
+details .menu{position:absolute;right:0;top:44px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 14px;z-index:5;display:grid;gap:7px;white-space:nowrap}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:16px;padding:22px;width:min(680px,calc(100% - 24px));max-height:90%}
+dialog.drawer{margin:auto;height:auto;max-height:calc(100dvh - 32px);width:min(720px,calc(100% - 32px));box-sizing:border-box;border-radius:16px;padding:22px;overflow-y:auto;overscroll-behavior:contain}
+dialog::backdrop{background:#03060dbb}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:grid;gap:4px;font-size:12px;color:var(--mute);align-content:start;min-width:0}
+label>*{font-size:14px;color:var(--fg)}
+.full{grid-column:1/-1}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.actions .left{margin-right:auto}
+.err{color:var(--danger);margin:8px 0 0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:9px;max-width:calc(100% - 32px);z-index:20;margin:0;border:0;inset-block-start:auto}
+#tip{position:fixed;pointer-events:none;background:var(--raise);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12px;white-space:pre;z-index:30}
+@media (max-width:1100px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:minmax(0,1fr)}.wide{grid-column:auto}}
+@media (max-width:760px){
+.app{display:block}
+nav{position:static;height:auto;flex-direction:row;flex-wrap:wrap;border:0;border-bottom:1px solid var(--line);margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));padding:12px max(12px,env(safe-area-inset-right,0px)) 12px max(12px,env(safe-area-inset-left,0px))}
+.brand{width:100%;padding:0 4px 8px}
+nav a{padding:6px 9px;gap:7px}
+.vaultbox{width:100%;margin-top:6px;padding:8px 11px}
+main{padding-left:0}
+.title{width:100%}
+.form{grid-template-columns:1fr}
+.stat{padding:13px}.stat b{font-size:26px}
+.bar{grid-template-columns:105px minmax(0,1fr) 46px}
+}
+</style>
+
+<div class="app">
+<nav aria-label="Chính"><div class="brand"><span id="logo"></span><div>Kho tài khoản<small>Quản lý Facebook</small></div></div><div id="menu" style="display:contents"></div><div class="vaultbox"><div id="save" role="status"></div></div></nav>
+<main>
+<header><div class="title"><h1 id="title"></h1><div id="subtitle"></div></div><button id="btnImport">Nhập file</button><button id="btnExport">Xuất file</button><button id="btnAdd" class="primary">+ Thêm tài khoản</button></header>
+<div id="banner" class="banner" hidden></div>
+<div id="view" class="view"></div>
+</main>
+</div>
+<div id="tip" hidden></div>
+<dialog id="dlg"></dialog>
+<dialog id="drawer" class="drawer"></dialog>
+<div id="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(()=>{
+"use strict";
+const SHARDS=64, LIMIT=250000, DAY=864e5;
+const VIEWS={"tong-quan":"Tổng quan","tai-khoan":"Tài khoản","nhom":"Nhóm","lich-su":"Lịch sử","cai-dat":"Cài đặt"};
+const DEF={staleDays:7,statuses:[
+{id:"live",name:"Live",color:"#2fbf71"},{id:"dead",name:"Die",color:"#ef5350"},{id:"new",name:"Chưa kiểm tra",color:"#8b95a7"}]};
+const FIELDS=[["uid","UID"],["pass","Mật khẩu"],["twofa","2FA"],["email","Gmail"],["mailpass","Pass Gmail"],["born","Ngày tạo"],["checked","Kiểm tra gần nhất"],["status","Live/Die"],["name","Tên"],["group","Nhóm"],["tags","Nhãn"],["phone","Số điện thoại"],["source","Nguồn"],["note","Ghi chú"]];
+const SECRETS=["pass","twofa","mailpass"];
+const ORDER=["uid","pass","twofa","email","mailpass","born","checked","status"];
+const LABEL=Object.fromEntries(FIELDS);
+const $=s=>document.querySelector(s);
+const PATHS={grid:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+users:'<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.5 2.7-5.5 6-5.5s6 2 6 5.5M16 5a3.5 3.5 0 0 1 0 6.5M18 15c2 .7 3 2.5 3 5"/>',
+folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+gear:'<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+unlock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
+up:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',down:'<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',plus:'<path d="M12 5v14M5 12h14"/>',
+check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',x:'<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>',
+eye:'<path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/>',
+off:'<path d="M4 4l16 16M9.5 5.8A10 10 0 0 1 12 5.500c6.500 0 10 6.500 10 6.500a17 17 0 0 1-3 3.700M6 7.500A17 17 0 0 0 2 12s3.500 6.500 10 6.500a10 10 0 0 0 4-.800"/>',
+copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/>',
+key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.500 6.500l4 4"/>'};
+const icon=n=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${PATHS[n]}</svg>`;
+const ib=(act,v,ic,label)=>`<button class="ico" data-act="${act}" data-v="${v}" title="${label}" aria-label="${label}">${icon(ic)}</button>`;
+const NAVI={"tong-quan":"grid","tai-khoan":"users","nhom":"folder","lich-su":"clock","cai-dat":"gear"};
+const SUB={"tong-quan":"Tình hình kho tài khoản","tai-khoan":"Tra cứu, cập nhật và thao tác hàng loạt","nhom":"Thống kê theo từng nhóm","lich-su":"Các thay đổi gần đây","cai-dat":"Trạng thái, bảo mật và dữ liệu"};
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/gi,"d").toLowerCase().trim();
+const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const fmt=t=>t?new Date(t).toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
+const fmtTime=t=>new Date(t).toLocaleString("vi-VN",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"});
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+
+let db=null,downloads=null,mode="loading",localMode=false;
+const LOCAL_DATA_KEY="mxh.resources.v1";
+function openLocalStore(){
+  const raw=localStorage.getItem(LOCAL_DATA_KEY);
+  const saved=raw?JSON.parse(raw):{};
+  if(!saved||typeof saved!=="object"||Array.isArray(saved))throw new Error("Invalid storage");
+  shards=Array.from({length:SHARDS},(_,i)=>saved["shards/s"+i]?.a||{});
+  settings=saved["meta/settings"]||structuredClone(DEF);
+  daily=saved["meta/daily"]?.days||{};
+  localMode=true;
+  db={doc:path=>({async set(body){
+    const current=JSON.parse(localStorage.getItem(LOCAL_DATA_KEY)||"{}");
+    current[path]=body;
+    localStorage.setItem(LOCAL_DATA_KEY,JSON.stringify(current));
+  }})};
+  // Check write access before allowing data entry.
+  localStorage.setItem(LOCAL_DATA_KEY,JSON.stringify(saved));
+  mode="ready";
+}
+let shards=Array.from({length:SHARDS},()=>({})), settings=structuredClone(DEF), daily={};
+let sel=new Set(), q="", fStatus="", fGroup="", fTag="", fStale=false, page=1, sort={k:"updated",d:-1};
+let per=store.get("per",25), cols=store.get("cols2",ORDER);
+const ready=()=>mode==="ready"||mode==="demo";
+
+const hash=s=>{let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return (h>>>0)%SHARDS};
+const all=()=>shards.flatMap(s=>Object.values(s));
+const get=uid=>{const s=shards[hash(uid)];return Object.hasOwn(s,uid)?s[uid]:undefined};
+const st=id=>settings.statuses.find(s=>s.id===id)||{id,name:"Không rõ",color:"#8b95a7"};
+const stale=a=>!a.checked||Date.now()-new Date(a.checked+"T00:00:00")>settings.staleDays*DAY;
+const groups=()=>[...new Set(all().map(a=>a.group).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"vi"));
+const tagsAll=()=>[...new Set(all().flatMap(a=>a.tags||[]))].sort((a,b)=>a.localeCompare(b,"vi"));
+const pill=id=>{const s=st(id);return `<span class="pill" style="--c:${esc(s.color)}"><span class="dot"></span>${esc(s.name)}</span>`};
+
+/* ---------- lưu trữ: mỗi shard là 1 document, ghi tuần tự ---------- */
+const jobs=new Map(); // path -> {dirty,busy,failed,data()}
+function queue(path,data){
+  if(mode!=="ready")return;
+  let j=jobs.get(path); if(!j){j={};jobs.set(path,j)}
+  j.data=data;j.dirty=true;j.failed=false;run(path,j);
+}
+async function run(path,j){
+  if(j.busy)return; j.busy=true; saveState();
+  while(j.dirty){
+    j.dirty=false;
+    try{
+      const body=JSON.parse(JSON.stringify(j.data()));
+      try{await db.doc(path).set(body)}
+      catch(e){if(e.code!=="unavailable")throw e;await new Promise(r=>setTimeout(r,800));await db.doc(path).set(body)}
+    }catch(e){
+      j.failed=e.code||"unavailable";j.dirty=true;
+      toast(e.code==="quota_exceeded"||e.name==="QuotaExceededError"?"Hết dung lượng lưu trữ. Hãy xuất dữ liệu để sao lưu.":"Chưa lưu được. Bấm “Thử lại” ở góc trạng thái.","error");break;
+    }
+  }
+  j.busy=false;saveState();
+}
+function saveState(){
+  const el=$("#save"),v=[...jobs.values()];
+  if(v.some(j=>j.failed)){el.innerHTML='<span class="err">Lỗi lưu.</span> <button class="link" data-act="retry">Thử lại</button>';return}
+  el.textContent=mode==="loading"?"Đang tải dữ liệu…":mode==="denied"?"Không thể mở kho dữ liệu":v.some(j=>j.busy||j.dirty)?"Đang lưu…":localMode?"Đã lưu trên trình duyệt này":"Đã lưu online";
+}
+addEventListener("beforeunload",e=>{if([...jobs.values()].some(j=>j.busy||j.dirty)){e.preventDefault();e.returnValue=""}});
+const pending=p=>{const j=jobs.get(p);return j&&(j.busy||j.dirty)};
+const saveShard=i=>queue("shards/s"+i,()=>({a:shards[i]}));
+const saveSettings=()=>queue("meta/settings",()=>settings);
+function snapshotDay(){
+  const c={};for(const a of all())c[a.status]=(c[a.status]||0)+1;
+  daily[today()]=c;
+  for(const k of Object.keys(daily).sort().slice(0,-90))delete daily[k];
+  queue("meta/daily",()=>({days:daily}));
+}
+
+/* put: danh sách bản ghi mới/sửa; del: danh sách uid */
+function commit(put=[],del=[]){
+  const next=new Map(),edit=i=>{if(!next.has(i))next.set(i,{...shards[i]});return next.get(i)};
+  for(const u of del)delete edit(hash(u))[u];
+  for(const a of put)edit(hash(a.uid))[a.uid]=a;
+  for(const [i,s] of next){
+    if(new TextEncoder().encode(JSON.stringify(s)).length>LIMIT){toast("Kho dữ liệu đã đầy ở một phân vùng. Hãy rút gọn ghi chú hoặc xoá bớt tài khoản.");return false}
+  }
+  for(const [i,s] of next){shards[i]=s;saveShard(i)}
+  snapshotDay();render();return true;
+}
+/* tạo bản ghi đã cập nhật kèm lịch sử (giữ 8 mục gần nhất) */
+function revise(old,patch,why,extra){
+  const a={...old,...patch,updated:Date.now()},ch=[];
+  if(!old.added){a.added=a.updated;ch.push(why||"Thêm tài khoản")}
+  else{
+    if(old.status!==a.status)ch.push(`Trạng thái: ${st(old.status).name} → ${st(a.status).name}`);
+    if((old.group||"")!==(a.group||""))ch.push(`Nhóm: ${old.group||"không có"} → ${a.group||"không có"}`);
+    const other=FIELDS.filter(([k])=>!["uid","status","group",...SECRETS].includes(k)&&String(old[k]??"")!==String(a[k]??"")).map(f=>f[1].toLowerCase());
+    if(other.length)ch.push("Sửa "+other.join(", "));
+    if(extra)ch.push(extra);
+    if(!ch.length)return null;
+  }
+  a.hist=[{t:a.updated,m:ch.join("; ").slice(0,200)},...(old.hist||[])].slice(0,8);
+  return a;
+}
+
+const shown=new Set();
+const secretsOf=a=>a?.sec&&typeof a.sec==='object'?a.sec:Object.fromEntries(SECRETS.filter(k=>a?.[k]).map(k=>[k,a[k]]));
+async function seal(uid,o){return Object.fromEntries(SECRETS.filter(k=>o[k]).map(k=>[k,o[k]]))}
+async function hydrate(){}
+/* mã 6 số từ khoá 2FA (TOTP, RFC 6238), tính ngay trên trình duyệt */
+async function totp(secret,now=Date.now()){
+  const t=secret.replace(/[\s=-]/g,"").toUpperCase();if(!/^[A-Z2-7]{16,}$/.test(t))return null;
+  let bits="";for(const c of t)bits+="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".indexOf(c).toString(2).padStart(5,"0");
+  const bytes=new Uint8Array(bits.match(/.{8}/g).map(x=>parseInt(x,2)));
+  const msg=new DataView(new ArrayBuffer(8));msg.setUint32(4,Math.floor(now/30000));
+  const k=await crypto.subtle.importKey("raw",bytes,{name:"HMAC",hash:"SHA-1"},false,["sign"]);
+  const h=new Uint8Array(await crypto.subtle.sign("HMAC",k,msg.buffer)),o=h[19]&15;
+  return String((((h[o]&127)<<24)|(h[o+1]<<16)|(h[o+2]<<8)|h[o+3])%1e6).padStart(6,"0");
+}
+async function copy(text,msg="Đã sao chép thành công"){
+  if(text===undefined||text===null||String(text)===""){toast("Không có dữ liệu để sao chép","error");return false}
+  text=String(text);
+  try{
+    if(!navigator.clipboard?.writeText)throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(text);
+  }catch{
+    const input=document.createElement("textarea"),focus=document.activeElement;
+    input.value=text;input.style.cssText="position:fixed;opacity:0;pointer-events:none";
+    const host=document.querySelector("dialog[open]")||document.body;host.append(input);
+    let copied=false;
+    try{input.focus();input.select();copied=document.execCommand("copy")}catch{}
+    finally{input.remove();focus?.focus?.()}
+    if(!copied){toast("Sao chép thất bại. Hãy cho phép truy cập bộ nhớ tạm hoặc sao chép thủ công.","error");return false}
+  }
+  toast(msg,"success");return true;
+}
+
+/* ---------- hiển thị ---------- */
+const route=()=>VIEWS[location.hash.slice(1)]?location.hash.slice(1):"tong-quan";
+function render(){
+  const r=route(),list=all();
+  $("#title").textContent=VIEWS[r];
+  $("#subtitle").textContent=SUB[r]+" · "+new Date().toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"});
+  $("#logo").innerHTML=icon("users");$("#tip").hidden=true;
+  $("#menu").innerHTML=Object.entries(VIEWS).map(([k,v])=>`<a href="#${k}" ${k===r?'aria-current="page"':''}>${icon(NAVI[k])}${v}${k==="tai-khoan"&&ready()?`<span class="num">${list.length}</span>`:""}</a>`).join("");
+  for(const id of ["#btnAdd","#btnImport"])$(id).disabled=!ready();
+  $("#btnExport").disabled=!ready()||!list.length;
+  $("#btnImport").innerHTML=icon("up")+"Nhập file";$("#btnExport").innerHTML=icon("down")+"Xuất file";$("#btnAdd").innerHTML=icon("plus")+"Thêm tài khoản";
+  const b=$("#banner");
+  b.hidden=mode!=="denied";
+  b.innerHTML=mode==="denied"?"Trang này chỉ dành cho chủ sở hữu. Hãy đăng nhập đúng tài khoản.":"";
+  for(const u of sel)if(!get(u))sel.delete(u);
+  const v=$("#view");
+  if(!ready()){v.innerHTML=`<div class="panel empty">${mode==="loading"?"Đang tải dữ liệu…":"Không có dữ liệu để hiển thị."}</div>`;saveState();return}
+  ({"tong-quan":overview,"tai-khoan":accounts,"nhom":groupsView,"lich-su":history,"cai-dat":config})[r](v,list);
+  saveState();
+}
+const emptyHtml=`<div class="panel empty">Chưa có tài khoản nào. Thêm thủ công hoặc nhập từ file CSV, Excel.<div><button class="primary" data-act="add">+ Thêm tài khoản</button><button data-act="import">Nhập file</button></div></div>`;
+
+function overview(v,list){
+  if(!list.length){v.innerHTML=emptyHtml;return}
+  const n=list.length,cnt=id=>list.filter(a=>a.status===id).length,old=list.filter(stale).length,S=settings.statuses;
+  const pct=x=>Math.round(x/n*100);
+  const days=[...Array(30)].map((_,i)=>{const d=new Date(today()+"T00:00:00Z");d.setUTCDate(d.getUTCDate()-29+i);return d.toISOString().slice(0,10)});
+  const sum=c=>Object.values(c).reduce((x,y)=>x+y,0);
+  let max=Math.max(1,...days.filter(d=>daily[d]).map(d=>sum(daily[d])));max=Math.ceil(max/2)*2;
+  const dm=d=>d.slice(8)+"/"+d.slice(5,7);
+  const prevKey=Object.keys(daily).filter(d=>d<today()).sort().pop(),prev=prevKey&&daily[prevKey];
+  const delta=(now,was)=>prev?(now===was?"Không đổi":(now>was?"▲ +":"▼ −")+Math.abs(now-was))+" so với "+dm(prevKey):"";
+  const card=(act,val,label,value,sub,ic,color)=>`<button class="stat" data-act="${act}" data-v="${esc(val)}" style="--c:${esc(color)}"><span class="lbl">${esc(label)}</span><span class="tile">${icon(ic)}</span><b>${value}</b><small>${esc(sub)}</small></button>`;
+  const stc=(id,ic)=>{const s=st(id),c=cnt(id);return card("filter",id,s.name,c,[pct(c)+"% tổng số",delta(c,prev?.[id]||0)].filter(Boolean).join(" · "),ic,s.color)};
+  let off=0;const arcs=S.map(s=>{const c=cnt(s.id);if(!c)return "";const len=c/n*100,gap=len<100?0.8:0,o=off;off+=len;return `<circle cx="60" cy="60" r="50" pathLength="100" stroke="${esc(s.color)}" stroke-dasharray="${Math.max(len-gap,.4)} ${100-Math.max(len-gap,.4)}" stroke-dashoffset="${-o}" data-tip="${esc(s.name+": "+c+" ("+pct(c)+"%)")}"/>`}).join("");
+  const alerts=list.filter(a=>!["live","new"].includes(a.status)).sort((a,b)=>b.updated-a.updated);
+  const feed=list.flatMap(a=>(a.hist||[]).map(x=>({...x,a}))).sort((a,b)=>b.t-a.t).slice(0,6);
+  const gs=groups().map(g=>({g,m:list.filter(a=>a.group===g)})).sort((a,b)=>b.m.length-a.m.length).slice(0,6);
+  const who=(a,sub)=>`<span class="who"><span class="dot" style="--c:${esc(st(a.status).color)}" title="${esc(st(a.status).name)}"></span><span><button class="link mono" data-act="open" data-v="${esc(a.uid)}">${esc(a.uid)}</button><small>${esc(sub)}</small></span></span>`;
+  v.innerHTML=`<div class="stats">${card("filter","","Tổng tài khoản",n,groups().length+" nhóm","users","#5b8cff")}${stc("live","check")}${stc("dead","x")}${card("stale","","Cần kiểm tra",old,"Quá "+settings.staleDays+" ngày chưa kiểm tra","clock","#e5b53b")}</div>
+  <div class="grid"><section class="panel wide"><div class="head"><h2>Biến động 30 ngày</h2><span class="muted">Số tài khoản theo trạng thái</span></div>
+  <div class="chart"><div class="yaxis"><span>${max}</span><span>${max/2}</span><span>0</span></div><div class="trend">${days.map(d=>{const c=daily[d];if(!c)return `<div class="col" data-tip="${dm(d)}: không có thay đổi"></div>`;return `<div class="col" data-tip="${esc(dm(d)+"\n"+S.map(s=>s.name+": "+(c[s.id]||0)).join("\n"))}">${S.filter(s=>c[s.id]).map(s=>`<i style="--c:${esc(s.color)};height:calc(${c[s.id]/max*100}% - 2px)"></i>`).join("")}</div>`}).join("")}</div><div class="axis"><span>${dm(days[0])}</span><span>${dm(days[14])}</span><span>${dm(days[29])}</span></div></div>
+  <div class="legend">${S.map(s=>`<span><span class="dot" style="--c:${esc(s.color)}"></span>${esc(s.name)}</span>`).join("")}<span>Cột trống là ngày không có thay đổi.</span></div></section>
+  <section class="panel"><h2>Tỷ lệ Live/Die</h2><div class="donut"><svg viewBox="0 0 120 120" role="img" aria-label="Tỷ lệ trạng thái">${arcs}</svg><div style="pointer-events:none"><b>${pct(cnt("live"))}%</b><small>${esc(st("live").name)}</small></div></div><div class="keys">${S.map(s=>`<button data-act="filter" data-v="${esc(s.id)}"><span><span class="dot" style="--c:${esc(s.color)}"></span>${esc(s.name)}</span><span class="num">${cnt(s.id)} · ${pct(cnt(s.id))}%</span></button>`).join("")}</div></section>
+  <section class="panel"><div class="head"><h2>Cần xử lý</h2>${alerts.length?`<button class="link" data-act="filter" data-v="dead">Xem Die</button>`:""}</div>${alerts.slice(0,6).map(a=>`<div class="row">${who(a,a.email||a.name||"Chưa có Gmail")}${pill(a.status)}</div>`).join("")||'<div class="muted">Không có tài khoản Die.</div>'}</section>
+  <section class="panel"><div class="head"><h2>Hoạt động gần đây</h2><a class="muted" href="#lich-su">Tất cả</a></div>${feed.map(x=>`<div class="row">${who(x.a,x.m)}<span class="muted" style="font-size:12px">${fmtTime(x.t)}</span></div>`).join("")||'<div class="muted">Chưa có thay đổi.</div>'}</section>
+  <section class="panel"><h2>Tiến độ kiểm tra</h2><div class="big">${pct(n-old)}%</div><div class="track" style="margin:8px 0"><i style="--c:var(--accent);width:${(n-old)/n*100}%"></i></div><p class="muted">${n-old}/${n} tài khoản được kiểm tra trong ${settings.staleDays} ngày qua.</p><button data-act="stale" ${old?"":"disabled"}>Xem ${old} tài khoản quá hạn</button>
+  ${gs.length?`<h2 style="margin-top:22px">Nhóm lớn nhất</h2>${gs.map(({g,m})=>`<div class="bar"><button class="link" data-act="gOpen" data-v="${esc(g)}" style="justify-content:flex-start;overflow:hidden">${esc(g)}</button><span class="track">${S.map(s=>{const c=m.filter(a=>a.status===s.id).length;return c?`<i style="--c:${esc(s.color)};width:${c/m.length*100}%"></i>`:""}).join("")}</span><span class="num">${m.length}</span></div>`).join("")}`:""}</section></div>`;
+}
+
+function filtered(){
+  const k=norm(q);
+  return all().filter(a=>(!fStatus||a.status===fStatus)&&(!fGroup||(fGroup==="\0"?!a.group:a.group===fGroup))&&(!fTag||(a.tags||[]).includes(fTag))&&(!fStale||stale(a))&&
+    (!k||norm([a.uid,a.name,a.email,a.phone,a.group,a.source,a.note,(a.tags||[]).join(" ")].join(" ")).includes(k)))
+    .sort((a,b)=>{const val=x=>sort.k==="status"?st(x.status).name:sort.k==="tags"?(x.tags||[]).join(","):x[sort.k]??"";const x=val(a),y=val(b);return sort.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
+}
+const opts=(arr,cur,first)=>(first!==undefined?`<option value="">${first}</option>`:"")+arr.map(([v,t])=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(t)}</option>`).join("");
+function accounts(v,list){
+  if(!list.length){v.innerHTML=emptyHtml;return}
+  if(!$("#q")){
+    v.innerHTML=`<div class="tabs" id="tabs" role="group" aria-label="Lọc nhanh"></div><div class="tools filters"><input id="q" class="grow" type="search" placeholder="Tìm UID, Gmail, tên, ghi chú…  ( phím / )" aria-label="Tìm kiếm">
+    <select id="fStatus" hidden aria-label="Lọc trạng thái"></select><select id="fGroup" aria-label="Lọc nhóm"></select><select id="fTag" aria-label="Lọc nhãn"></select>
+    <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fStale">Cần kiểm tra</label>
+    <details><summary>Cột</summary><div class="menu">${FIELDS.map(([k,t])=>`<label style="display:flex;gap:8px"><input type="checkbox" id="col-${k}" data-col="${k}" ${cols.includes(k)?"checked":""} ${k==="uid"?"disabled":""}>${t}</label>`).join("")}</div></details></div><div id="tbl" class="view"></div>`;
+    $("#q").value=q;
+  }
+  $("#fStatus").innerHTML=opts(settings.statuses.map(s=>[s.id,s.name]),fStatus,"Mọi trạng thái");
+  $("#fGroup").innerHTML=opts([["\0","(Chưa có nhóm)"],...groups().map(g=>[g,g])],fGroup,"Mọi nhóm");
+  $("#fTag").innerHTML=opts(tagsAll().map(g=>[g,g]),fTag,"Mọi nhãn");
+  $("#fStale").checked=fStale;
+  tabs();table();
+}
+function tabs(){
+  const el=$("#tabs");if(!el)return;const l=all();
+  el.innerHTML=[{id:"",name:"Tất cả"},...settings.statuses].map(s=>`<button data-act="tab" data-v="${esc(s.id)}" aria-pressed="${fStatus===s.id}">${s.id?`<span class="dot" style="--c:${esc(s.color)};margin:0"></span>`:""}${esc(s.name)} <span class="num">${s.id?l.filter(a=>a.status===s.id).length:l.length}</span></button>`).join("");
+}
+function cell(a,k){
+  const u=esc(a.uid);
+  if(k==="uid")return `<span class="sec"><button class="link mono" data-act="open" data-v="${u}">${u}</button>${ib("cpUid",u,"copy","Chép UID")}</span>`;
+  if(SECRETS.includes(k)){
+    if(!Object.keys(secretsOf(a)).length)return '<span class="muted">—</span>';
+    const s=secretsOf(a);if(s.bad)return '<span class="err">Lỗi giải mã</span>';if(!s[k])return '<span class="muted">—</span>';
+    const id=a.uid+"|"+k,on=shown.has(id);
+    return `<span class="sec"><span class="mono">${on?esc(s[k]):"••••••"}</span>${ib("show",esc(id),on?"off":"eye",(on?"Ẩn ":"Hiện ")+LABEL[k])}${ib("cp",esc(id),"copy","Chép "+LABEL[k])}${k==="twofa"?ib("code",u,"key","Lấy mã 6 số"):""}</span>`;
+  }
+  if(k==="email"&&a.email)return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail",u,"copy","Chép Gmail")}</span>`;
+  if(k==="status")return `<select class="state" style="--c:${esc(st(a.status).color)}" data-state="${u}" id="state-${u}" aria-label="Trạng thái ${u}">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select>`;
+  if(k==="tags")return (a.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("");
+  if(k==="checked"||k==="born")return fmt(a[k]&&a[k]+"T00:00:00")+(k==="checked"&&stale(a)?' <span title="Quá hạn kiểm tra" style="color:var(--warn)">●</span>':"");
+  return esc(a[k])||'<span class="muted">—</span>';
+}
+function table(){
+  const el=$("#tbl");if(!el)return;const sx=el.querySelector(".tablewrap")?.scrollLeft||0;
+  const rows=filtered(),pages=Math.max(1,Math.ceil(rows.length/per));page=Math.min(page,pages);
+  const shown=rows.slice((page-1)*per,page*per),show=FIELDS.map(f=>f[0]).filter(k=>cols.includes(k)||k==="uid");
+  el.innerHTML=`${sel.size?`<div class="tools bulk"><b>Đã chọn ${sel.size}</b>
+  ${sel.size<rows.length?`<button class="link" data-act="selAll">Chọn cả ${rows.length}</button>`:""}
+  <select id="bStatus" aria-label="Đổi trạng thái">${opts(settings.statuses.map(s=>[s.id,s.name]),"","Đổi trạng thái…")}</select>
+  <button data-act="bGroup">Gán nhóm</button><button data-act="bTag">Thêm nhãn</button><button data-act="bCheck">Đánh dấu đã kiểm tra</button><button data-act="bCopy">Sao chép UID</button><button data-act="bExport">Xuất</button><button class="danger" data-act="bDel">Xoá</button><button class="link" data-act="selNone">Bỏ chọn</button></div>`:""}
+  <div class="tablewrap"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length&&shown.every(a=>sel.has(a.uid))?"checked":""}></th>${show.map(k=>`<th aria-sort="${sort.k===k?(sort.d>0?"ascending":"descending"):"none"}">${SECRETS.includes(k)?LABEL[k]:`<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k===k?(sort.d>0?" ↑":" ↓"):""}</button>`}</th>`).join("")}<th>Thao tác</th></tr></thead>
+  <tbody>${shown.map(a=>`<tr data-uid="${esc(a.uid)}"><td><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid)?"checked":""}></td>${show.map(k=>`<td>${cell(a,k)}</td>`).join("")}<td><button class="mini" data-act="open" data-v="${esc(a.uid)}">${icon("edit")}Sửa</button></td></tr>`).join("")||`<tr><td colspan="${show.length+2}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
+  <div class="tools" style="justify-content:space-between"><span class="muted">${rows.length} kết quả · trang ${page}/${pages}</span><span class="tools"><select id="per" aria-label="Số dòng mỗi trang">${opts([25,50,100].map(n=>[String(n),n+" dòng"]),String(per))}</select><button data-act="prev" ${page<=1?"disabled":""}>Trước</button><button data-act="next" ${page>=pages?"disabled":""}>Sau</button></span></div>`;
+  el.querySelector(".tablewrap").scrollLeft=sx;
+}
+function groupsView(v,list){
+  if(!list.length){v.innerHTML=emptyHtml;return}
+  const names=[...groups(),...(list.some(a=>!a.group)?[""]:[])];
+  v.innerHTML=`<div class="two">${names.map(g=>{const m=list.filter(a=>(a.group||"")===g),live=m.filter(a=>a.status==="live").length;return `<section class="panel"><h2>${esc(g||"Chưa có nhóm")} <span class="muted">· ${m.length} tài khoản · ${Math.round(live/m.length*100)}% hoạt động</span></h2>${settings.statuses.map(s=>{const c=m.filter(a=>a.status===s.id).length;return c?`<div class="bar" style="--c:${esc(s.color)}"><span><span class="dot"></span>${esc(s.name)}</span><span class="track"><i style="width:${c/m.length*100}%"></i></span><span class="num">${c}</span></div>`:""}).join("")}<div class="tools" style="margin-top:10px"><button data-act="gOpen" data-v="${esc(g||"\u0001")}">Xem danh sách</button>${g?`<button data-act="gRename" data-v="${esc(g)}">Đổi tên</button>`:""}</div></section>`}).join("")}</div><p class="muted">Tạo nhóm mới bằng cách nhập tên nhóm khi thêm, sửa hoặc gán hàng loạt.</p>`;
+}
+function history(v,list){
+  const h=list.flatMap(a=>(a.hist||[]).map(x=>({...x,a}))).sort((a,b)=>b.t-a.t).slice(0,200);
+  v.innerHTML=`<section class="panel">${h.map(x=>`<div class="row"><span><span class="muted mono">${fmtTime(x.t)}</span> &nbsp;<button class="link" data-act="open" data-v="${esc(x.a.uid)}">${esc(x.a.name||x.a.uid)}</button></span><span>${esc(x.m)}</span></div>`).join("")||'<div class="empty">Chưa có thay đổi nào.</div>'}</section><p class="muted">Hiển thị 200 thay đổi gần nhất. Mỗi tài khoản giữ 8 mục. Tài khoản đã xoá không còn trong lịch sử.</p>`;
+}
+function config(v){
+  if(v.querySelector("#cfg input:focus"))return;
+  v.innerHTML=`<section class="panel" id="cfg"><h2>Trạng thái</h2>${settings.statuses.map(s=>`<div class="tools" style="margin-bottom:8px"><input type="color" id="c-${esc(s.id)}" data-sc="${esc(s.id)}" value="${esc(s.color)}" aria-label="Màu"><input id="n-${esc(s.id)}" data-sn="${esc(s.id)}" value="${esc(s.name)}" maxlength="30" aria-label="Tên trạng thái">${DEF.statuses.some(d=>d.id===s.id)?"":`<button class="danger" data-act="sDel" data-v="${esc(s.id)}">Xoá</button>`}</div>`).join("")}<button data-act="sAdd">+ Thêm trạng thái</button></section>
+  <section class="panel"><h2>Nhắc kiểm tra</h2><label style="max-width:260px">Báo quá hạn sau (ngày)<input id="staleDays" type="number" min="1" max="365" value="${settings.staleDays}"></label></section>
+  <section class="panel"><h2>Dữ liệu</h2><div class="tools"><button data-act="export">Xuất toàn bộ</button><button data-act="template">Tải file mẫu CSV</button><button class="danger" data-act="wipe">Xoá toàn bộ tài khoản</button></div><p class="muted">Ghi chú, Gmail và các trường khác không được mã hoá. Đừng ghi mật khẩu vào đó.</p></section>`;
+}
+
+/* ---------- hộp thoại ---------- */
+let toastT;
+function toast(m,type="success"){const t=$("#toast");t.textContent=m||"Thao tác hoàn tất";t.dataset.type=type;t.style.border="1px solid var(--"+(type==="error"?"danger":"ok")+")";t.setAttribute("role",type==="error"?"alert":"status");t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,4500)}
+function dialog(html,onOk){
+  const d=$("#dlg");d.innerHTML=`<form>${html}<p class="err" id="dErr" hidden></p><div class="actions"><button type="button" data-act="close">Huỷ</button><button class="primary" id="dOk">Xác nhận</button></div></form>`;
+  const form=d.querySelector("form");
+  form.onsubmit=async e=>{e.preventDefault();const ok=form.querySelector("#dOk");if(ok.disabled)return;ok.disabled=true;
+    let r;try{r=await onOk(d)}catch{r="Có lỗi xảy ra. Hãy thử lại."}
+    ok.disabled=false;if(!form.isConnected)return;
+    if(typeof r==="string"){const el=form.querySelector("#dErr");el.textContent=r;el.hidden=false}else if(r!==false)d.close()};
+  d.showModal();return d;
+}
+const ask=(title,text,fn)=>dialog(`<h2>${esc(title)}</h2><p>${esc(text)}</p>`,fn);
+const prompt_=(title,label,list,fn)=>dialog(`<h2>${esc(title)}</h2><label>${esc(label)}<input id="pv" list="pl" maxlength="60" autocomplete="off"></label><datalist id="pl">${list.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`,()=>fn($("#pv").value.trim()));
+const splitTags=s=>[...new Set(String(s||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean))].slice(0,12);
+
+function openAccount(uid){
+  const old=uid?get(uid):null;if(uid&&!old)return;
+  const a=old||{status:"new"},d=$("#drawer"),before=old?{...secretsOf(old)}:{},baseSec=old?.sec||"";
+  const val=k=>SECRETS.includes(k)?before[k]:k==="tags"?(a.tags||[]).join(", "):a[k];
+  const inp=(k,extra="",cls="")=>`<label class="${cls}">${LABEL[k]}<input id="e-${k}" value="${esc(val(k))}" maxlength="120" autocomplete="off" spellcheck="false" ${extra}></label>`;
+  const sec=k=>inp(k,'type="password" class="mono secretIn"');
+  d.innerHTML=`<form><h2>${old?"Chỉnh sửa "+esc(a.uid):"Thêm tài khoản"}</h2><div class="form">
+  ${inp("uid",old?"readonly":"required","full")}${sec("pass")}${sec("twofa")}${inp("email")}${sec("mailpass")}
+  <label class="full" style="display:flex;gap:8px"><input type="checkbox" id="eShow">Hiện mật khẩu</label>
+  ${inp("born",'type="date"')}${inp("checked",'type="date"')}<label class="full">Live/Die<select id="e-status">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select></label>
+  ${inp("name")}${inp("group",'list="gl"')}${inp("tags",'placeholder="cách nhau bằng dấu phẩy"')}${inp("phone")}${inp("source","","full")}
+  <label class="full">Ghi chú (không mã hoá)<textarea id="e-note" rows="3" maxlength="500">${esc(a.note)}</textarea></label></div><datalist id="gl">${groups().map(g=>`<option value="${esc(g)}">`).join("")}</datalist>
+  <p class="err" id="eErr" hidden></p><div class="actions">${old?`<button type="button" class="danger left" data-act="del" data-v="${esc(uid)}">Xoá</button>`:""}<button type="button" data-act="closeDrawer">Đóng</button><button class="primary" id="eSave">Lưu</button></div></form>
+  ${old?`<h2 style="margin-top:22px">Lịch sử</h2>${(a.hist||[]).map(h=>`<div class="row"><span class="muted mono">${fmtTime(h.t)}</span><span>${esc(h.m)}</span></div>`).join("")}<p><a href="https://www.facebook.com/profile.php?id=${encodeURIComponent(uid)}" target="_blank" rel="noopener" style="color:var(--accent)">Mở trang Facebook</a></p>`:""}`;
+  $("#eShow").onchange=e=>d.querySelectorAll(".secretIn").forEach(i=>i.type=e.target.checked?"text":"password");
+  const form=d.querySelector("form");let saving=false;
+  form.onsubmit=async e=>{
+    e.preventDefault();if(saving)return;const v={};for(const [k] of FIELDS)v[k]=$("#e-"+k).value.trim();v.tags=splitTags(v.tags);
+    const err=m=>{const el=form.querySelector("#eErr");el.textContent=m;el.hidden=false};
+    if(!/^[A-Za-z0-9._-]{1,60}$/.test(v.uid)||v.uid.startsWith("__"))return err("UID chỉ gồm chữ không dấu, số, dấu chấm, gạch (tối đa 60 ký tự).");
+    const sv={};for(const k of SECRETS){sv[k]=v[k];delete v[k]}
+    const changed=SECRETS.filter(k=>(before[k]||"")!==sv[k]);
+    saving=true;
+    try{
+      if(changed.length)v.sec=await seal(v.uid,sv);
+      if(!form.isConnected)return;
+      if(!old&&get(v.uid))return err("UID này đã có trong danh sách.");
+      if(old&&!get(uid))return err("Tài khoản này vừa bị xoá ở nơi khác.");
+      if(old&&changed.length&&(get(uid).sec||"")!==baseSec)return err("Mật khẩu vừa được sửa ở nơi khác. Hãy đóng và mở lại.");
+      const r=revise(old?get(uid):{},v,undefined,changed.length?"Đổi "+changed.map(k=>LABEL[k].toLowerCase()).join(", "):"");
+      if(!r||commit([r])){d.close();d.innerHTML="";toast(r?"Đã lưu tài khoản":"Không có gì thay đổi");hydrate()}
+    }finally{saving=false}
+  };
+  if(!d.open)d.showModal();
+}
+
+/* ---------- nhập / xuất ---------- */
+function parseText(text){
+  text=text.replace(/^ï»¿/,"");
+  const first=text.split(/\r?\n/).find(l=>l.trim())||"";
+  const delim=["\t","|",";",","].map(d=>[d,first.split(d).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const rows=[];let row=[],f="",quoted=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(quoted){if(c==='"'){if(text[i+1]==='"'){f+='"';i++}else quoted=false}else f+=c}
+    else if(c==='"'&&!f)quoted=true;else if(c===delim){row.push(f);f=""}
+    else if(c==="\n"){row.push(f);rows.push(row);row=[];f=""}else if(c!=="\r")f+=c}
+  row.push(f);rows.push(row);return rows.filter(r=>r.some(x=>x.trim()));
+}
+const ALIAS={uid:["uid","id","fb id","facebook id"],pass:["pass","password","mat khau","mk","pass fb"],twofa:["2fa","ma 2fa","key 2fa"],email:["gmail","email","mail"],mailpass:["pass gmail","pass mail","passmail","pass email","mat khau gmail","mat khau mail"],born:["ngay tao","ngay tao fb"],checked:["kiem tra gan nhat","lan kiem tra gan nhat","kiem tra lan cuoi","ngay kiem tra"],status:["live/die","trang thai","status"],name:["ten","name","ho ten"],group:["nhom","group"],tags:["nhan","tags","tag"],phone:["so dien thoai","sdt","phone"],source:["nguon","source"],note:["ghi chu","note"]};
+const BLOCK=/(cookie|token)/;
+const guess=h=>Object.keys(ALIAS).find(k=>ALIAS[k].includes(norm(h)))||"";
+const toDate=s=>{s=String(s).trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/),y,mo,d;if(m)[,y,mo,d]=m;else if(m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/))[,d,mo,y]=m;else return "";const r=`${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`;return isNaN(Date.parse(r))?"":r};
+
+function importDialog(){
+  let rows=null;
+  const d=dialog(`<h2>Nhập tài khoản</h2><p class="muted">Chọn file CSV, TXT, Excel hoặc dán danh sách. Nếu không có dòng tên cột, thứ tự mặc định là <span class="mono">uid|pass|2fa|gmail|pass gmail|ngày tạo|kiểm tra gần nhất|live/die</span>.</p>
+  <label>File<input type="file" id="file" accept=".csv,.txt,.xlsx,.xls"></label><label style="margin-top:10px">Hoặc dán vào đây<textarea id="paste" rows="5" class="mono" placeholder="uid|pass|2fa|gmail|pass gmail|ngày tạo"></textarea></label><div id="map"></div>`,async d=>{
+    if(!rows)return "Hãy chọn file hoặc dán dữ liệu.";
+    const header=$("#hasHead").checked,map=[...d.querySelectorAll("[data-map]")].map(s=>s.value);
+    if(!map.includes("uid"))return "Hãy chọn một cột làm UID.";
+    const used=map.filter(Boolean);if(new Set(used).size<used.length)return "Mỗi trường chỉ được chọn cho một cột.";
+    const update=$("#dup").value==="update",put=new Map();let add=0,up=0,skip=0,bad=0,unknown=0;
+    for(const r of rows.slice(header?1:0)){
+      const v={};map.forEach((k,i)=>{if(!k)return;let x=String(r[i]??"").trim().replace(/^'(?=[=+\-@])/,"");if(x)v[k]=x.slice(0,k==="note"?500:120)});
+      if(!/^[A-Za-z0-9._-]{1,60}$/.test(v.uid||"")||v.uid.startsWith("__")){bad++;continue}
+      if(v.status){const s=settings.statuses.find(s=>norm(s.name)===norm(v.status)||s.id===norm(v.status))||({live:{id:"live"},die:{id:"dead"}})[norm(v.status)];if(s)v.status=s.id;else{delete v.status;unknown++}}
+      if(v.tags)v.tags=splitTags(v.tags);
+      for(const k of ["born","checked"])if(v[k]){v[k]=toDate(v[k]);if(!v[k])delete v[k]}
+      const old=put.get(v.uid)||get(v.uid);
+      if(old&&!update){skip++;continue}
+      const sv={};for(const k of SECRETS)if(v[k]){sv[k]=v[k];delete v[k]}
+      let extra="";
+      if(Object.keys(sv).length){
+        let prev={};
+        if(old?.sec)prev=secretsOf(old);
+        if(Object.keys(sv).some(k=>sv[k]!==prev[k])){v.sec=await seal(v.uid,{...prev,...sv});extra="Đổi "+Object.keys(sv).filter(k=>sv[k]!==prev[k]).map(k=>LABEL[k].toLowerCase()).join(", ")}
+        if(!d.open)return false;
+      }
+      const n=revise(old||{},old?v:{status:"new",...v},"Nhập từ file",extra);
+      if(!n){skip++;continue}
+      if(!put.has(v.uid))get(v.uid)?up++:add++;
+      put.set(v.uid,n);
+    }
+    if(!put.size)return `Không có gì để nhập. Bỏ qua ${skip} dòng trùng hoặc không đổi, ${bad} dòng UID không hợp lệ.`;
+    if(!commit([...put.values()]))return "Dữ liệu vượt quá dung lượng. Hãy chia nhỏ file.";
+    hydrate();
+    toast(`Thêm ${add}, cập nhật ${up}, bỏ qua ${skip}, UID lỗi ${bad}${unknown?`, trạng thái lạ ${unknown}`:""}`);
+  });
+  const preview=()=>{
+    if(!rows||!rows.length){rows=null;$("#map").innerHTML="";return}
+    const looks=rows[0].some(x=>guess(x)),hh=$("#hasHead")?$("#hasHead").checked:looks;
+    const width=Math.min(30,Math.max(...rows.slice(0,50).map(r=>r.length)));
+    $("#map").innerHTML=`<label style="display:flex;gap:8px;margin-top:12px"><input type="checkbox" id="hasHead" ${hh?"checked":""}>Dòng đầu là tên cột</label><p class="muted">${rows.length-(hh?1:0)} dòng. Chọn trường cho từng cột:</p><div class="tablewrap"><table><thead><tr>${[...Array(width)].map((_,i)=>{const h=hh?String(rows[0][i]??""):"",secret=BLOCK.test(norm(h));const g=hh?guess(h):ORDER[i]||"";return `<th>${esc(h||"Cột "+(i+1))}<br><select data-map="${i}" id="map-${i}" aria-label="Trường cho cột ${i+1}" ${secret?"disabled":""}>${opts(FIELDS,secret?"":g,secret?"Bị chặn":"Bỏ qua")}</select></th>`}).join("")}</tr></thead><tbody>${rows.slice(hh?1:0,(hh?1:0)+3).map(r=>`<tr>${[...Array(width)].map((_,i)=>{const f=hh?guess(rows[0][i])||(BLOCK.test(norm(rows[0][i]))?"pass":""):ORDER[i];return `<td>${SECRETS.includes(f)?"•••":esc(r[i])}</td>`}).join("")}</tr>`).join("")}</tbody></table></div><label style="margin-top:12px">Khi UID đã tồn tại<select id="dup"><option value="skip">Bỏ qua</option><option value="update">Cập nhật các ô có dữ liệu</option></select></label>`;
+    $("#hasHead").onchange=preview;
+  };
+  $("#paste").oninput=e=>{rows=parseText(e.target.value);preview()};
+  $("#file").onchange=async e=>{
+    const f=e.target.files[0];if(!f)return;
+    try{
+      if(/\.xlsx?$/i.test(f.name)){
+        if(!window.XLSX)throw 0;
+        const wb=XLSX.read(await f.arrayBuffer(),{cellDates:true});
+        rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:""}).map(r=>r.map(c=>c instanceof Date?new Date(+c+12*36e5).toISOString().slice(0,10):String(c))).filter(r=>r.some(x=>x.trim()));
+      }else rows=parseText(await f.text());
+      if($("#hasHead"))$("#hasHead").closest("label").remove();
+      preview();
+    }catch{rows=null;toast("Không đọc được file này. Hãy lưu lại dạng CSV rồi thử lại.")}
+  };
+}
+async function save(filename,data){
+  if(!downloads){toast("Không tải file được ở chế độ xem này.");return}
+  try{await downloads.save({filename,data})}catch(e){if(e.code!=="declined")toast("Chưa tải được file. Hãy thử lại sau.")}
+}
+const safe=v=>/^[=+\-@\t\r]/.test(v)?"'"+v:v;
+const matrix=(list,keys,secrets)=>[keys.map(k=>LABEL[k]),...list.map(a=>keys.map(k=>k==="status"?st(a.status).name:k==="tags"?(a.tags||[]).join(", "):SECRETS.includes(k)?secrets.get(a.uid)?.[k]||"":String(a[k]??"")))];
+const csv=m=>"\ufeff"+m.map(r=>r.map(c=>`"${safe(c).replace(/"/g,'""')}"`).join(",")).join("\r\n");
+function exportDialog(onlySel){
+  const picked=onlySel?[...sel]:(route()==="tai-khoan"?filtered():all()).map(a=>a.uid);
+  dialog(`<h2>Xuất ${picked.length} tài khoản</h2><label>Định dạng<select id="xf"><option value="xlsx">Excel (.xlsx)</option><option value="csv">CSV</option><option value="txt">TXT (uid|pass|2fa|gmail|…)</option></select></label><label style="display:flex;gap:8px;margin-top:12px"><input type="checkbox" id="xs">Kèm mật khẩu, 2FA, pass Gmail</label><p class="muted">File xuất ra không được mã hoá. Ai có file đều đọc được.</p>`,()=>{
+    const f=$("#xf").value,withS=$("#xs").checked;
+    const go=async()=>{
+      const list=picked.map(get).filter(Boolean),secrets=new Map();
+      if(withS)for(const a of list)secrets.set(a.uid,secretsOf(a));
+      const keys=FIELDS.map(x=>x[0]).filter(k=>withS||!SECRETS.includes(k)),name=`tai-khoan-fb-${today()}.${f}`;
+      if(f==="txt"){const cut=ORDER.filter(k=>keys.includes(k)),m=matrix(list,cut,secrets);if(m.some(r=>r.some(c=>c.includes("|")))){toast("Có dữ liệu chứa dấu |. Hãy xuất CSV hoặc Excel.");return}save(name,m.map(r=>r.map(c=>c.replace(/[|\r\n]/g," ")).join("|")).join("\r\n"))}
+      else if(f==="csv")save(name,csv(matrix(list,keys,secrets)));
+      else{if(!window.XLSX){toast("Chưa tải được thư viện Excel. Hãy chọn CSV.");return}const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(matrix(list,keys,secrets)),"Tài khoản");save(name,XLSX.write(wb,{type:"array",bookType:"xlsx"}))}
+    };
+    go();
+  });
+}
+;
+const go=h=>{if(location.hash==="#"+h)render();else location.hash=h};
+const resetF=()=>{q=fStatus=fGroup=fTag="";fStale=false;page=1};
+const bulk=(fn,msg)=>{const put=[...sel].map(get).filter(Boolean).map(a=>revise(a,fn(a))).filter(Boolean);if(commit(put))toast(msg)};
+const acts={
+ add:()=>openAccount(),import:importDialog,export:()=>exportDialog(),open:openAccount,
+ close:()=>$("#dlg").close(),closeDrawer:()=>$("#drawer").close(),
+ show:id=>{const [u,k]=id.split("|");if(!secretsOf(get(u))[k])return toast("Không có dữ liệu để hiển thị","error");const hide=shown.has(id);hide?shown.delete(id):shown.add(id);table();toast((hide?"Đã ẩn ":"Đã hiện ")+LABEL[k])},
+ cp:id=>{const [u,k]=id.split("|");return copy(secretsOf(get(u))[k],"Đã sao chép "+LABEL[k])},
+ cpUid:u=>copy(u,"Đã sao chép UID"),cpMail:u=>copy(get(u)?.email,"Đã sao chép Gmail"),
+ code:async u=>{const c=await totp(secretsOf(get(u)).twofa||"");if(!c)return toast("Khoá 2FA không hợp lệ","error");return copy(c,"Đã sao chép mã 2FA (có hiệu lực 30 giây mỗi chu kỳ)")},
+ del:u=>ask("Xoá tài khoản","Xoá tài khoản này?",()=>commit([],[u])),
+ filter:v=>{resetF();fStatus=v;go("tai-khoan")},stale:()=>{resetF();fStale=true;go("tai-khoan")},
+ gOpen:v=>{resetF();fGroup=v;go("tai-khoan")},
+ reset:()=>{resetF();render()},tab:v=>{fStatus=v;page=1;tabs();table()},
+ sort:k=>{sort={k,d:sort.k===k?-sort.d:1};table()},prev:()=>{page--;table()},next:()=>{page++;table()},
+ selAll:()=>{filtered().forEach(a=>sel.add(a.uid));table()},selNone:()=>{sel.clear();table()},
+ bCopy:()=>copy([...sel].join("\n")),bExport:()=>exportDialog(true),
+ bDel:()=>ask("Xoá tài khoản","Xoá các tài khoản đã chọn?",()=>{const ids=[...sel];sel.clear();commit([],ids)}),
+ bCheck:()=>bulk(()=>({checked:today()}),"Đã cập nhật"),
+ bGroup:()=>prompt_("Gán nhóm","Tên nhóm",groups(),n=>bulk(()=>({group:n}),"Đã gán nhóm")),
+ bTag:()=>prompt_("Thêm nhãn","Nhãn",tagsAll(),n=>bulk(a=>({tags:[...new Set([...(a.tags||[]),...splitTags(n)])]}),"Đã thêm nhãn")),
+ wipe:()=>ask("Xoá toàn bộ","Xoá toàn bộ tài khoản?",()=>commit([],all().map(a=>a.uid))),
+ retry:()=>{for(const [p,j] of jobs)if(j.failed){j.failed=false;run(p,j)}}
+};
+document.addEventListener("click",async e=>{
+  const b=e.target.closest("[data-act]");
+  if(b){e.preventDefault();if(b.disabled)return;try{const action=acts[b.dataset.act];if(!action)throw new Error("Missing action");await action(b.dataset.v)}catch{toast("Thao tác thất bại. Vui lòng thử lại.","error")}return}
+  const tr=e.target.closest("tr[data-uid]");
+  if(tr&&!e.target.closest("input,button,select,a,td:first-child,.sec"))openAccount(tr.dataset.uid);
+});
+for(const d of [$("#dlg"),$("#drawer")])d.addEventListener("close",()=>{if(!d.open)d.innerHTML=""});
+$("#btnAdd").onclick=()=>openAccount();$("#btnImport").onclick=importDialog;$("#btnExport").onclick=()=>exportDialog();
+document.addEventListener("input",e=>{if(e.target.id==="q"){q=e.target.value;page=1;table()}});
+document.addEventListener("change",e=>{
+  const t=e.target;
+  if(t.id==="fStatus"){fStatus=t.value;page=1;tabs();table()}
+  else if(t.id==="fGroup"){fGroup=t.value;page=1;table()}
+  else if(t.id==="fTag"){fTag=t.value;page=1;table()}
+  else if(t.id==="fStale"){fStale=t.checked;page=1;table()}
+  else if(t.id==="per"){per=+t.value;store.set("per",per);page=1;table()}
+  else if(t.id==="bStatus"&&t.value)bulk(()=>({status:t.value,checked:today()}),"Đã đổi trạng thái");
+  else if(t.dataset.state!==undefined){const a=get(t.dataset.state),r=a&&revise(a,{status:t.value,checked:today()});if(r&&commit([r]))toast("Đã cập nhật, ngày kiểm tra là hôm nay")}
+  else if(t.id==="pageAll"){$("#tbl").querySelectorAll("[data-sel]").forEach(c=>t.checked?sel.add(c.dataset.sel):sel.delete(c.dataset.sel));table()}
+  else if(t.dataset.sel!==undefined){t.checked?sel.add(t.dataset.sel):sel.delete(t.dataset.sel);table()}
+  else if(t.dataset.col){cols=t.checked?[...cols,t.dataset.col]:cols.filter(c=>c!==t.dataset.col);store.set("cols2",cols);table()}
+  else if(t.dataset.sn||t.dataset.sc){const id=t.dataset.sn||t.dataset.sc,key=t.dataset.sn?"name":"color",val=t.value.trim();if(!val)return;settings={...settings,statuses:settings.statuses.map(s=>s.id===id?{...s,[key]:val}:s)};saveSettings();toast("Đã lưu cài đặt")}
+  else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365){settings={...settings,staleDays:n};saveSettings();toast("Đã lưu cài đặt")}}
+});
+document.addEventListener("keydown",e=>{if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$("#q")){e.preventDefault();$("#q").focus()}});
+document.addEventListener("pointermove",e=>{
+  const t=e.target.closest?.("[data-tip]"),tip=$("#tip");if(!t){tip.hidden=true;return}
+  tip.textContent=t.dataset.tip;tip.hidden=false;
+  tip.style.left=Math.max(8,Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8))+"px";tip.style.top=Math.max(8,Math.min(e.clientY+14,innerHeight-tip.offsetHeight-8))+"px";
+});
+addEventListener("hashchange",()=>{$("#view").innerHTML="";render()});
+
+/* ---------- khởi động ---------- */
+async function boot(){
+  render();
+  const c=window.claude;
+  const [d,u,dl]=c?.use?await Promise.all([c.use("db"),c.use("user"),c.use("downloads")]):[null,null,null];
+  downloads=dl;
+  const owner=u?await u.isOwner():null;
+  if(owner===false){mode="denied";render();return}
+  if(!d){
+    if(c?.use){mode="denied";render();$("#banner").textContent="Không kết nối được kho dữ liệu. Hãy đăng nhập rồi mở lại trang.";return}
+    try{openLocalStore();render()}catch{mode="denied";render();$("#banner").hidden=false;$("#banner").textContent="Không mở được dữ liệu đã lưu. Hãy kiểm tra quyền lưu trữ của trình duyệt; dữ liệu cũ chưa bị xoá.";toast("Không thể mở kho lưu trữ trên trình duyệt","error")}
+    return;
+  }
+  db=d;
+  const got={};
+  const slow=setTimeout(()=>{const b=$("#banner");b.hidden=false;b.textContent="Chưa kết nối được kho dữ liệu. Trang sẽ tự hiển thị khi kết nối xong."},10000);
+  const fail=()=>{clearTimeout(slow);mode="loading";render();const b=$("#banner");b.hidden=false;b.textContent="Mất kết nối với kho dữ liệu. Hãy tải lại trang.";$("#save").textContent="Mất kết nối"};
+  const done=(key,snap)=>{
+    if(!snap.metadata.fromCache)got[key]=true;
+    if(mode==="loading"&&got.s&&got.set&&got.day){mode="ready";clearTimeout(slow)}
+    render();hydrate();
+  };
+  db.collection("shards").onSnapshot(s=>{
+    const found=new Map(s.docs.map(x=>[x.id,x.data().a||{}]));
+    shards=shards.map((cur,i)=>pending("shards/s"+i)?cur:(found.get("s"+i)||{}));
+    done("s",s);
+  },fail);
+  db.doc("meta/settings").onSnapshot(s=>{if(!pending("meta/settings"))settings=s.exists?structuredClone(s.data()):structuredClone(DEF);done("set",s)},fail);
+  db.doc("meta/daily").onSnapshot(s=>{if(!pending("meta/daily"))daily=s.exists?structuredClone(s.data().days||{}):{};done("day",s)},fail);
+}
+boot();
+})();
+</script>
+
+</body></html>
+
+
+
