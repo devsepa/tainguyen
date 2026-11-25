@@ -13,15 +13,20 @@ input,select,textarea{background:var(--bg);border:1px solid var(--line);border-r
 input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);padding:0}
 input[type=color]{padding:2px;width:44px;height:36px}
 textarea{width:100%;resize:vertical}
-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;white-space:nowrap;font-weight:500}
-button:hover:not(:disabled){border-color:var(--accent)}
+button{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;white-space:nowrap;font-weight:500;user-select:none;transition:transform .08s ease,border-color .15s ease,background-color .15s ease,box-shadow .15s ease}
+button:hover:not(:disabled){border-color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,0.25)}
+button:active:not(:disabled){transform:scale(0.95);box-shadow:none}
 button:disabled{opacity:.45;cursor:default}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.primary:hover:not(:disabled){box-shadow:0 0 12px rgba(91,140,255,0.4)}
 button.danger{color:var(--danger)}
+button.danger:hover:not(:disabled){border-color:var(--danger);box-shadow:0 0 12px rgba(240,98,95,0.3)}
 button.link{background:none;border:0;padding:0;color:var(--accent)}
+button.link:hover{text-decoration:underline}
 button.mini{padding:3px 9px;font-size:12px}
-button.ico{width:27px;height:27px;padding:0;background:none;border-color:transparent;color:var(--mute)}
+button.ico{width:27px;height:27px;padding:0;background:none;border-color:transparent;color:var(--mute);transition:transform .08s ease,color .15s ease}
 button.ico:hover:not(:disabled){color:var(--fg);background:var(--raise);border-color:var(--line)}
+button.ico:active:not(:disabled){transform:scale(0.88)}
 svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100%;padding-right:max(16px,env(safe-area-inset-right,0px));padding-left:max(16px,env(safe-area-inset-left,0px))}
@@ -116,9 +121,13 @@ select.state{padding:3px 8px;font-size:12px;border-radius:99px;border-color:colo
 details{position:relative}
 summary{cursor:pointer;list-style:none;background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:8px 14px}
 details .menu{position:absolute;right:0;top:44px;background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:10px 14px;z-index:5;display:grid;gap:7px;white-space:nowrap}
-dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:16px;padding:22px;width:min(680px,calc(100% - 24px));max-height:90%}
+@keyframes dlgPop{from{opacity:0;transform:scale(0.96) translateY(-8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes toastDrop{from{opacity:0;transform:translate(-50%,-16px) scale(0.95)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@keyframes pulseOtpBox{0%,100%{box-shadow:0 0 0 0 rgba(47,191,113,0.3)}50%{box-shadow:0 0 18px 3px rgba(47,191,113,0.45)}}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:16px;padding:22px;width:min(680px,calc(100% - 24px));max-height:90%;box-shadow:0 24px 60px rgba(0,0,0,0.65)}
+dialog[open]{animation:dlgPop 0.22s cubic-bezier(0.16,1,0.3,1)}
 dialog.drawer{margin:auto;height:auto;max-height:calc(100dvh - 32px);width:min(720px,calc(100% - 32px));box-sizing:border-box;border-radius:16px;padding:22px;overflow-y:auto;overscroll-behavior:contain}
-dialog::backdrop{background:#03060dbb}
+dialog::backdrop{background:rgba(3,6,13,0.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 label{display:grid;gap:4px;font-size:12px;color:var(--mute);align-content:start;min-width:0}
 label>*{font-size:14px;color:var(--fg)}
@@ -126,7 +135,9 @@ label>*{font-size:14px;color:var(--fg)}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 .actions .left{margin-right:auto}
 .err{color:var(--danger);margin:8px 0 0}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:9px;max-width:calc(100% - 32px);z-index:20;margin:0;border:0;inset-block-start:auto}
+#toast{position:fixed;left:50%;transform:translateX(-50%);top:24px;bottom:auto;background:rgba(18,25,41,0.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);color:var(--fg);border:1px solid var(--accent);padding:10px 20px;border-radius:99px;max-width:calc(100% - 32px);z-index:9999999;margin:0;box-shadow:0 12px 36px rgba(0,0,0,0.5),0 0 20px rgba(91,140,255,0.25);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;pointer-events:none;animation:toastDrop 0.25s cubic-bezier(0.16,1,0.3,1)}
+#toast[data-type=success]{border-color:#2fbf71;box-shadow:0 12px 36px rgba(0,0,0,0.5),0 0 22px rgba(47,191,113,0.35)}
+#toast[data-type=error]{border-color:#f0625f;box-shadow:0 12px 36px rgba(0,0,0,0.5),0 0 22px rgba(240,98,95,0.35)}
 #tip{position:fixed;pointer-events:none;background:var(--raise);border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:12px;white-space:pre;z-index:30}
 @media (max-width:1100px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:minmax(0,1fr)}.wide{grid-column:auto}}
 @media (max-width:760px){
@@ -233,7 +244,7 @@ let sel=new Set(), q="", fStatus="", fPlatform="", fStale=false, page=1, sort={k
 let per=store.get("per",25), cols=store.get("cols3",ORDER).filter(c=>!["group","tags"].includes(c));
 if(!cols.includes("platform"))cols=["platform",...cols];
 if(!cols.includes("name")){const uIdx=cols.indexOf("uid");if(uIdx>=0)cols.splice(uIdx+1,0,"name");else cols.unshift("name")}
-let qGmail="", sortGmail={k:"updated",d:-1}, pageGmail=1, perGmail=25, selGmail=new Set();
+let qGmail="", sortGmail={k:"updated",d:-1}, pageGmail=1, perGmail=25, selGmail=new Set(), mailSubTab="edu";
 function makeGmailUid(email){
   const clean='gm_'+String(email||'').trim().toLowerCase().replace('@','_at_').replace(/[^A-Za-z0-9._-]/g,'_');
   return clean.slice(0,60);
@@ -453,6 +464,7 @@ function accounts(v,list){
     v.innerHTML=`<div class="tabs" id="tabs" role="group" aria-label="Lọc nhanh"></div><div class="tools filters"><input id="q" class="grow" type="search" placeholder="Tìm UID, Gmail, tên, ghi chú…  ( phím / )" aria-label="Tìm kiếm">
     <select id="fPlatform" aria-label="Lọc nền tảng"><option value="">Mọi nền tảng</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="fStatus" hidden aria-label="Lọc trạng thái"></select>
     <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fStale">Cần kiểm tra</label>
+    <button data-act="checkAllLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Kiểm tra Live/Die tự động cho các tài khoản Facebook">${icon("check")} ⚡ Check Live/Die FB</button>
     <details><summary>Cột</summary><div class="menu">${FIELDS.map(([k,t])=>`<label style="display:flex;gap:8px"><input type="checkbox" id="col-${k}" data-col="${k}" ${cols.includes(k)?"checked":""} ${k==="uid"?"disabled":""}>${t}</label>`).join("")}</div></details></div><div id="tbl" class="view"></div>`;
     $("#q").value=q;
   }
@@ -474,8 +486,8 @@ function cell(a,k){
     const id=a.uid+"|"+k,on=shown.has(id);
     return `<span class="sec"><span class="mono">${on?esc(s[k]):"••••••"}</span>${ib("show",esc(id),on?"off":"eye",(on?"Ẩn ":"Hiện ")+LABEL[k])}${ib("cp",esc(id),"copy","Chép "+LABEL[k])}${k==="twofa"?ib("code",u,"key","Lấy mã 6 số"):""}</span>`;
   }
-  if(k==="email"&&a.email)return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail",u,"copy","Chép Gmail")}</span>`;
-  if(k==="status")return `<select class="state" ${canWrite()?"":"disabled"} style="--c:${esc(st(a.status).color)}" data-state="${u}" id="state-${u}" aria-label="Trạng thái ${u}">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select>`;
+  if(k==="email"&&a.email)return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail",u,"copy","Chép Gmail")}<button class="ico" data-act="inboxTempMailByEmail" data-v="${esc(a.email)}" title="Mở hộp thư &amp; lấy mã OTP" style="color:#2fbf71;width:24px;height:24px">${icon("mail")}</button></span>`;
+  if(k==="status")return `<span style="display:inline-flex;align-items:center;gap:4px"><select class="state" ${canWrite()?"":"disabled"} style="--c:${esc(st(a.status).color)}" data-state="${u}" id="state-${u}" aria-label="Trạng thái ${u}">${opts(settings.statuses.map(s=>[s.id,s.name]),a.status)}</select><button class="ico" data-act="checkOneLive" data-v="${u}" title="Check Live/Die nick này ngay" style="color:#2fbf71;width:22px;height:22px">${icon("refresh")}</button></span>`;
   if(k==="checked"||k==="born")return fmt(a[k]&&a[k]+"T00:00:00")+(k==="checked"&&stale(a)?' <span title="Quá hạn kiểm tra" style="color:var(--warn)">●</span>':"");
   if(k==="name")return a.name?`<b>${esc(a.name)}</b>`:'<span class="muted">—</span>';
   return esc(a[k])||'<span class="muted">—</span>';
@@ -486,6 +498,7 @@ function table(){
   const shown=rows.slice((page-1)*per,page*per),show=FIELDS.map(f=>f[0]).filter(k=>cols.includes(k)||k==="uid");
   el.innerHTML=`${sel.size?`<div class="tools bulk"><b>Đã chọn ${sel.size}</b>
   ${sel.size<rows.length?`<button class="link" data-act="selAll">Chọn cả ${rows.length}</button>`:""}
+  <button data-act="bCheckLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:4px">${icon("check")} ⚡ Check ${sel.size} nick FB</button>
   <select id="bPlatform" aria-label="Đổi nền tảng"><option value="">Đổi nền tảng…</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="bStatus" aria-label="Đổi trạng thái">${opts(settings.statuses.map(s=>[s.id,s.name]),"","Đổi trạng thái…")}</select>
   <button data-act="bCheck">Đánh dấu đã kiểm tra</button><button data-act="bCopy">Sao chép UID</button><button data-act="bExport">Xuất</button><button class="danger" data-act="bDel">Xoá</button><button class="link" data-act="selNone">Bỏ chọn</button></div>`:""}
   <div class="tablewrap"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length&&shown.every(a=>sel.has(a.uid))?"checked":""}></th>${show.map(k=>`<th aria-sort="${sort.k===k?(sort.d>0?"ascending":"descending"):"none"}">${SECRETS.includes(k)?LABEL[k]:`<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k===k?(sort.d>0?" ↑":" ↓"):""}</button>`}</th>`).join("")}</tr></thead>
@@ -493,34 +506,94 @@ function table(){
   <div class="tools" style="justify-content:space-between"><span class="muted">${rows.length} kết quả · trang ${page}/${pages}</span><span class="tools"><select id="per" aria-label="Số dòng mỗi trang">${opts([25,50,100].map(n=>[String(n),n+" dòng"]),String(per))}</select><button data-act="prev" ${page<=1?"disabled":""}>Trước</button><button data-act="next" ${page>=pages?"disabled":""}>Sau</button></span></div>`;
   el.querySelector(".tablewrap").scrollLeft=sx;
 }
+function isEduMailRecord(a){
+  const email=String(a.email||"").toLowerCase();
+  const pass=String(secretsOf(a).pass||a.pass||"").toLowerCase();
+  const note=String(a.note||"").toLowerCase();
+  return email.includes("edu")||pass.includes("access?key")||note.includes("edu")||note.includes("tempamail");
+}
+
 function filteredGmail(){
   const k=norm(qGmail);
-  return all().filter(a=>a.platform==="gmail"&&(!k||norm([a.email,secretsOf(a).pass,a.note].join(" ")).includes(k)))
+  let base=all().filter(a=>a.platform==="gmail");
+  if(mailSubTab==="edu"){
+    base=base.filter(a=>isEduMailRecord(a));
+  }else if(mailSubTab==="cloud"){
+    base=base.filter(a=>!isEduMailRecord(a));
+  }
+  return base.filter(a=>!k||norm([a.email,secretsOf(a).pass,a.note].join(" ")).includes(k))
     .sort((a,b)=>{const val=x=>sortGmail.k==="updated"?x.updated||0:x[sortGmail.k]??"";const x=val(a),y=val(b);return sortGmail.d*(typeof x==="number"?x-y:String(x).localeCompare(String(y),"vi",{numeric:true}))});
 }
+
 function gmailView(v,list){
-  const gList=list.filter(a=>a.platform==="gmail");
-  const noteBanner=`<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(91,140,255,0.06);border:1px solid rgba(91,140,255,0.22);border-radius:10px">
-    <div style="font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px">
-      <span style="color:#5b8cff;display:inline-flex">${icon("info")}</span> Hướng dẫn đăng nhập &amp; mở hòm thư ảo:
-    </div>
-    <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.65;color:var(--text)">
-      <li>Dùng <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempmail.cloud/</a> để log mail | pass.</li>
-      <li>Đối với mail edu <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempamail.com/edu</a> dùng link pass để mở hòm thư ảo.</li>
-    </ul>
+  const allMails=list.filter(a=>a.platform==="gmail");
+  const eduCount=allMails.filter(isEduMailRecord).length;
+  const cloudCount=allMails.length-eduCount;
+
+  const tabSwitcher=`<div class="tabs" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="${mailSubTab==='edu'?'primary':''}" data-act="switchMailTab" data-v="edu" aria-pressed="${mailSubTab==='edu'}" style="font-weight:600">
+      🎓 Temp Mail .EDU (${eduCount})
+    </button>
+    <button class="${mailSubTab==='cloud'?'primary':''}" data-act="switchMailTab" data-v="cloud" aria-pressed="${mailSubTab==='cloud'}" style="font-weight:600">
+      ☁️ Temp Mail Cloud (${cloudCount})
+    </button>
+    <button data-act="switchMailTab" data-v="all" aria-pressed="${mailSubTab==='all'}">
+      📁 Tất cả (${allMails.length})
+    </button>
   </div>`;
-  if(!gList.length&&!qGmail){
-    v.innerHTML=`${noteBanner}<div class="panel empty">Chưa có tài khoản Gmail nào trong kho. Dán danh sách text / file TXT, thêm thủ công hoặc tạo tự động.<div><button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail Ảo / EDU</button><button class="primary" data-act="addGmail">+ Thêm Gmail</button><button data-act="importGmail">${icon("up")} Nhập text / file TXT</button></div></div>`;
-    return;
+
+  let noteBanner="";
+  if(mailSubTab==="edu"){
+    noteBanner=`<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(47,191,113,0.06);border:1px solid rgba(47,191,113,0.25);border-radius:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;color:var(--fg);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+            <span style="color:#2fbf71;display:inline-flex">${icon("mail")}</span> <b>Kho Mail Sinh viên (.EDU) — Tempamail:</b>
+          </div>
+          <div style="font-size:12.5px;color:var(--mute)">Cơ chế <b>Access Key</b>: Không cần pass. Bấm nút <b>[Hộp thư &amp; OTP]</b> để đọc thư/OTP realtime trực tiếp trong app hoặc click link mở web.</div>
+        </div>
+        <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:5px 12px;border-radius:7px;color:var(--fg);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail Edu">${icon("ext")} Mở Tempamail.com/edu</a>
+      </div>
+    </div>`;
+  } else if(mailSubTab==="cloud"){
+    noteBanner=`<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(123,66,255,0.06);border:1px solid rgba(123,66,255,0.25);border-radius:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;color:var(--fg);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+            <span style="color:#7b42ff;display:inline-flex">${icon("bolt")}</span> <b>Kho Temp Mail Cloud — TempMail.cloud:</b>
+          </div>
+          <div style="font-size:12.5px;color:var(--mute)">Cơ chế <b>Email | Password | Date</b>: Có mật khẩu riêng để đăng nhập lại hộp thư tại <a href="https://tempmail.cloud/" target="_blank" style="color:var(--accent);text-decoration:underline">https://tempmail.cloud/</a>.</div>
+        </div>
+        <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:5px 12px;border-radius:7px;color:var(--fg);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail.cloud">${icon("ext")} Mở TempMail.cloud</a>
+      </div>
+    </div>`;
   }
+
   const rows=filteredGmail(),pages=Math.max(1,Math.ceil(rows.length/perGmail));
   pageGmail=Math.min(pageGmail,pages);
   const shownRows=rows.slice((pageGmail-1)*perGmail,pageGmail*perGmail);
-  v.innerHTML=`${noteBanner}<div class="tools filters">
-    <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ Gmail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Gmail">
-    <button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail Ảo / EDU</button>
-    <button class="primary" data-act="addGmail">+ Thêm Gmail</button>
-    <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>
+
+  let actionBtns="";
+  if(mailSubTab==="edu"){
+    actionBtns=`<button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail .EDU</button>
+      <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
+  } else if(mailSubTab==="cloud"){
+    actionBtns=`<button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#078df5,#7b42ff);border:none;font-weight:600">${icon("bolt")} Lấy Mail TempMail.cloud</button>
+      <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
+  } else {
+    actionBtns=`<button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail .EDU</button>
+      <button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#078df5,#7b42ff);border:none;font-weight:600">${icon("bolt")} Lấy TempMail.cloud</button>
+      <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
+  }
+
+  if(!rows.length&&!qGmail){
+    v.innerHTML=`${tabSwitcher}${noteBanner}<div class="panel empty">Chưa có tài khoản nào trong danh sách này.<div>${actionBtns}</div></div>`;
+    return;
+  }
+
+  v.innerHTML=`${tabSwitcher}${noteBanner}<div class="tools filters">
+    <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ mail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Mail">
+    ${actionBtns}
   </div>
   ${selGmail.size?`<div class="tools bulk"><b>Đã chọn ${selGmail.size}</b>
     ${selGmail.size<rows.length?`<button class="link" data-act="selAllGmail">Chọn cả ${rows.length}</button>`:""}
@@ -533,42 +606,41 @@ function gmailView(v,list){
   <div class="tablewrap"><table>
     <thead><tr>
       <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length&&shownRows.every(a=>selGmail.has(a.uid))?"checked":""}></th>
-      <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Gmail &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
-      <th style="min-width:180px">Mật khẩu</th>
+      <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Email &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
+      <th style="min-width:180px">${mailSubTab==='cloud'?'Mật khẩu (Password)':'Mật khẩu / Key'}</th>
       <th style="min-width:240px">Ghi chú (Nhấp để sửa)</th>
       <th style="min-width:220px">Sao chép &amp; Thao tác</th>
     </tr></thead>
     <tbody>
       ${shownRows.map(a=>{
         const u=esc(a.uid),email=esc(a.email||""),pass=secretsOf(a).pass||"",passId=a.uid+"|pass",on=shown.has(passId);
-        const isUrlPass=/^https?:\/\//i.test(pass.trim()),isEdu=/\.edu(\.|\/|$)|@.*edu/i.test(email);
+        const isUrlPass=/^https?:\/\//i.test(pass.trim()),isEdu=isEduMailRecord(a);
         const isTimeNote=/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\b/.test(String(a.note||"").trim());
         const timeLabel=isTimeNote?a.note:fmtTime(a.updated||a.added);
         const displayNote=isTimeNote?"":a.note;
-        const hasKey=isUrlPass||/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(pass.trim())||isEdu||/temp/i.test(a.note||"");
         return `<tr data-guid="${u}">
           <td><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid)?"checked":""}></td>
           <td>
             <div style="display:flex;flex-direction:column;gap:2px">
-              <span class="sec"><span style="color:#ea4335;display:inline-flex;align-items:center" title="Gmail">${icon("mail")}</span> <b>${email}</b> ${ib("cpText",email,"copy","Chép Gmail")}</span>
+              <span class="sec"><span style="color:${isEdu?'#2fbf71':'#7b42ff'};display:inline-flex;align-items:center" title="${isEdu?'Mail Edu':'TempMail Cloud'}">${icon("mail")}</span> <b>${email}</b> ${ib("cpText",email,"copy","Chép Email")}</span>
               <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
             </div>
           </td>
           <td>${pass?`<span class="sec"><span class="mono">${on?esc(pass):"••••••••"}</span>${ib("show",esc(passId),on?"off":"eye",on?"Ẩn ":"Hiện ")}${ib("cpText",esc(pass),"copy","Chép mật khẩu")}${isUrlPass?`<a href="${esc(pass.trim())}" target="_blank" rel="noopener noreferrer" class="link" style="margin-left:4px;display:inline-flex;align-items:center;color:var(--accent)" title="Mở link hòm thư ảo" onclick="event.stopPropagation()">${icon("ext")}</a>`:""}</span>`:'<span class="muted">—</span>'}</td>
           <td>
-            <input type="text" data-note-guid="${u}" value="${esc(displayNote)}" placeholder="— Nhấp để thêm ghi chú..." title="Nhấp vào để sửa ghi chú, nhấn Enter hoặc bấm ra ngoài để lưu" style="background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;width:100%;max-width:280px;color:var(--fg);font-size:12.5px;transition:all .15s" onfocus="this.style.background='var(--raise)';this.style.borderColor='var(--accent)';this.style.borderStyle='solid'" onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.borderStyle='dashed'">
+            <input type="text" data-note-guid="${u}" value="${esc(displayNote)}" placeholder="— Nhập ghi chú..." title="Nhấp vào để sửa ghi chú, nhấn Enter hoặc bấm ra ngoài để lưu" style="background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;width:100%;max-width:280px;color:var(--fg);font-size:12.5px;transition:all .15s" onfocus="this.style.background='var(--raise)';this.style.borderColor='var(--accent)';this.style.borderStyle='solid'" onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.borderStyle='dashed'">
           </td>
           <td style="white-space:nowrap">
             <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
             <button class="mini" data-act="inboxTempMail" data-v="${u}" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600" title="Mở hộp thư &amp; đọc mã OTP">${icon("mail")} Hộp thư &amp; OTP</button>
-            <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Gmail">${icon("x")}</button>
+            <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Mail">${icon("x")}</button>
           </td>
         </tr>`;
-      }).join("")||`<tr><td colspan="5" class="empty">Không tìm thấy tài khoản Gmail khớp từ khoá. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
+      }).join("")||`<tr><td colspan="5" class="empty">Không tìm thấy tài khoản nào khớp từ khoá. <button class="link" data-act="resetGmail">Xoá tìm kiếm</button></td></tr>`}
     </tbody>
   </table></div>
   <div class="tools" style="justify-content:space-between">
-    <span class="muted">${rows.length} tài khoản Gmail · trang ${pageGmail}/${pages}</span>
+    <span class="muted">${rows.length} tài khoản · trang ${pageGmail}/${pages}</span>
     <span class="tools">
       <select id="perGmail" aria-label="Số dòng mỗi trang">${opts([25,50,100,200].map(n=>[String(n),n+" dòng"]),String(perGmail))}</select>
       <button data-act="prevGmail" ${pageGmail<=1?"disabled":""}>Trước</button>
@@ -587,17 +659,112 @@ function extractEmailUuid(a){
   return null;
 }
 
-function extractOtp(text,subject=""){
-  const combined=(subject+" "+text);
-  const patterns=[
-    /(?:mã|code|otp|pin|verification)\s*(?:is|là|:|\-)?\s*([0-9]{4,8})\b/i,
-    /\b([0-9]{6})\b/,
-    /\b([0-9]{4,5})\b/
-  ];
-  for(const p of patterns){
-    const m=combined.match(p);
-    if(m&&m[1])return m[1];
+function playChime(type="success"){
+  try{
+    const AudioCtx=window.AudioContext||window.webkitAudioContext;
+    if(!AudioCtx)return;
+    const ctx=new AudioCtx();
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const now=ctx.currentTime;
+    if(type==="otp"){
+      osc.type="triangle";
+      osc.frequency.setValueAtTime(523.25,now);
+      osc.frequency.setValueAtTime(659.25,now+0.09);
+      osc.frequency.setValueAtTime(1046.50,now+0.18);
+      gain.gain.setValueAtTime(0.09,now);
+      gain.gain.exponentialRampToValueAtTime(0.001,now+0.45);
+      osc.start(now);osc.stop(now+0.45);
+    }else if(type==="error"){
+      osc.type="sawtooth";
+      osc.frequency.setValueAtTime(220,now);
+      osc.frequency.exponentialRampToValueAtTime(140,now+0.16);
+      gain.gain.setValueAtTime(0.07,now);
+      gain.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+      osc.start(now);osc.stop(now+0.2);
+    }else{
+      osc.type="sine";
+      osc.frequency.setValueAtTime(587.33,now);
+      osc.frequency.exponentialRampToValueAtTime(880,now+0.1);
+      gain.gain.setValueAtTime(0.07,now);
+      gain.gain.exponentialRampToValueAtTime(0.001,now+0.26);
+      osc.start(now);osc.stop(now+0.26);
+    }
+  }catch(e){}
+}
+
+window.copyOtp=function(btn,otp){
+  if(!otp)return;
+  navigator.clipboard.writeText(otp);
+  playChime("success");
+  if(btn){
+    const oldHtml=btn.innerHTML;
+    btn.innerHTML="✓ ĐÃ CHÉP!";
+    btn.style.background="#ffffff";
+    btn.style.borderColor="#ffffff";
+    btn.style.color="#000000";
+    setTimeout(()=>{
+      if(btn&&btn.isConnected){
+        btn.innerHTML=oldHtml;
+        btn.style.background="#2fbf71";
+        btn.style.borderColor="#2fbf71";
+        btn.style.color="#07112b";
+      }
+    },1800);
   }
+  toast("Đã sao chép OTP: "+otp,"success");
+};
+
+function extractOtp(text,subject=""){
+  const cleanSubj=String(subject||"").trim();
+  if(cleanSubj){
+    // 1. Tiêu đề bắt đầu bằng mã số: "20857 là mã xác nhận Facebook của bạn"
+    const startM=cleanSubj.match(/^([0-9]{4,8})\b/);
+    if(startM)return startM[1];
+
+    // 2. Số đứng trước từ khóa xác nhận: "20857 là mã...", "20857 is your code..."
+    const beforeKey=cleanSubj.match(/\b([0-9]{4,8})\s*(?:là|is|:|-|\s)\s*(?:mã|code|otp|pin|xác nhận|xác minh|verification)/i);
+    if(beforeKey)return beforeKey[1];
+
+    // 3. Từ khóa đứng trước số: "mã xác nhận: 20857"
+    const afterKey=cleanSubj.match(/(?:mã|code|otp|pin|xác nhận|xác minh|verification|security)\D{0,10}?([0-9]{4,8})\b/i);
+    if(afterKey)return afterKey[1];
+
+    // 4. Nếu tiêu đề chỉ có đúng 1 cụm số 4-8 chữ số
+    const allSubjDigits=cleanSubj.match(/\b([0-9]{4,8})\b/g);
+    if(allSubjDigits&&allSubjDigits.length===1)return allSubjDigits[0];
+  }
+
+  // Quét nội dung body sạch
+  let cleanBody=String(text||"");
+  cleanBody=cleanBody.replace(/<style[^>]*>[\s\S]*?<\/style>/gi," ");
+  cleanBody=cleanBody.replace(/<script[^>]*>[\s\S]*?<\/script>/gi," ");
+  // Loại bỏ mã màu hex (#050505, #ffffff, ...)
+  cleanBody=cleanBody.replace(/#[0-9a-fA-F]{3,8}\b/g," ");
+  // Loại bỏ thẻ HTML & entities
+  cleanBody=cleanBody.replace(/<[^>]+>/g," ");
+  cleanBody=cleanBody.replace(/&(?:nbsp|amp|quot|lt|gt);/g," ");
+
+  // 1. Từ khóa xác nhận trong body
+  const m1=cleanBody.match(/(?:mã|code|otp|pin|xác nhận|xác minh|verification|security code)\D{0,15}?([0-9]{4,8})\b/i);
+  if(m1)return m1[1];
+
+  // 2. Số đứng trước từ khóa trong body
+  const m2=cleanBody.match(/\b([0-9]{4,8})\s*(?:là|is|:|-|\s)\s*(?:mã|code|otp|pin|xác nhận|xác minh)/i);
+  if(m2)return m2[1];
+
+  // 3. Số 6 chữ số độc lập
+  const m3=cleanBody.match(/\b([0-9]{6})\b/);
+  if(m3&&!["123456","000000"].includes(m3[1]))return m3[1];
+
+  // 4. Số 5 hoặc 4 chữ số độc lập
+  const m4=cleanBody.match(/\b([0-9]{5})\b/);
+  if(m4)return m4[1];
+  const m5=cleanBody.match(/\b([0-9]{4})\b/);
+  if(m5)return m5[1];
+
   return null;
 }
 
@@ -754,6 +921,163 @@ function genTempMailDialog(){
   d.showModal();
 }
 
+function guideCloudMailDialog(){
+  const d=$("#dlg");
+  d.innerHTML=`<form style="display:grid;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
+      <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
+        <span style="color:#7b42ff">${icon("bolt")}</span> Lấy Tài Khoản từ TempMail.cloud
+      </h2>
+      <button type="button" class="ico" data-act="close">${icon("x")}</button>
+    </div>
+
+    <div style="background:rgba(123,66,255,0.08);border:1px solid rgba(123,66,255,0.25);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.6">
+      Web <b>tempmail.cloud</b> tạo tài khoản có cả <b>Email và Mật khẩu riêng</b> (dùng để đăng nhập lại sau này).<br>
+      Bạn có thể mở web đó, dùng Bookmarklet / Console để copy danh sách dạng <span class="mono">email | pass | date</span> rồi dán vào đây:
+      <div style="margin-top:8px">
+        <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="primary" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:600;font-size:12px;color:#fff">${icon("ext")} Mở trang TempMail.cloud</a>
+      </div>
+    </div>
+
+    <label>Dán danh sách tài khoản vào đây:
+      <textarea id="tmCloudPaste" rows="6" class="mono" placeholder="user1@pemoteusonourweb.sbs | pass123 | 2026-11-25 21:00:00&#10;user2@imlimikom.store | pass456 | 2026-11-25 21:00:00" style="margin-top:6px"></textarea>
+    </label>
+
+    <div class="actions">
+      <button type="button" data-act="close">Đóng</button>
+      <button type="button" class="primary" id="btnImportCloudList" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">📥 Lưu vào Tab TempMail.cloud</button>
+    </div>
+  </form>`;
+
+  d.querySelector("#btnImportCloudList").onclick=async()=>{
+    const text=d.querySelector("#tmCloudPaste").value.trim();
+    if(!text)return toast("Chưa có nội dung để nhập","error");
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const created=[];
+    for(const line of lines){
+      let parts=line.includes('|')?line.split('|'):line.includes(':')?line.split(':'):line.split(/\s+/);
+      const email=parts[0]?.trim();
+      if(!email||!email.includes('@'))continue;
+      const pass=parts[1]?.trim()||'';
+      const note=parts.slice(2).join('|').trim()||`[TempMail.cloud] ${email.split('@')[1]||''}`;
+      const targetUid=makeGmailUid(email);
+      created.push({
+        uid:targetUid,
+        email,
+        platform:"gmail",
+        sec:{pass},
+        pass,
+        note,
+        status:"live",
+        added:Date.now(),
+        updated:Date.now()
+      });
+    }
+    if(!created.length)return toast("Không tìm thấy dòng email|pass hợp lệ","error");
+    await commit(created);
+    toast(`Đã thêm ${created.length} tài khoản vào tab TempMail.cloud!`);
+    d.close();
+  };
+
+  d.showModal();
+}
+
+function checkAccountLive(a){
+  if(!a)return Promise.resolve({status:"unknown"});
+  const plat=a.platform||"facebook";
+  if(plat==="facebook"){
+    return new Promise((resolve)=>{
+      const img=new Image();
+      let done=false;
+      const finish=(status)=>{
+        if(done)return;
+        done=true;
+        clearTimeout(timer);
+        img.onload=img.onerror=null;
+        resolve({status,plat});
+      };
+      const timer=setTimeout(()=>finish("timeout"),7000);
+      img.onload=()=>finish("live");
+      img.onerror=()=>finish("dead");
+      img.src=`https://graph.facebook.com/${encodeURIComponent(a.uid)}/picture?type=normal&_t=${Date.now()}`;
+    });
+  }else if(plat==="instagram"){
+    return Promise.resolve({status:"manual",plat});
+  }
+  return Promise.resolve({status:"unknown",plat});
+}
+
+async function runBatchCheckLive(list){
+  if(!list||!list.length)return toast("Không có tài khoản nào để kiểm tra","error");
+  const d=$("#dlg");
+  let stopped=false;
+  d.innerHTML=`<div style="display:grid;gap:12px;padding:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
+      <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
+        <span style="color:#2fbf71">${icon("check")}</span> ⚡ Kiểm Tra Live/Die Tự Động
+      </h2>
+      <button type="button" class="ico" id="btnDlgStop">${icon("x")}</button>
+    </div>
+    <div id="chkProgText" style="font-size:13px;color:var(--mute)">Đang khởi tạo danh sách...</div>
+    <div class="track" style="margin:4px 0"><i id="chkBar" style="--c:#2fbf71;width:0%"></i></div>
+    <div id="chkCurrent" style="font-size:12px;font-family:var(--mono);color:var(--fg);min-height:18px"></div>
+    <div style="display:flex;gap:14px;font-size:13px;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--line)">
+      <span style="color:#2fbf71;font-weight:600">Live: <b id="cntL">0</b></span>
+      <span style="color:#ef5350;font-weight:600">Die: <b id="cntD">0</b></span>
+      <span style="color:var(--mute);font-weight:500">Bỏ qua: <b id="cntS">0</b></span>
+    </div>
+    <div class="actions">
+      <button type="button" id="btnCancelCheck" class="danger">Dừng kiểm tra</button>
+    </div>
+  </div>`;
+  d.showModal();
+
+  const progText=$("#chkProgText"),bar=$("#chkBar"),cur=$("#chkCurrent"),cntL=$("#cntL"),cntD=$("#cntD"),cntS=$("#cntS");
+  const stop=()=>{stopped=true;};
+  $("#btnDlgStop").onclick=()=>{stop();d.close();};
+  $("#btnCancelCheck").onclick=()=>{stop();d.close();};
+
+  let live=0,dead=0,skip=0,total=list.length;
+  const updated=[];
+
+  for(let i=0;i<total;i++){
+    if(stopped)break;
+    const a=list[i];
+    cur.textContent=`[${i+1}/${total}] UID: ${a.uid} (${a.platform||"facebook"})`;
+    bar.style.width=`${Math.round(((i+1)/total)*100)}%`;
+    progText.textContent=`Đang kiểm tra ${i+1}/${total} tài khoản...`;
+
+    const res=await checkAccountLive(a);
+    if(stopped)break;
+
+    if(res.status==="live"){
+      live++;
+      cntL.textContent=live;
+      const rev=revise(a,{status:"live",checked:today()},"Check Live tự động");
+      if(rev)updated.push(rev);
+    }else if(res.status==="dead"){
+      dead++;
+      cntD.textContent=dead;
+      const rev=revise(a,{status:"dead",checked:today()},"Check Live tự động");
+      if(rev)updated.push(rev);
+    }else{
+      skip++;
+      cntS.textContent=skip;
+    }
+    await new Promise(r=>setTimeout(r,120));
+  }
+
+  if(updated.length){
+    progText.textContent="Đang lưu kết quả vào kho...";
+    await commit(updated);
+  }
+
+  playChime("success");
+  d.close();
+  render();
+  toast(`Hoàn tất kiểm tra: ${live} Live, ${dead} Die${skip?`, ${skip} bỏ qua`:""}!`);
+}
+
 let inboxPollInterval=null;
 async function openTempMailInbox(uid){
   const a=get(uid);
@@ -812,7 +1136,7 @@ async function openTempMailInbox(uid){
 
   const statusEl=d.querySelector("#inboxStatus"),listEl=d.querySelector("#inboxList"),btnRefresh=d.querySelector("#btnRefreshInbox"),autoCheck=d.querySelector("#autoCheck"),btnClose=d.querySelector("#btnCloseInbox");
 
-  let clientUuid="unknown",isFetching=false;
+  let clientUuid="unknown",isFetching=false,seenMsgIds=new Set();
 
   const stopPolling=()=>{
     if(inboxPollInterval){clearInterval(inboxPollInterval);inboxPollInterval=null;}
@@ -866,6 +1190,7 @@ async function openTempMailInbox(uid){
       }
 
       let html="";
+      let newOtpDetected=false;
       for(const m of messages){
         const fromRaw=typeof m.from==="object"?(m.from.name||m.from.address):String(m.from||"");
         const subject=m.subject||"(Không có tiêu đề)";
@@ -873,6 +1198,11 @@ async function openTempMailInbox(uid){
         const otp=extractOtp(body,subject);
         const time=m.created_at?new Date(m.created_at).toLocaleString("vi-VN"):"";
         const msgId="msg_"+m.id;
+
+        if(otp&&!seenMsgIds.has(m.id)){
+          newOtpDetected=true;
+        }
+        seenMsgIds.add(m.id);
 
         html+=`<div style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
@@ -884,12 +1214,12 @@ async function openTempMailInbox(uid){
           </div>
 
           ${otp?`
-          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(47,191,113,0.12);border:1px solid #2fbf71;border-radius:8px;padding:8px 12px;margin-top:4px">
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(47,191,113,0.12);border:1px solid #2fbf71;border-radius:10px;padding:10px 14px;margin-top:4px;animation:pulseOtpBox 2.5s infinite ease-in-out">
             <div>
               <div style="font-size:11px;font-weight:700;color:#2fbf71;text-transform:uppercase;letter-spacing:0.5px">MÃ XÁC NHẬN OTP:</div>
-              <div style="font-size:22px;font-weight:800;letter-spacing:4px;color:#2fbf71;font-family:var(--mono)">${esc(otp)}</div>
+              <div style="font-size:24px;font-weight:800;letter-spacing:4px;color:#2fbf71;font-family:var(--mono)">${esc(otp)}</div>
             </div>
-            <button type="button" class="primary" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:700;padding:6px 12px" onclick="navigator.clipboard.writeText('${esc(otp)}');toast('Đã chép OTP: ${esc(otp)}')">📋 Copy OTP</button>
+            <button type="button" class="primary" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:700;padding:8px 16px;border-radius:8px;font-size:13px" onclick="copyOtp(this,'${esc(otp)}')">📋 Copy OTP</button>
           </div>
           `:""}
 
@@ -897,6 +1227,10 @@ async function openTempMailInbox(uid){
             <div style="font-family:inherit;word-break:break-word">${body}</div>
           </div>
         </div>`;
+      }
+
+      if(newOtpDetected){
+        playChime("otp");
       }
 
       listEl.innerHTML=html;
@@ -1038,7 +1372,21 @@ function config(v){
 
 /* ---------- hộp thoại ---------- */
 let toastT;
-function toast(m,type="success"){const t=$("#toast");t.textContent=m||"Thao tác hoàn tất";t.dataset.type=type;t.style.border="1px solid var(--"+(type==="error"?"danger":"ok")+")";t.setAttribute("role",type==="error"?"alert":"status");t.hidden=false;try{t.showPopover?.()}catch{}clearTimeout(toastT);toastT=setTimeout(()=>{try{t.hidePopover?.()}catch{}t.hidden=true},4500)}
+function toast(m,type="success"){
+  const t=$("#toast");if(!t)return;
+  const ic=type==="error"?"✕":type==="warn"?"⚠️":"✓";
+  t.innerHTML=`<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.12);font-size:12px;font-weight:700">${ic}</span><span>${esc(m||"Thao tác hoàn tất")}</span>`;
+  t.dataset.type=type;
+  t.setAttribute("role",type==="error"?"alert":"status");
+  t.hidden=false;
+  try{t.showPopover?.()}catch{}
+  playChime(type==="error"?"error":"success");
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>{
+    try{t.hidePopover?.()}catch{}
+    t.hidden=true;
+  },3000);
+}
 function dialog(html,onOk){
   const d=$("#dlg");d.innerHTML=`<form>${html}<p class="err" id="dErr" hidden></p><div class="actions"><button type="button" data-act="close">Huỷ</button><button class="primary" id="dOk">Xác nhận</button></div></form>`;
   const form=d.querySelector("form");
@@ -1251,7 +1599,43 @@ const acts={
    if(!await commit([],[u]))return false;render();toast("Đã xoá Gmail");
  }),
  genTempMail:()=>genTempMailDialog(),
- inboxTempMail:u=>openTempMailInbox(u)
+ guideCloudMail:()=>guideCloudMailDialog(),
+ inboxTempMail:u=>openTempMailInbox(u),
+ inboxTempMailByEmail:async email=>{
+   if(!email)return toast("Tài khoản chưa có email","error");
+   const gmUid=makeGmailUid(email);
+   let gm=get(gmUid)||all().find(x=>x.platform==="gmail"&&norm(x.email)===norm(email));
+   if(!gm){
+     gm={uid:gmUid,email,platform:"gmail",sec:{},pass:"",note:"Liên kết từ nick MXH",status:"live",added:Date.now(),updated:Date.now()};
+     await commit([gm]);
+   }
+   openTempMailInbox(gm.uid);
+ },
+ checkOneLive:async uid=>{
+   const a=get(uid);if(!a)return;
+   const plat=a.platform||"facebook";
+   if(plat==="instagram")return toast("Instagram vui lòng nhấp vào UID để mở trang cá nhân kiểm tra trực tiếp.","warn");
+   toast(`Đang kiểm tra UID ${uid}...`);
+   const res=await checkAccountLive(a);
+   if(res.status==="live"){
+     const r=revise(a,{status:"live",checked:today()},"Check Live");
+     if(r&&await commit([r])){playChime("success");toast(`🟢 UID ${uid} đang LIVE!`,"success");table()}
+   }else if(res.status==="dead"){
+     const r=revise(a,{status:"dead",checked:today()},"Check Live");
+     if(r&&await commit([r])){playChime("error");toast(`🔴 UID ${uid} đã DIE!`,"error");table()}
+   }else toast("Không kiểm tra được kết nối với Facebook","error");
+ },
+ checkAllLive:()=>{
+   const list=filtered().filter(a=>(a.platform||"facebook")==="facebook");
+   if(!list.length)return toast("Không có tài khoản Facebook nào trong bộ lọc hiện tại để kiểm tra","error");
+   runBatchCheckLive(list);
+ },
+ bCheckLive:()=>{
+   const list=[...sel].map(get).filter(Boolean).filter(a=>(a.platform||"facebook")==="facebook");
+   if(!list.length)return toast("Vui lòng chọn ít nhất 1 tài khoản Facebook để kiểm tra","error");
+   runBatchCheckLive(list);
+ },
+ switchMailTab:v=>{mailSubTab=v;pageGmail=1;render();}
 };
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");
@@ -1269,14 +1653,7 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",async e=>{
   const t=e.target;
-  if(t.dataset.noteGuid!==undefined){
-    const a=get(t.dataset.noteGuid);
-    if(a&&String(a.note||"").trim()!==t.value.trim()){
-      const r=revise(a,{note:t.value.trim()},"Cập nhật ghi chú");
-      if(r&&await commit([r]))toast("Đã lưu ghi chú");
-    }
-  }
-  else if(t.id==="pageAllGmail"){$("#view").querySelectorAll("[data-gsel]").forEach(c=>t.checked?selGmail.add(c.dataset.gsel):selGmail.delete(c.dataset.gsel));render()}
+  if(t.id==="pageAllGmail"){$("#view").querySelectorAll("[data-gsel]").forEach(c=>t.checked?selGmail.add(c.dataset.gsel):selGmail.delete(c.dataset.gsel));render()}
   else if(t.dataset.gsel!==undefined){t.checked?selGmail.add(t.dataset.gsel):selGmail.delete(t.dataset.gsel);render()}
   else if(t.id==="perGmail"){perGmail=+t.value;pageGmail=1;render()}
   else if(t.id==="fPlatform"){fPlatform=t.value;page=1;table()}
@@ -1293,10 +1670,7 @@ document.addEventListener("change",async e=>{
   else if(t.id==="staleDays"){const n=Math.round(+t.value);if(n>=1&&n<=365)await persistSettings({...settings,staleDays:n})}
 });
 document.addEventListener("keydown",e=>{
-  if(e.key==="Enter"&&e.target.dataset.noteGuid!==undefined){
-    e.target.blur();
-  }
-  else if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
+  if(e.key==="/"&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
     if(route()==="gmail"&&$("#qGmail")){e.preventDefault();$("#qGmail").focus()}
     else if($("#q")){e.preventDefault();$("#q").focus()}
   }
