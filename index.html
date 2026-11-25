@@ -187,7 +187,7 @@ copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 
 key:'<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.500 6.500l4 4"/>',
 facebook:'<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
 instagram:'<rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>',
-mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',info:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',ext:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'};
+mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/>',info:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',ext:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',bolt:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',refresh:'<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M22 12.5a10 10 0 0 1-18.8 4.2L2.5 16"/>'};
 const PLATFORMS={
   facebook:{id:"facebook",name:"Facebook",color:"#1877f2",icon:"facebook",url:uid=>/^\d+$/.test(uid)?`https://www.facebook.com/profile.php?id=${encodeURIComponent(uid)}`:`https://www.facebook.com/${encodeURIComponent(uid)}`},
   instagram:{id:"instagram",name:"Instagram",color:"#e1306c",icon:"instagram",url:uid=>`https://www.instagram.com/${encodeURIComponent(uid)}/`}
@@ -501,24 +501,16 @@ function filteredGmail(){
 function gmailView(v,list){
   const gList=list.filter(a=>a.platform==="gmail");
   const noteBanner=`<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(91,140,255,0.06);border:1px solid rgba(91,140,255,0.22);border-radius:10px">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
-      <div>
-        <div style="font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px">
-          <span style="color:#5b8cff;display:inline-flex">${icon("info")}</span> Hướng dẫn đăng nhập &amp; mở hòm thư ảo:
-        </div>
-        <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.65;color:var(--text)">
-          <li>Dùng <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempmail.cloud/</a> để log mail | pass.</li>
-          <li>Đối với mail edu <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempamail.com/edu</a> dùng link pass để mở hòm thư ảo.</li>
-        </ul>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:6px 12px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail.cloud">${icon("ext")} Mở TempMail.cloud</a>
-        <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:6px 12px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail Edu">${icon("ext")} Mở TempMail Edu</a>
-      </div>
+    <div style="font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+      <span style="color:#5b8cff;display:inline-flex">${icon("info")}</span> Hướng dẫn đăng nhập &amp; mở hòm thư ảo:
     </div>
+    <ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.65;color:var(--text)">
+      <li>Dùng <a href="https://tempmail.cloud/" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempmail.cloud/</a> để log mail | pass.</li>
+      <li>Đối với mail edu <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" style="color:#5b8cff;text-decoration:underline;font-weight:600">https://tempamail.com/edu</a> dùng link pass để mở hòm thư ảo.</li>
+    </ul>
   </div>`;
   if(!gList.length&&!qGmail){
-    v.innerHTML=`${noteBanner}<div class="panel empty">Chưa có tài khoản Gmail nào trong kho. Dán danh sách text / file TXT hoặc thêm thủ công.<div><button class="primary" data-act="addGmail">+ Thêm Gmail</button><button data-act="importGmail">${icon("up")} Nhập text / file TXT</button></div></div>`;
+    v.innerHTML=`${noteBanner}<div class="panel empty">Chưa có tài khoản Gmail nào trong kho. Dán danh sách text / file TXT, thêm thủ công hoặc tạo tự động.<div><button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail Ảo / EDU</button><button class="primary" data-act="addGmail">+ Thêm Gmail</button><button data-act="importGmail">${icon("up")} Nhập text / file TXT</button></div></div>`;
     return;
   }
   const rows=filteredGmail(),pages=Math.max(1,Math.ceil(rows.length/perGmail));
@@ -526,6 +518,7 @@ function gmailView(v,list){
   const shownRows=rows.slice((pageGmail-1)*perGmail,pageGmail*perGmail);
   v.innerHTML=`${noteBanner}<div class="tools filters">
     <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ Gmail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Gmail">
+    <button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail Ảo / EDU</button>
     <button class="primary" data-act="addGmail">+ Thêm Gmail</button>
     <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>
   </div>
@@ -543,7 +536,7 @@ function gmailView(v,list){
       <th style="min-width:260px"><button data-act="sortGmail" data-v="email">Địa chỉ Gmail &amp; Thời gian ${sortGmail.k==="email"?(sortGmail.d>0?" ↑":" ↓"):""}</button></th>
       <th style="min-width:200px">Mật khẩu</th>
       <th>Ghi chú</th>
-      <th style="width:190px">Sao chép &amp; Thao tác</th>
+      <th style="width:230px">Sao chép &amp; Thao tác</th>
     </tr></thead>
     <tbody>
       ${shownRows.map(a=>{
@@ -552,6 +545,7 @@ function gmailView(v,list){
         const isTimeNote=/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\b/.test(String(a.note||"").trim());
         const timeLabel=isTimeNote?a.note:fmtTime(a.updated||a.added);
         const displayNote=isTimeNote?"":a.note;
+        const hasKey=isUrlPass||/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(pass.trim())||isEdu||/temp/i.test(a.note||"");
         return `<tr data-guid="${u}" title="Nhấp vào dòng để chỉnh sửa">
           <td><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid)?"checked":""}></td>
           <td>
@@ -564,6 +558,7 @@ function gmailView(v,list){
           <td><span class="muted" style="overflow:hidden;text-overflow:ellipsis;display:inline-block;max-width:320px">${esc(displayNote)||"—"}</span></td>
           <td>
             <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
+            ${hasKey?`<button class="mini" data-act="inboxTempMail" data-v="${u}" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600" title="Mở hộp thư &amp; đọc mã OTP">${icon("mail")} Hộp thư &amp; OTP</button>`:""}
             ${isEdu?`<a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px;color:var(--ink)" title="Mở TempMail Edu" onclick="event.stopPropagation()">${icon("ext")} Edu</a>`:""}
             <button class="mini danger" data-act="delGmail" data-v="${u}" title="Xoá Gmail">${icon("x")}</button>
           </td>
@@ -579,6 +574,362 @@ function gmailView(v,list){
       <button data-act="nextGmail" ${pageGmail>=pages?"disabled":""}>Sau</button>
     </span>
   </div>`;
+}
+
+function extractEmailUuid(a){
+  if(!a)return null;
+  const pass=String(secretsOf(a).pass||a.pass||"").trim();
+  const m=pass.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if(m)return m[0];
+  const noteM=String(a.note||"").match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if(noteM)return noteM[0];
+  return null;
+}
+
+function extractOtp(text,subject=""){
+  const combined=(subject+" "+text);
+  const patterns=[
+    /(?:mã|code|otp|pin|verification)\s*(?:is|là|:|\-)?\s*([0-9]{4,8})\b/i,
+    /\b([0-9]{6})\b/,
+    /\b([0-9]{4,5})\b/
+  ];
+  for(const p of patterns){
+    const m=combined.match(p);
+    if(m&&m[1])return m[1];
+  }
+  return null;
+}
+
+async function fetchTempMailDomains(tld="edu"){
+  try{
+    const body=new URLSearchParams({app_uuid:"a5x-cj6a-ka1q"});
+    if(tld)body.append("tld",tld);
+    const res=await fetch("https://api.tempamail.com/v1/domains",{
+      method:"POST",
+      headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body
+    });
+    const d=await res.json();
+    return d.domains||[];
+  }catch(e){
+    console.error("fetch domains error",e);
+    return [];
+  }
+}
+
+function genTempMailDialog(){
+  if(!canWrite())return toast("Bạn không có quyền thêm tài khoản","error");
+  const d=$("#dlg");
+  d.innerHTML=`<form style="display:grid;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
+      <h2 style="margin:0;display:flex;align-items:center;gap:8px;font-size:16px"><span style="color:#7b42ff">${icon("bolt")}</span> Tạo Mail Ảo Hàng Loạt</h2>
+      <button type="button" class="ico" data-act="close" title="Đóng">${icon("x")}</button>
+    </div>
+    
+    <label>1. Loại Mail
+      <select id="tmType">
+        <option value="edu" selected>🎓 Mail Sinh viên (.EDU) - Tỉ lệ thành công cao</option>
+        <option value="com">✉️ Mail Thường (.COM / .NET / .ORG)</option>
+      </select>
+    </label>
+
+    <label>2. Bộ lọc Tên miền (Domain sạch)
+      <select id="tmDomain">
+        <option value="">-- Đang tải danh sách tên miền sạch... --</option>
+      </select>
+      <small class="muted" style="font-size:11.5px;margin-top:3px;display:block">Hệ thống tự động lọc danh sách domain sống từ máy chủ để tránh bị các dịch vụ chặn.</small>
+    </label>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <label>3. Tiền tố Email (Tùy chọn)
+        <input id="tmAlias" placeholder="Bỏ trống để tạo ngẫu nhiên" maxlength="30" autocomplete="off">
+      </label>
+      <label>4. Số lượng cần tạo
+        <input type="number" id="tmCount" min="1" max="50" value="5">
+      </label>
+    </div>
+
+    <div id="tmStatus" style="font-size:12.5px;color:var(--accent);min-height:18px;margin-top:2px"></div>
+    <div id="tmLog" style="display:none;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-height:120px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap;color:#00ffc4"></div>
+
+    <div class="actions" style="margin-top:8px">
+      <button type="button" data-act="close">Đóng</button>
+      <button type="button" class="primary" id="btnDoGen" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">🚀 Bắt đầu tạo &amp; Lưu vào kho</button>
+    </div>
+  </form>`;
+
+  const selectType=d.querySelector("#tmType"),selectDomain=d.querySelector("#tmDomain"),inputAlias=d.querySelector("#tmAlias"),inputCount=d.querySelector("#tmCount"),statusEl=d.querySelector("#tmStatus"),logEl=d.querySelector("#tmLog"),btnDo=d.querySelector("#btnDoGen");
+
+  const loadDomains=async(type)=>{
+    selectDomain.innerHTML='<option value="">-- Đang tải tên miền... --</option>';
+    const domains=await fetchTempMailDomains(type==="edu"?"edu":"");
+    if(!domains.length){
+      selectDomain.innerHTML='<option value="">-- Ngẫu nhiên domain hệ thống --</option>';
+      return;
+    }
+    let html='<option value="">-- Ngẫu nhiên tất cả domain sạch --</option>';
+    for(const dm of domains){
+      html+=`<option value="${dm.id}">${esc(dm.name)} (${esc(dm.tld||"clean")})</option>`;
+    }
+    selectDomain.innerHTML=html;
+  };
+
+  selectType.onchange=()=>loadDomains(selectType.value);
+  loadDomains("edu");
+
+  btnDo.onclick=async()=>{
+    const count=Math.max(1,Math.min(50,parseInt(inputCount.value)||1));
+    const type=selectType.value,domainId=selectDomain.value,alias=inputAlias.value.trim();
+
+    btnDo.disabled=true;selectType.disabled=true;selectDomain.disabled=true;inputAlias.disabled=true;inputCount.disabled=true;
+    logEl.style.display="block";logEl.textContent="";
+
+    const created=[];
+    for(let i=1;i<=count;i++){
+      statusEl.textContent=`Đang tạo tài khoản [${i}/${count}]...`;
+      try{
+        const body=new URLSearchParams({
+          client_uuid:"unknown",
+          app_uuid:"a5x-cj6a-ka1q",
+          tld:type==="edu"?"edu":""
+        });
+        if(domainId){
+          body.append("domain_id",domainId);
+          body.append("action","custom");
+          body.append("alias",(alias?(alias+(count>1?i:"")):("user"+Math.floor(100000+Math.random()*900000))));
+        }else if(alias){
+          body.append("action","custom");
+          body.append("alias",(alias+(count>1?i:"")));
+        }
+
+        const res=await fetch("https://api.tempamail.com/v1/generate",{
+          method:"POST",
+          headers:{"Content-Type":"application/x-www-form-urlencoded"},
+          body
+        });
+        const data=await res.json();
+        if(data&&data.email){
+          const email=data.email.address,uuid=data.email.uuid;
+          const accessUrl=`https://tempamail.com/access?key=${uuid}`;
+          const targetUid=makeGmailUid(email);
+          const note=`[${type==='edu'?'Temp EDU':'Temp Mail'}] ${email.split('@')[1]||''}`;
+          const record={
+            uid:targetUid,
+            email,
+            platform:"gmail",
+            sec:{pass:accessUrl},
+            pass:accessUrl,
+            note,
+            status:"live",
+            added:Date.now(),
+            updated:Date.now()
+          };
+          created.push(record);
+          logEl.textContent+=`[${i}/${count}] ${email}\n`;
+          logEl.scrollTop=logEl.scrollHeight;
+        }
+        await new Promise(r=>setTimeout(r,300));
+      }catch(err){
+        console.error(err);
+        logEl.textContent+=`[${i}/${count}] Lỗi tạo: ${err.message}\n`;
+      }
+    }
+
+    if(created.length){
+      statusEl.innerHTML=`<span style="color:#2fbf71">✅ Đã tạo thành công ${created.length} mail! Đang lưu vào kho...</span>`;
+      await commit(created);
+      toast(`Đã thêm ${created.length} tài khoản mail ảo vào kho!`);
+      statusEl.innerHTML=`<span style="color:#2fbf71">✅ Đã lưu xong ${created.length} mail vào Kho Gmail!</span>`;
+      btnDo.textContent="Hoàn tất";
+      btnDo.onclick=()=>d.close();
+      btnDo.disabled=false;
+    }else{
+      statusEl.innerHTML=`<span style="color:#f0625f">❌ Không thể tạo mail. Vui lòng kiểm tra kết nối mạng.</span>`;
+      btnDo.disabled=false;
+      btnDo.textContent="Thử lại";
+    }
+  };
+
+  d.showModal();
+}
+
+let inboxPollInterval=null;
+async function openTempMailInbox(uid){
+  const a=get(uid);
+  if(!a)return toast("Không tìm thấy thông tin tài khoản","error");
+  const email=a.email,emailUuid=extractEmailUuid(a);
+  if(!emailUuid){
+    return toast("Tài khoản này không có Access Key hòm thư ảo","error");
+  }
+
+  const d=$("#dlg");
+  d.innerHTML=`<div style="display:grid;gap:12px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:10px;gap:10px">
+      <div>
+        <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
+          <span style="color:#2fbf71">${icon("mail")}</span> Hộp Thư &amp; OTP
+        </h2>
+        <div style="font-size:12px;color:var(--mute);margin-top:3px;word-break:break-all">
+          Địa chỉ: <b style="color:var(--fg)">${esc(email)}</b>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <a href="https://tempamail.com/access?key=${esc(emailUuid)}" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px" title="Mở trên web">${icon("ext")} Web</a>
+        <button type="button" class="ico" id="btnCloseInbox" title="Đóng">${icon("x")}</button>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--line);font-size:12px">
+      <div id="inboxStatus" style="display:flex;align-items:center;gap:6px;color:#2fbf71">
+        <span>Đang kết nối hộp thư...</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="autoCheck" checked> Tự động (3s)
+        </label>
+        <button type="button" class="mini" id="btnRefreshInbox" title="Làm mới">${icon("refresh")} Tải lại</button>
+      </div>
+    </div>
+
+    <div id="inboxList" style="display:grid;gap:10px;min-height:140px">
+      <div style="text-align:center;padding:30px 10px;color:var(--mute)">
+        <div style="font-size:24px;margin-bottom:6px">⏳</div>
+        Đang tải hộp thư...
+      </div>
+    </div>
+  </div>`;
+
+  const statusEl=d.querySelector("#inboxStatus"),listEl=d.querySelector("#inboxList"),btnRefresh=d.querySelector("#btnRefreshInbox"),autoCheck=d.querySelector("#autoCheck"),btnClose=d.querySelector("#btnCloseInbox");
+
+  let clientUuid="unknown",isFetching=false;
+
+  const stopPolling=()=>{
+    if(inboxPollInterval){clearInterval(inboxPollInterval);inboxPollInterval=null;}
+  };
+
+  btnClose.onclick=()=>{stopPolling();d.close();};
+  d.addEventListener("close",stopPolling,{once:true});
+
+  const fetchInbox=async()=>{
+    if(isFetching)return;
+    isFetching=true;
+    try{
+      if(clientUuid==="unknown"){
+        const accRes=await fetch("https://api.tempamail.com/v1/manage",{
+          method:"POST",
+          headers:{"Content-Type":"application/x-www-form-urlencoded"},
+          body:new URLSearchParams({
+            action:"access",
+            email_uuid:emailUuid,
+            client_uuid:"unknown",
+            app_uuid:"a5x-cj6a-ka1q"
+          })
+        });
+        const accData=await accRes.json();
+        if(accData&&accData.client&&accData.client.uuid){
+          clientUuid=accData.client.uuid;
+        }
+      }
+
+      const res=await fetch("https://api.tempamail.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:new URLSearchParams({
+          client_uuid:clientUuid,
+          email_uuid:emailUuid,
+          last_message_id:0
+        })
+      });
+      const data=await res.json();
+      const messages=(data&&data.messages)||[];
+
+      statusEl.innerHTML=`<span style="color:#2fbf71">●</span> Lắng nghe thư (Lần cuối: ${new Date().toLocaleTimeString("vi-VN")})`;
+
+      if(!messages.length){
+        listEl.innerHTML=`<div style="text-align:center;padding:32px 10px;background:rgba(255,255,255,0.02);border:1px dashed var(--line);border-radius:10px;color:var(--mute)">
+          <div style="font-size:26px;margin-bottom:8px">📬</div>
+          <b style="color:var(--fg);font-size:14px">Hộp thư đang trống</b>
+          <div style="font-size:12px;margin-top:4px">Chưa có thư hoặc mã OTP nào gửi đến <b style="color:var(--fg)">${esc(email)}</b>.<br>Hệ thống vẫn đang tự động canh thư...</div>
+        </div>`;
+        return;
+      }
+
+      let html="";
+      for(const m of messages){
+        const fromRaw=typeof m.from==="object"?(m.from.name||m.from.address):String(m.from||"");
+        const subject=m.subject||"(Không có tiêu đề)";
+        const body=m.body||"";
+        const otp=extractOtp(body,subject);
+        const time=m.created_at?new Date(m.created_at).toLocaleString("vi-VN"):"";
+        const msgId="msg_"+m.id;
+
+        html+=`<div style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600;color:var(--fg);font-size:13.5px">${esc(subject)}</div>
+              <div style="font-size:11.5px;color:var(--mute);margin-top:2px">Từ: <span style="color:var(--fg)">${esc(fromRaw)}</span> · ${esc(time)}</div>
+            </div>
+            <button type="button" class="mini" data-toggle-msg="${msgId}" style="align-self:flex-start">👁️ Xem nội dung</button>
+          </div>
+
+          ${otp?`
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(47,191,113,0.12);border:1px solid #2fbf71;border-radius:8px;padding:8px 12px;margin-top:4px">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#2fbf71;text-transform:uppercase;letter-spacing:0.5px">MÃ XÁC NHẬN OTP:</div>
+              <div style="font-size:22px;font-weight:800;letter-spacing:4px;color:#2fbf71;font-family:var(--mono)">${esc(otp)}</div>
+            </div>
+            <button type="button" class="primary" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:700;padding:6px 12px" onclick="navigator.clipboard.writeText('${esc(otp)}');toast('Đã chép OTP: ${esc(otp)}')">📋 Copy OTP</button>
+          </div>
+          `:""}
+
+          <div id="${msgId}" style="display:none;margin-top:8px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;max-height:300px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px">
+            <div style="font-family:inherit;word-break:break-word">${body}</div>
+          </div>
+        </div>`;
+      }
+
+      listEl.innerHTML=html;
+
+      listEl.querySelectorAll("[data-toggle-msg]").forEach(btn=>{
+        btn.onclick=()=>{
+          const target=listEl.querySelector("#"+btn.dataset.toggleMsg);
+          if(target){
+            const isHidden=target.style.display==="none";
+            target.style.display=isHidden?"block":"none";
+            btn.textContent=isHidden?"Ẩn nội dung":"👁️ Xem nội dung";
+          }
+        };
+      });
+
+    }catch(err){
+      console.error(err);
+      statusEl.innerHTML=`<span style="color:#ef5350">Lỗi: ${esc(err.message)}</span>`;
+    }finally{
+      isFetching=false;
+    }
+  };
+
+  btnRefresh.onclick=()=>fetchInbox();
+
+  autoCheck.onchange=()=>{
+    if(autoCheck.checked){
+      startPolling();
+    }else{
+      stopPolling();
+      statusEl.textContent="Đã tắt tự động làm mới.";
+    }
+  };
+
+  const startPolling=()=>{
+    stopPolling();
+    inboxPollInterval=setInterval(()=>{
+      if(d.open&&autoCheck.checked)fetchInbox();
+    },3000);
+  };
+
+  d.showModal();
+  fetchInbox();
+  startPolling();
 }
 
 function openGmail(uid){
@@ -887,7 +1238,9 @@ const acts={
  }),
  delGmail:u=>ask("Xoá Gmail","Xoá tài khoản Gmail này?",async()=>{
    if(!await commit([],[u]))return false;render();toast("Đã xoá Gmail");
- })
+ }),
+ genTempMail:()=>genTempMailDialog(),
+ inboxTempMail:u=>openTempMailInbox(u)
 };
 document.addEventListener("click",async e=>{
   const b=e.target.closest("[data-act]");
