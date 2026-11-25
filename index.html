@@ -982,29 +982,29 @@ function guideCloudMailDialog(){
   d.showModal();
 }
 
-function checkAccountLive(a){
-  if(!a)return Promise.resolve({status:"unknown"});
+async function checkAccountLive(a){
+  if(!a)return {status:"unknown"};
   const plat=a.platform||"facebook";
   if(plat==="facebook"){
-    return new Promise((resolve)=>{
-      const img=new Image();
-      let done=false;
-      const finish=(status)=>{
-        if(done)return;
-        done=true;
-        clearTimeout(timer);
-        img.onload=img.onerror=null;
-        resolve({status,plat});
-      };
-      const timer=setTimeout(()=>finish("timeout"),7000);
-      img.onload=()=>finish("live");
-      img.onerror=()=>finish("dead");
-      img.src=`https://graph.facebook.com/${encodeURIComponent(a.uid)}/picture?type=normal&_t=${Date.now()}`;
-    });
+    try{
+      const res=await fetch(`https://graph.facebook.com/${encodeURIComponent(a.uid)}/picture?redirect=false&_t=${Date.now()}`);
+      if(!res.ok)return {status:"dead",plat};
+      const json=await res.json();
+      const url=json?.data?.url||"";
+      if(!url||url.includes("static.xx.fbcdn.net")||url.includes("rsrc.php")){
+        return {status:"dead",plat};
+      }
+      if(url.includes("scontent")||json?.data?.width>0){
+        return {status:"live",plat};
+      }
+      return {status:"dead",plat};
+    }catch{
+      return {status:"dead",plat};
+    }
   }else if(plat==="instagram"){
-    return Promise.resolve({status:"manual",plat});
+    return {status:"manual",plat};
   }
-  return Promise.resolve({status:"unknown",plat});
+  return {status:"unknown",plat};
 }
 
 async function runBatchCheckLive(list){
