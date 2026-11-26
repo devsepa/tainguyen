@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: light;
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
@@ -27,18 +27,18 @@ img {
 /* Layout: sidebar cố định + topbar + lưới KPI, biểu đồ, danh sách; chi tiết trượt từ phải. Chỉ giao diện tối. */
 :root {
   color-scheme: dark;
-  --bg: #0a0e17;
-  --side: #0e1320;
-  --panel: #121929;
-  --raise: #1a2338;
-  --line: #232e47;
-  --fg: #e8edf7;
-  --mute: #8e9bb5;
-  --accent: #5b8cff;
-  --accent-ink: #07112b;
-  --danger: #f0625f;
-  --ok: #2fbf71;
-  --warn: #e5b53b;
+  --bg: #09090b;
+  --side: #111114;
+  --panel: #18181b;
+  --raise: #222227;
+  --line: #27272a;
+  --fg: #fafafa;
+  --mute: #a1a1aa;
+  --accent: #10b981;
+  --accent-ink: #052e16;
+  --danger: #f87171;
+  --ok: #10b981;
+  --warn: #fbbf24;
   --sans: "Be Vietnam Pro", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
 }
@@ -120,7 +120,7 @@ button.primary {
   font-weight: 600;
 }
 button.primary:hover:not(:disabled) {
-  box-shadow: 0 0 12px rgba(91, 140, 255, 0.4);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
 button.danger {
   color: var(--danger);
@@ -620,8 +620,10 @@ h2 {
   padding: 5px 13px;
 }
 .tabs button[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--accent);
   border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
 }
 .bulk {
   background: var(--raise);
@@ -643,7 +645,7 @@ table {
 th,
 td {
   text-align: left;
-  padding: 9px 8px;
+  padding: 11px 10px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
   max-width: 240px;
@@ -1078,7 +1080,7 @@ label > * {
   main {
     padding: 12px 12px calc(76px + env(safe-area-inset-bottom, 0px)) 12px !important;
     min-width: 0 !important;
-    overflow-x: hidden !important;
+    overflow-x: visible !important;
   }
   header {
     padding: 8px 0 12px !important;
@@ -1229,4 +1231,229 @@ label > * {
   .bar {
     grid-template-columns: 100px minmax(0, 1fr) 42px !important;
   }
+}
+
+/* Mobile: keep every action reachable; wide data scrolls inside its container. */
+@media (max-width: 760px) {
+  html { scroll-padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+  body, .app, main, .view, .panel, .tools, .bulk { min-width: 0; max-width: 100%; }
+  main { padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)) !important; }
+  nav {
+    flex-wrap: wrap !important;
+    max-height: 35dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  nav .vaultbox {
+    display: flex !important;
+    flex: 1 1 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 12px;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 3px 8px;
+    font-size: 11px;
+    overflow-wrap: anywhere;
+  }
+  nav .vaultbox > * { min-width: 0; max-width: 100%; }
+  #menu {
+    justify-content: flex-start !important;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  #menu a { flex: 1 0 76px !important; min-height: 48px; }
+  header > button { flex: 1 1 auto; }
+  button, a.mini, a.link, select { min-height: 44px; }
+  button.ico, .ico { min-width: 40px !important; min-height: 44px !important; }
+  button, .mini { white-space: normal; overflow-wrap: anywhere; }
+  input:not([type="checkbox"]):not([type="color"]), select, textarea,
+  .filters input:not([type="checkbox"]), .filters select {
+    font-size: 16px !important;
+  }
+  input[type="checkbox"], .filters input[type="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    flex: 0 0 20px;
+  }
+  .filters label { min-height: 44px; align-items: center; }
+  .tools, .bulk, .actions { flex-wrap: wrap; max-width: 100%; }
+  .tools > *, .bulk > *, .actions > * { min-width: 0; max-width: 100%; }
+  .tools .grow { flex: 1 1 100%; width: 100%; }
+  .bulk { position: static; }
+  .bulk button, .bulk select { flex: 1 1 140px; }
+  .tablewrap {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    touch-action: pan-x pan-y;
+  }
+  .tablewrap table { width: max-content; min-width: 100%; }
+  .tablewrap th, .tablewrap td {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    vertical-align: top;
+  }
+  .tablewrap .sec { max-width: none; }
+  .tablewrap .sec > .mono, .tablewrap .sec > span:first-child {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .tablewrap td small { white-space: normal; max-width: 300px; overflow-wrap: anywhere; }
+  .tabs { scrollbar-width: thin !important; }
+  .tabs::-webkit-scrollbar { display: block !important; height: 4px; }
+  dialog, dialog.drawer {
+    max-height: 88dvh !important;
+    overflow: auto !important;
+    overscroll-behavior: contain;
+    scroll-padding-block: 16px;
+  }
+  dialog > *, dialog form, dialog .form { min-width: 0; max-width: 100%; }
+  dialog input, dialog textarea, dialog select { scroll-margin-block: 24px; }
+  dialog [style*="min-width"] { min-width: 0 !important; max-width: 100%; }
+  dialog .actions { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  dialog .actions button { flex: 1 1 120px; }
+  .panel .head { flex-wrap: wrap; gap: 8px; }
+  .panel p, .banner, #subtitle { overflow-wrap: anywhere; }
+  #toast { border-radius: 12px; white-space: normal; overflow-wrap: anywhere; }
+  #mailNotifStack { max-width: calc(100vw - 24px); }
+}
+@media (max-width: 360px) {
+  main { padding-inline: 8px !important; }
+  .stats { gap: 6px !important; }
+  .stat { padding: 10px 8px !important; }
+  .stat b { font-size: 21px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog[open], dialog.drawer[open] { animation: none !important; }
+}
+
+tbody tr:hover td { background: rgba(16, 185, 129, 0.06); }
+
+/* Stack account/mail rows into cards while retaining the same controls. */
+@media (max-width: 760px) {
+  .mobile-cards { background: transparent; border: 0; overflow: visible; }
+  .mobile-cards table, .mobile-cards thead, .mobile-cards tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .mobile-cards thead tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 8px;
+    margin-bottom: 10px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .mobile-cards thead th {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 0 4px !important;
+    border: 0;
+    background: transparent;
+    white-space: normal;
+    font-size: 11px;
+  }
+  .mobile-cards thead th button { font-size: 11px; }
+  .mobile-cards tbody tr {
+    display: block;
+    margin-bottom: 12px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--panel);
+  }
+  .mobile-cards tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 10px 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    border-bottom: 1px solid var(--line);
+  }
+  .mobile-cards tbody td:last-child { border-bottom: 0; }
+  .mobile-cards td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--mute);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .mobile-cards td > *, .mobile-cards td .sec > * {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .mobile-cards td .sec { flex-wrap: wrap; }
+  .mobile-cards td .sec > .mono, .mobile-cards td .sec > span:first-child {
+    max-width: 100%;
+    white-space: normal;
+  }
+  .mobile-cards td small { max-width: 100%; }
+  .mobile-cards td[data-label="Thao tác"] { flex-direction: row; flex-wrap: wrap; }
+  .mobile-cards td[data-label="Thao tác"]::before { flex-basis: 100%; }
+  .mobile-cards td[data-label="Thao tác"] button { flex: 1 1 auto; }
+  .mobile-cards td input:not([type="checkbox"]) { width: 100%; max-width: 100% !important; }
+}
+
+/* Compact mobile workspace: search + paired filters + one action row. */
+@media (max-width: 760px) {
+  .filters {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px !important;
+    padding: 8px !important;
+  }
+  .filters > input[type="search"] { grid-column: 1 / -1; }
+  .filters > * { min-width: 0; margin: 0; width: 100%; }
+  .filters button, .filters select { padding: 6px 8px; }
+  .accounts-filters {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: center;
+  }
+  .accounts-filters > #q { grid-column: 1 / -1; }
+  .accounts-filters > #fPlatform { grid-column: span 3; }
+  .accounts-filters > label:has(#fStale) { grid-column: span 3; justify-content: flex-start; }
+  .accounts-filters > button[data-act="checkAllLive"] { grid-column: span 3; font-size: 12px; }
+  .accounts-filters > label:has(#chkAutoBg) { grid-column: span 2; font-size: 11px !important; gap: 4px !important; }
+  .accounts-filters > details { grid-column: span 1; }
+  .accounts-filters > details summary { padding: 10px 4px; text-align: center; font-size: 11px; }
+  .accounts-filters > #bgCheckStatus { grid-column: 1 / -1; }
+  .accounts-filters > details .menu { right: 0; left: auto; max-width: calc(100vw - 32px); }
+  .tabs { gap: 4px; margin-bottom: 6px; }
+  .tabs button { padding: 4px 9px !important; min-height: 36px; }
+  .mobile-cards thead tr { gap: 0 6px; padding: 4px 6px; margin-bottom: 6px; }
+  .mobile-cards thead th button { min-height: 34px; }
+  .mobile-cards tbody tr { padding: 4px 10px; margin-bottom: 8px; border-radius: 10px; }
+  .mobile-cards tbody td {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    align-items: center;
+    gap: 3px 8px;
+    padding: 6px 0 !important;
+  }
+  .mobile-cards td[data-label]::before { grid-column: 1; grid-row: 1; font-size: 10px; }
+  .mobile-cards tbody td > * { grid-column: 2; }
+  .mobile-cards td[data-label="Thao tác"] { display: flex; gap: 5px; }
+  .mobile-cards td[data-label="Thao tác"]::before { flex-basis: 100%; }
+  .mobile-cards td button.mini { padding: 5px 8px; font-size: 11px; }
+  .mobile-cards td button.ico { min-width: 36px !important; }
+  .mobile-cards tbody td[colspan] { display: block; }
 }

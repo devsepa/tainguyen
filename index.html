@@ -721,8 +721,14 @@
           $("#btnRefresh").disabled = cloudBusy;
           $("#btnAuth").hidden = !currentUser;
           $("#btnAuth").disabled = cloudBusy;
+          const maskIdentityEmail = (em) => {
+            const s = String(em || "").trim();
+            const at = s.indexOf("@");
+            if (at <= 0) return "••••••";
+            return `${s.slice(0, Math.min(2, at))}***@${s.slice(at + 1)}`;
+          };
           $("#identity").textContent = currentUser
-            ? currentUser.email +
+            ? maskIdentityEmail(currentUser.email) +
               (memberRole
                 ? " · " +
                   { admin: "Quản trị", editor: "Chỉnh sửa", viewer: "Chỉ xem" }[
@@ -957,13 +963,13 @@
             return;
           }
           if (!$("#q")) {
-            v.innerHTML = `<div class="tabs" id="tabs" role="group" aria-label="Lọc nhanh"></div><div class="tools filters"><input id="q" class="grow" type="search" placeholder="Tìm UID, Gmail, tên, ghi chú…  ( phím / )" aria-label="Tìm kiếm">
+            v.innerHTML = `<div class="tabs" id="tabs" role="group" aria-label="Lọc nhanh"></div><div class="tools filters accounts-filters"><input id="q" class="grow" type="search" placeholder="Tìm UID, Gmail, tên, ghi chú…" aria-label="Tìm kiếm">
     <select id="fPlatform" aria-label="Lọc nền tảng"><option value="">Mọi nền tảng</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select><select id="fStatus" hidden aria-label="Lọc trạng thái"></select>
     <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fStale">Cần kiểm tra</label>
-    <button data-act="checkAllLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Kiểm tra Live/Die tự động cho các tài khoản Facebook &amp; Instagram">${icon("check")} ⚡ Check Live/Die FB &amp; IG</button>
+    <button data-act="checkAllLive" class="mini" style="background:#2fbf71;border-color:#2fbf71;color:#07112b;font-weight:600;display:inline-flex;align-items:center;gap:5px" title="Kiểm tra Live/Die tự động cho các tài khoản Facebook &amp; Instagram">${icon("check")} Check FB &amp; IG</button>
     <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px;user-select:none" title="Tự động kiểm tra ngầm các nick Facebook chưa check hôm nay khi mở web">
       <input type="checkbox" id="chkAutoBg" ${autoCheckBgEnabled ? "checked" : ""}>
-      <span style="color:#2fbf71;font-weight:600">⚡ Tự động quét</span>
+      <span style="color:#2fbf71;font-weight:600">Tự quét</span>
     </label>
     <span id="bgCheckStatus" style="display:none;align-items:center;gap:5px;font-size:12px;background:rgba(47,191,113,0.12);border:1px solid rgba(47,191,113,0.3);border-radius:6px;padding:3px 8px;color:#2fbf71"></span>
     <details><summary>Cột</summary><div class="menu">${FIELDS.map(([k, t]) => `<label style="display:flex;gap:8px"><input type="checkbox" id="col-${k}" data-col="${k}" ${cols.includes(k) ? "checked" : ""} ${k === "uid" ? "disabled" : ""}>${t}</label>`).join("")}</div></details></div><div id="tbl" class="view"></div>`;
@@ -1051,8 +1057,8 @@
   <button data-act="bCheck">Đánh dấu đã kiểm tra</button><button data-act="bCopy">Sao chép UID</button><button data-act="bExport">Xuất</button><button class="danger" data-act="bDel">Xoá</button><button class="link" data-act="selNone">Bỏ chọn</button></div>`
               : ""
           }
-  <div class="tablewrap"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length && shown.every((a) => sel.has(a.uid)) ? "checked" : ""}></th>${show.map((k) => `<th aria-sort="${sort.k === k ? (sort.d > 0 ? "ascending" : "descending") : "none"}">${SECRETS.includes(k) ? LABEL[k] : `<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`}</th>`).join("")}</tr></thead>
-  <tbody>${shown.map((a) => `<tr data-uid="${esc(a.uid)}" title="Nhấp vào dòng để chỉnh sửa"><td><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid) ? "checked" : ""}></td>${show.map((k) => `<td>${cell(a, k)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${show.length + 1}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
+  <div class="tablewrap mobile-cards"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length && shown.every((a) => sel.has(a.uid)) ? "checked" : ""}></th>${show.map((k) => `<th aria-sort="${sort.k === k ? (sort.d > 0 ? "ascending" : "descending") : "none"}">${SECRETS.includes(k) ? LABEL[k] : `<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`}</th>`).join("")}</tr></thead>
+  <tbody>${shown.map((a) => `<tr data-uid="${esc(a.uid)}" title="Nhấp vào dòng để chỉnh sửa"><td data-label="Chọn tài khoản"><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid) ? "checked" : ""}></td>${show.map((k) => `<td data-label="${esc(LABEL[k])}">${cell(a, k)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${show.length + 1}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
   <div class="tools" style="justify-content:space-between;align-items:center;padding:6px 2px;margin-top:6px"><span class="muted" style="font-size:13px">${rows.length} kết quả · trang ${page}/${pages}</span><span class="tools" style="gap:8px"><select id="per" aria-label="Số dòng mỗi trang" style="padding:6px 12px;font-size:13px;border-radius:8px;font-weight:600">${opts(
     [25, 50, 100].map((n) => [String(n), n + " dòng"]),
     String(per),
@@ -1291,7 +1297,7 @@
   </div>`
       : ""
   }
-  <div class="tablewrap"><table>
+  <div class="tablewrap mobile-cards"><table>
     <thead><tr>
       <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length && shownRows.every((a) => selGmail.has(a.uid)) ? "checked" : ""}></th>
       <th style="min-width:240px"><button data-act="sortGmail" data-v="email">Địa chỉ Email &amp; Thời gian ${sortGmail.k === "email" ? (sortGmail.d > 0 ? " ↑" : " ↓") : ""}</button></th>
@@ -1319,8 +1325,8 @@
               : fmtTime(a.updated || a.added);
             const displayNote = isTimeNote ? "" : a.note;
             return `<tr data-guid="${u}">
-          <td><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid) ? "checked" : ""}></td>
-          <td>
+          <td data-label="Chọn email"><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid) ? "checked" : ""}></td>
+          <td data-label="Email / Thời gian">
             <div style="display:flex;flex-direction:column;gap:2px">
               <span class="sec"><span style="color:${isEdu ? "#2fbf71" : "#7b42ff"};display:inline-flex;align-items:center" title="${isEdu ? "Mail Edu" : "TempMail Cloud"}">${icon("mail")}</span> <b>${email}</b> ${ib("cpText", email, "copy", "Chép Email")}</span>
               <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
@@ -1336,7 +1342,7 @@
               }</div>
             </div>
           </td>
-          <td>
+          <td data-label="Trạng thái">
             ${
               a.status === "live"
                 ? `<span class="pill" style="--c:#2fbf71;cursor:pointer" data-act="checkSingleMailLive" data-v="${u}" title="Nhấp để kiểm tra lại"><span class="dot" style="--c:#2fbf71"></span>Live</span>`
@@ -1346,11 +1352,11 @@
             }
             ${a.checked ? `<div class="muted mono" style="font-size:10.5px;margin-top:2px">${esc(a.checked)}</div>` : ""}
           </td>
-          <td>${pass ? `<span class="sec" title="${esc(pass)}"><span class="mono">${on ? (isUrlPass ? `key=${(extractEmailUuid(a) || pass).slice(0, 8)}…` : esc(pass)) : "••••••••"}</span>${ib("show", esc(passId), on ? "off" : "eye", on ? "Ẩn " : "Hiện ")}${ib("cpText", esc(pass), "copy", "Chép mật khẩu")}${isUrlPass ? `<a href="${esc(pass.trim())}" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;color:var(--accent)" title="Mở link hòm thư ảo" onclick="event.stopPropagation()">${icon("ext")}</a>` : ""}</span>` : '<span class="muted">—</span>'}</td>
-          <td>
+          <td data-label="Mật khẩu / Key">${pass ? `<span class="sec" title="${esc(pass)}"><span class="mono">${on ? (isUrlPass ? `key=${(extractEmailUuid(a) || pass).slice(0, 8)}…` : esc(pass)) : "••••••••"}</span>${ib("show", esc(passId), on ? "off" : "eye", on ? "Ẩn " : "Hiện ")}${ib("cpText", esc(pass), "copy", "Chép mật khẩu")}${isUrlPass ? `<a href="${esc(pass.trim())}" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;color:var(--accent)" title="Mở link hòm thư ảo" onclick="event.stopPropagation()">${icon("ext")}</a>` : ""}</span>` : '<span class="muted">—</span>'}</td>
+          <td data-label="Ghi chú">
             <input type="text" data-note-guid="${u}" value="${esc(displayNote)}" placeholder="— Nhập ghi chú..." title="Nhấp vào để sửa ghi chú, nhấn Enter hoặc bấm ra ngoài để lưu" style="background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;width:100%;max-width:280px;color:var(--fg);font-size:12.5px;transition:all .15s" onfocus="this.style.background='var(--raise)';this.style.borderColor='var(--accent)';this.style.borderStyle='solid'" onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.borderStyle='dashed'">
           </td>
-          <td style="white-space:nowrap">
+          <td data-label="Thao tác" style="white-space:nowrap">
             <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
             ${isEdu
               ? `<button class="mini" data-act="inboxTempMail" data-v="${u}" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600" title="Mở hộp thư &amp; đọc mã OTP realtime">${icon("mail")} Hộp thư &amp; OTP</button>`

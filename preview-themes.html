@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Xem thử 3 bản thiết kế giao diện</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Be Vietnam Pro", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        transition: background 0.2s, color 0.2s;
+      }
+      /* Switcher bar */
+      .preview-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 10px 18px;
+        background: #0b1120;
+        color: #f8fafc;
+        border-bottom: 1px solid #1e293b;
+      }
+      .preview-bar .title {
+        font-weight: 700;
+        font-size: 13.5px;
+      }
+      .preview-pills {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .preview-pills button {
+        border: 1px solid #334155;
+        background: #1e293b;
+        color: #cbd5e1;
+        padding: 7px 14px;
+        border-radius: 99px;
+        font: 600 12.5px/1 "Be Vietnam Pro", sans-serif;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .preview-pills button.active {
+        background: #3b82f6;
+        border-color: #3b82f6;
+        color: #ffffff;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+      }
+
+      /* Theme 1: Midnight Slate (Tối dịu, tương phản cao) */
+      body[data-theme="slate"] {
+        --bg: #0f172a;
+        --side: #111c33;
+        --panel: #1e293b;
+        --raise: #26354d;
+        --line: #334155;
+        --fg: #f1f5f9;
+        --mute: #94a3b8;
+        --accent: #3b82f6;
+        --accent-fg: #ffffff;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --danger: #ef4444;
+        --input-bg: #0f172a;
+        --row-hover: rgba(59, 130, 246, 0.08);
+      }
+
+      /* Theme 2: Daylight Clean (Sáng hiện đại, dễ nhìn ban ngày) */
+      body[data-theme="daylight"] {
+        --bg: #f1f5f9;
+        --side: #ffffff;
+        --panel: #ffffff;
+        --raise: #f8fafc;
+        --line: #cbd5e1;
+        --fg: #0f172a;
+        --mute: #64748b;
+        --accent: #2563eb;
+        --accent-fg: #ffffff;
+        --ok: #16a34a;
+        --warn: #d97706;
+        --danger: #dc2626;
+        --input-bg: #ffffff;
+        --row-hover: rgba(37, 99, 235, 0.05);
+      }
+
+      /* Theme 3: Emerald Command (Tối sâu, nhấn xanh ngọc, thao tác nhanh) */
+      body[data-theme="emerald"] {
+        --bg: #09090b;
+        --side: #111114;
+        --panel: #18181b;
+        --raise: #222227;
+        --line: #27272a;
+        --fg: #fafafa;
+        --mute: #a1a1aa;
+        --accent: #10b981;
+        --accent-fg: #052e16;
+        --ok: #10b981;
+        --warn: #fbbf24;
+        --danger: #f87171;
+        --input-bg: #09090b;
+        --row-hover: rgba(16, 185, 129, 0.08);
+      }
+
+      /* App layout */
+      .app {
+        display: grid;
+        grid-template-columns: 230px 1fr;
+        min-height: calc(100vh - 52px);
+      }
+      nav {
+        background: var(--side);
+        border-right: 1px solid var(--line);
+        padding: 18px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px 16px;
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .brand-dot {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: var(--accent);
+        color: var(--accent-fg);
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+      }
+      .brand small {
+        display: block;
+        font-weight: 500;
+        font-size: 11px;
+        color: var(--mute);
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--mute);
+        cursor: pointer;
+      }
+      .nav-item.active {
+        background: var(--accent);
+        color: var(--accent-fg);
+        font-weight: 700;
+      }
+      .nav-badge {
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 99px;
+        background: rgba(128, 128, 128, 0.18);
+      }
+      .vaultbox {
+        margin-top: auto;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--raise);
+        font-size: 12px;
+        color: var(--mute);
+        line-height: 1.5;
+      }
+
+      main {
+        padding: 22px 26px;
+        display: grid;
+        gap: 16px;
+        align-content: start;
+      }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .topbar h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .topbar p {
+        margin: 3px 0 0;
+        font-size: 12.5px;
+        color: var(--mute);
+      }
+      .btn-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      button.btn {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--fg);
+        padding: 8px 14px;
+        border-radius: 9px;
+        font: 600 13px/1.2 "Be Vietnam Pro", sans-serif;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      button.btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-fg);
+      }
+      button.btn.ok {
+        background: rgba(34, 197, 94, 0.14);
+        border-color: var(--ok);
+        color: var(--ok);
+      }
+      button.btn.danger {
+        color: var(--danger);
+      }
+      .tabs {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .tab {
+        padding: 8px 14px;
+        border-radius: 99px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--mute);
+        font: 600 13px/1 "Be Vietnam Pro", sans-serif;
+        cursor: pointer;
+      }
+      .tab.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-fg);
+      }
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        background: var(--panel);
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+      }
+      .toolbar input,
+      .toolbar select {
+        background: var(--input-bg);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font: 500 13px "Be Vietnam Pro", sans-serif;
+      }
+      .toolbar input {
+        flex: 1;
+        min-width: 220px;
+      }
+      .table-card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+      }
+      th {
+        text-align: left;
+        padding: 12px 14px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--mute);
+        background: var(--raise);
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      tr:hover td {
+        background: var(--row-hover);
+      }
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid var(--ok);
+        color: var(--ok);
+        background: rgba(34, 197, 94, 0.1);
+      }
+      .link-badge {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+      }
+      .totp-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 13px;
+        border: 1px solid var(--ok);
+        color: var(--ok);
+        background: rgba(34, 197, 94, 0.12);
+        cursor: pointer;
+      }
+      @media (max-width: 820px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+        nav {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="slate">
+    <div class="preview-bar">
+      <div class="title">🎨 Chọn bản thiết kế bạn thích nhất để áp dụng:</div>
+      <div class="preview-pills">
+        <button class="active" onclick="setTheme('slate', this)">
+          1. Midnight Slate (Tối dịu, rõ nét)
+        </button>
+        <button onclick="setTheme('daylight', this)">
+          2. Daylight Clean (Giao diện Sáng)
+        </button>
+        <button onclick="setTheme('emerald', this)">
+          3. Emerald Command (Tối sâu, xanh ngọc)
+        </button>
+      </div>
+    </div>
+
+    <div class="app">
+      <nav>
+        <div class="brand">
+          <div class="brand-dot">K</div>
+          <div>Kho tài khoản<small>Facebook &amp; Instagram</small></div>
+        </div>
+        <div class="nav-item"><span>📊 Tổng quan</span></div>
+        <div class="nav-item">
+          <span>👤 Tài khoản MXH</span><span class="nav-badge">15</span>
+        </div>
+        <div class="nav-item active">
+          <span>✉️ Kho Gmail</span><span class="nav-badge">31</span>
+        </div>
+        <div class="nav-item"><span>🕘 Lịch sử</span></div>
+        <div class="nav-item"><span>⚙️ Cài đặt</span></div>
+        <div class="vaultbox">
+          ng***@gmail.com · Quản trị<br />
+          ● Đã lưu trên Supabase
+        </div>
+      </nav>
+
+      <main>
+        <div class="topbar">
+          <div>
+            <h1>Kho Gmail &amp; Mail OTP</h1>
+            <p>Thứ Năm, 26/11/2026 · Quản lý mail gắn nick và nhận OTP nhanh</p>
+          </div>
+          <div class="btn-row">
+            <button class="btn">🔄 Tải lại</button>
+            <button class="btn">📥 Nhập</button>
+            <button class="btn">📤 Xuất</button>
+            <button class="btn primary">+ Thêm Gmail</button>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active">🎓 Temp Mail .EDU (19)</button>
+          <button class="tab">☁️ Temp Mail Cloud (12)</button>
+          <button class="tab">📁 Tất cả (31)</button>
+        </div>
+
+        <div class="toolbar">
+          <input placeholder="Tìm địa chỉ mail, mật khẩu, ghi chú… (phím /)" />
+          <select>
+            <option>Tất cả trạng thái</option>
+            <option>🟢 Chỉ Live</option>
+          </select>
+          <select>
+            <option>Tất cả mức dùng</option>
+            <option>✨ Chưa gắn nick</option>
+          </select>
+          <button class="btn primary">⚡ Tạo Mail .EDU</button>
+          <button class="btn ok">✓ Check Live Mail</button>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Địa chỉ Email &amp; Nick gắn</th>
+                <th>Trạng thái</th>
+                <th>Mật khẩu / 2FA mẫu</th>
+                <th>Thao tác nhanh</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div style="font-weight: 600">latinam@hepoa.edu.pl</div>
+                  <div class="mono" style="font-size: 11.5px; color: var(--mute)">
+                    00:48 · 26/11/2026
+                  </div>
+                  <span class="link-badge">🔗 IG: latinam38</span>
+                </td>
+                <td><span class="pill">● Live</span></td>
+                <td>
+                  <span class="totp-pill mono">🔑 785832 · 14s</span>
+                </td>
+                <td>
+                  <div class="btn-row">
+                    <button class="btn">📋 Mail|Pass</button>
+                    <button class="btn ok">✉️ Hộp thư &amp; OTP</button>
+                    <button class="btn danger">✕</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="font-weight: 600">jalalic@hepoa.edu.pl</div>
+                  <div class="mono" style="font-size: 11.5px; color: var(--mute)">
+                    20:48 · 25/11/2026
+                  </div>
+                  <span style="font-size: 11.5px; color: var(--mute)">✨ Chưa gắn nick</span>
+                </td>
+                <td><span class="pill">● Live</span></td>
+                <td>
+                  <span class="mono" style="color: var(--mute)">••••••••</span>
+                </td>
+                <td>
+                  <div class="btn-row">
+                    <button class="btn">📋 Mail|Pass</button>
+                    <button class="btn ok">✉️ Hộp thư &amp; OTP</button>
+                    <button class="btn danger">✕</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      function setTheme(name, btn) {
+        document.body.dataset.theme = name;
+        document
+          .querySelectorAll(".preview-pills button")
+          .forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+      }
+    </script>
+  </body>
+</html>
