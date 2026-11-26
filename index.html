@@ -19,6 +19,7 @@
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     />
     <link rel="stylesheet" href="./styles.css?v=2" />
+    <link rel="stylesheet" href="./ig-tool-ui.css?v=1" />
   </head>
   <body>
 
@@ -70,6 +71,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
     <script src="./supabase-config.js"></script>
     <script src="./supabase-store.js"></script>
+    <script src="./ig-tool-ui.js?v=1"></script>
     <script>
       (() => {
         "use strict";
@@ -83,6 +85,7 @@
           "tong-quan": "Tổng quan",
           "tai-khoan": "Tài khoản MXH",
           gmail: "Kho Gmail",
+          "tao-ig": "Tạo IG / FB",
           "lich-su": "Lịch sử",
           "cai-dat": "Cài đặt",
         };
@@ -190,6 +193,7 @@
           "tong-quan": "grid",
           "tai-khoan": "users",
           gmail: "mail",
+          "tao-ig": "instagram",
           "lich-su": "clock",
           "cai-dat": "gear",
         };
@@ -197,6 +201,7 @@
           "tong-quan": "Tình hình kho tài nguyên",
           "tai-khoan": "Tra cứu, cập nhật tài khoản Facebook & Instagram",
           gmail: "Lưu trữ tài khoản Gmail, mật khẩu và ghi chú",
+          "tao-ig": "Tạo tài khoản Instagram qua trình duyệt cục bộ",
           "lich-su": "Các thay đổi gần đây",
           "cai-dat": "Trạng thái, bảo mật và dữ liệu",
         };
@@ -774,6 +779,7 @@
             "tong-quan": overview,
             "tai-khoan": accounts,
             gmail: gmailView,
+            "tao-ig": renderIgTool,
             "lich-su": history,
             "cai-dat": config,
           })[r](v, list);
@@ -2351,10 +2357,18 @@
           if (!autoCheckBgEnabled || isBgScanning || !canWrite() || cloudBusy)
             return;
           const currentToday = today();
+          const nowMs = Date.now();
           const queue = all().filter(
-            (a) =>
-              a.platform !== "gmail" &&
-              (a.platform === "instagram" ? (!a.igCheck?.at || Date.now() - Date.parse(a.igCheck.at) > 6 * 60 * 60 * 1000) : a.checked !== currentToday),
+            (a) => {
+              if (a.platform === "gmail" || a.status === "dead") return false;
+              const isNewToday = a.born === currentToday;
+              if (a.platform === "instagram") {
+                const ttl = isNewToday ? 4 * 60 * 1000 : 6 * 60 * 60 * 1000;
+                return !a.igCheck?.at || nowMs - Date.parse(a.igCheck.at) > ttl;
+              }
+              if (a.checked !== currentToday) return true;
+              return isNewToday && nowMs - Number(a.checkedAt || a.added || 0) > 4 * 60 * 1000;
+            },
           );
           if (!queue.length) {
             updateBgStatus(
@@ -2399,11 +2413,11 @@
 
             if (
               a.platform === "instagram" || (res.status !== "unknown" &&
-              (newStatus !== oldStatus || a.checked !== currentToday))
+              (newStatus !== oldStatus || a.checked !== currentToday || a.born === currentToday))
             ) {
               const rev = revise(
                 a,
-                a.platform === "instagram" ? igResultPatch(res) : { status: newStatus, checked: currentToday },
+                a.platform === "instagram" ? igResultPatch(res) : { status: newStatus, checked: currentToday, checkedAt: Date.now() },
                 "Quét ngầm tự động",
                 a.platform === "instagram" ? "IG: " + (res.reason || res.status) : undefined,
               );
@@ -2464,7 +2478,7 @@
             () => {
               if (autoCheckBgEnabled && ready()) triggerBackgroundScan();
             },
-            10 * 60 * 1000,
+            4 * 60 * 1000,
           );
         }
 
@@ -4597,6 +4611,94 @@
               toast("Đã chuyển dữ liệu lên Supabase");
             },
           );
+        }
+        let igToolHandle = null;
+        function renderIgTool(v, list) {
+          igToolHandle?.destroy();
+          if (!globalThis.IgTool?.mount) {
+            v.innerHTML = '<div class="panel empty">Không tải được giao diện IG Tool.</div>';
+            return;
+          }
+          const uuidRe = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+          const mails = () => {
+            const usedByPlat = new Map();
+            for (const a of all()) {
+              if (a.platform === "gmail") continue;
+              const em = String(a.email || "").trim().toLowerCase();
+              if (!em) continue;
+              const p = a.platform || "facebook";
+              if (!usedByPlat.has(em)) usedByPlat.set(em, {});
+              usedByPlat.get(em)[p] = true;
+            }
+            return all()
+              .filter((a) => a.platform === "gmail")
+              .map((a) => {
+                const sec = secretsOf(a);
+                const raw = `${sec.pass || a.pass || ""} ${a.note || ""}`;
+                const m = raw.match(uuidRe);
+                const email = a.email || a.uid;
+                return {
+                  email,
+                  accessKey: m ? m[0] : "",
+                  usedOn: usedByPlat.get(String(email || "").trim().toLowerCase()) || {},
+                };
+              })
+              .filter((m) => m.email);
+          };
+          igToolHandle = globalThis.IgTool.mount(v, {
+            canWrite,
+            mails,
+            save: async (result) => {
+              if (!canWrite()) {
+                toast("Bạn không có quyền chỉnh sửa hoặc hệ thống đang lưu", "error");
+                return false;
+              }
+              const generation = authGeneration;
+              const plat = result?.platform === "facebook" ? "facebook" : "instagram";
+              const uname = String(result?.username || "").trim().toLowerCase();
+              if (!uname) return false;
+              const dup = all().some(
+                (a) =>
+                  (a.platform || "facebook") === plat &&
+                  (String(a.uid || "").toLowerCase() === uname ||
+                    (plat === "instagram" && String(a.igUsername || "").toLowerCase() === uname)),
+              );
+              if (dup) {
+                toast("Tài khoản này đã tồn tại trong kho.", "error");
+                return false;
+              }
+              const mailTarget = String(result.email || "").trim().toLowerCase();
+              const mailRec = all().find(
+                (a) =>
+                  a.platform === "gmail" &&
+                  String(a.email || a.uid || "").trim().toLowerCase() === mailTarget,
+              );
+              const mailSec = mailRec ? secretsOf(mailRec) : {};
+              const mailPass = mailSec.pass || mailRec?.pass || "";
+              const rec = revise(
+                {},
+                {
+                  platform: plat,
+                  uid: result.username,
+                  ...(plat === "instagram" ? { igUsername: result.username } : {}),
+                  name: result.name || "",
+                  pass: result.password || "",
+                  email: result.email || "",
+                  mailpass: mailPass,
+                  born: today(),
+                  checked: today(),
+                  status: "live",
+                  source: plat === "facebook" ? "fb-tool" : "ig-tool",
+                  note: plat === "facebook" ? "Tạo qua FB Tool" : "Tạo qua IG Tool",
+                },
+                plat === "facebook" ? "Thêm tài khoản FB" : "Thêm tài khoản IG",
+              );
+              const ok = await commit([rec]);
+              if (generation !== authGeneration) return false;
+              if (ok) toast(`Đã lưu tài khoản ${plat === "facebook" ? "Facebook" : "Instagram"} vào kho`);
+              return ok;
+            },
+          });
         }
         async function boot() {
           render();
