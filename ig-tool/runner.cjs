@@ -95,7 +95,8 @@ class Runner {
       try {
         const filled=await browser.fill(j.input);signal.throwIfAborted();
         if(filled===false)this.set(j,'paused','Biểu mẫu khác dự kiến. Kiểm tra trình duyệt, hoàn tất bước hiện tại rồi bấm Tiếp tục.');
-        else {j.since=Date.now();await browser.submit();}
+        else if(filled!=='pending'){j.since=Date.now();await browser.submit();}
+        else {j.since=Date.now();}
       }catch {signal.throwIfAborted();this.set(j,'paused','Chưa gửi được biểu mẫu. Kiểm tra thông tin trong trình duyệt rồi bấm Tiếp tục.');}
       j.since ||= Date.now();j.unknownSince=Date.now();let birthdaySubmitted=false,lastOtpAt=0,lastMailAt=0;
       let pendingStep=null,termsSubmittedAt=null;

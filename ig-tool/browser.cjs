@@ -5,7 +5,16 @@ const {observePage}=require('./diagnostics.cjs');
 async function visible(locator){for(const item of await locator.all())if(await item.isVisible())return item;return null;}
 const otpSelector='input[name="confirmationCode"],input[name="email_confirmation_code"],input[name="code"],input[name="c"],#code_in_cliff,input[autocomplete="one-time-code"]';
 
+async function pressMobileOrClick(btn,isMobile){
+  await btn.scrollIntoViewIfNeeded().catch(()=>{});
+  if(isMobile){
+    try{await btn.tap();return;}catch{}
+  }
+  await btn.click({force:true});
+}
+
 async function navigateToRegistration(page,{platform='instagram',device='desktop',startUrl,baseUrl}={}){
+  const isMobile=device==='mobile';
   const isFb=platform==='facebook';
   const fromHome=device==='mobile'&&!startUrl;
   const igBase=baseUrl||'https://www.instagram.com';
@@ -24,13 +33,15 @@ async function navigateToRegistration(page,{platform='instagram',device='desktop
     await signup.waitFor({state:'visible',timeout:15000});
     await signup.click();
     if(isFb){
-      const startBtn=page.getByRole('button',{name:/^(bắt đầu|get started)$/i}).or(page.getByRole('link',{name:/^(bắt đầu|get started)$/i})).first();
+      const startLocator=page.getByRole('button',{name:/^(bắt đầu|get started)$/i})
+        .or(page.getByRole('link',{name:/^(bắt đầu|get started)$/i}));
       await Promise.race([
-        page.locator('input').first().waitFor({state:'visible',timeout:4000}).catch(()=>{}),
-        startBtn.waitFor({state:'visible',timeout:4000}).catch(()=>{}),
+        page.locator('input').first().waitFor({state:'visible',timeout:15000}).catch(()=>{}),
+        startLocator.first().waitFor({state:'visible',timeout:15000}).catch(()=>{}),
       ]);
-      if(!(await page.locator('input').first().isVisible().catch(()=>false))&&await startBtn.isVisible().catch(()=>false)){
-        await startBtn.click();
+      const startBtn=await visible(startLocator);
+      if(!(await page.locator('input').first().isVisible().catch(()=>false))&&startBtn){
+        await pressMobileOrClick(startBtn,isMobile);
       }
     }
     await page.locator('input').first().waitFor({state:'visible',timeout:15000});
@@ -85,7 +96,7 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
           const el=document.createElement('div');
           el.id='__ig_tool_cookie_pill';
           el.textContent='📋 Copy Cookie';
-          el.style.cssText='position:fixed;top:6px;right:6px;z-index:2147483647;padding:4px 9px;border-radius:999px;background:rgba(15,23,42,0.88);color:#34d399;border:1px solid rgba(52,211,153,0.45);font:600 11px/1.2 system-ui,sans-serif;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.35)';
+          el.style.cssText='position:fixed;bottom:10px;right:10px;z-index:2147483647;padding:4px 9px;border-radius:999px;background:rgba(15,23,42,0.88);color:#34d399;border:1px solid rgba(52,211,153,0.45);font:600 11px/1.2 system-ui,sans-serif;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.35)';
           el.onclick=async()=>{
             try{
               const c=await window.__igToolGetCookie();
@@ -230,10 +241,31 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
           const parts=input.name.trim().split(/\s+/);
           const lastName=parts[0]||input.name;
           const firstName=parts.slice(1).join(' ')||lastName;
-          const lastEl=await findInput('input[name="lastname"]',/^họ$|surname|last name/i);
-          const firstEl=await findInput('input[name="firstname"]',/^tên$|first name/i);
+          let lastEl=await findInput('input[name="lastname"]',/^họ$|surname|last name/i);
+          let firstEl=await findInput('input[name="firstname"]',/^tên$|first name/i);
+          if(!lastEl&&!firstEl){
+            const startBtn=await visible(
+              page.getByRole('button',{name:/^(bắt đầu|get started)$/i})
+                .or(page.getByRole('link',{name:/^(bắt đầu|get started)$/i}))
+                .or(page.locator('[role="button"],button,a').filter({hasText:/^\s*(bắt đầu|get started)\s*$/i}))
+            );
+            if(startBtn){
+              await pressMobileOrClick(startBtn,isMobile);
+              await page.locator('input').first().waitFor({state:'visible',timeout:10000}).catch(()=>{});
+              lastEl=await findInput('input[name="lastname"]',/^họ$|surname|last name/i);
+              firstEl=await findInput('input[name="firstname"]',/^tên$|first name/i);
+              if(!lastEl&&!firstEl)return 'pending';
+            }else if(isMobile){
+              return 'pending';
+            }
+          }
           const emailEl=await findInput('input[name="reg_email__"],input[name="email"]',/số di động hoặc email|email/i);
           const passEl=await findInput('input[name="reg_passwd__"],input[type="password"]',/mật khẩu mới|mật khẩu|password/i);
+          if(lastEl&&firstEl&&!emailEl&&!passEl){
+            await typeField(lastEl,lastName);
+            await typeField(firstEl,firstName);
+            return true;
+          }
           if(!lastEl||!firstEl||!emailEl||!passEl)return false;
           await typeField(lastEl,lastName);
           await typeField(firstEl,firstName);
@@ -289,7 +321,7 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
       fillBirthday,
       async fillStep(step,input){
         if(step==='password'){
-          const f=await findInput('input[name="password"],input[type="password"],input[autocomplete="new-password"]',/mật khẩu|password/i);
+          const f=await findInput('input[name="password"],input[name="reg_passwd__"],input[type="password"],input[autocomplete="new-password"]',/mật khẩu|password/i);
           if(!f)throw Error('step_field_missing');
           await typeField(f,input.password);
         }else if(step==='name'){
@@ -301,6 +333,32 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
           if(!f)throw Error('step_field_missing');
           if(await f.inputValue()!==input.username)await typeField(f,input.username);
           await f.press('Tab');
+        }else if(step==='fb_name'){
+          const parts=input.name.trim().split(/\s+/);
+          const lastName=parts[0]||input.name;
+          const firstName=parts.slice(1).join(' ')||lastName;
+          const lastEl=await findInput('input[name="lastname"]',/^họ$|surname|last name/i) || await visible(page.locator('input').nth(0));
+          const firstEl=await findInput('input[name="firstname"]',/^tên$|first name/i) || await visible(page.locator('input').nth(1));
+          if(!lastEl||!firstEl)throw Error('step_field_missing');
+          await typeField(lastEl,lastName);
+          await typeField(firstEl,firstName);
+        }else if(step==='fb_name_choice'){
+          const firstRadio=await visible(page.locator('input[type="radio"],[role="radio"]'));
+          if(firstRadio){
+            const checked=await firstRadio.isChecked().catch(()=>false);
+            if(!checked)await firstRadio.click();
+          }
+        }else if(step==='fb_gender'){
+          const genderRe=input.gender==='male'?/^nam$|^male$/i:/^nữ$|^female$/i;
+          const opt=await visible(page.getByRole('radio',{name:genderRe}))
+            || await visible(page.getByLabel(genderRe))
+            || await visible(page.locator('label,[role="radio"]').filter({hasText:genderRe}));
+          if(!opt)throw Error('step_field_missing');
+          await opt.click();
+        }else if(step==='fb_email'){
+          const f=await findInput('input[name="reg_email__"],input[name="email"],input[type="email"]',/^email$|số di động hoặc email|email/i);
+          if(!f)throw Error('step_field_missing');
+          await typeField(f,input.email);
         }
       },
       async updateEmail(newEmail){
@@ -311,32 +369,36 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
       },
       async submit(){
         const btn=(platform==='facebook'?await visible(page.locator('button[name="websubmit"]')):null)
-          || await visible(page.getByRole('button',{name:/^(gửi|đăng ký|sign up|submit|tiếp|tiếp tục|next|continue)$/i}));
+          || await visible(
+            page.getByRole('button',{name:/^(gửi|đăng ký|sign up|submit|tiếp|tiếp tục|next|continue)$/i})
+              .or(page.locator('[role="button"]').filter({hasText:/^\s*(gửi|đăng ký|sign up|submit|tiếp|tiếp tục|next|continue)\s*$/i}))
+          );
         if(!btn)throw Error('submit_missing');
         if(!headless)await page.waitForTimeout(1200);
-        await btn.click();
+        await pressMobileOrClick(btn,isMobile);
       },
       async submitOtp(code){
         const field=await otpInput();if(!field)throw Error('otp_missing');await typeField(field,code);
         const button=await visible(page.getByRole('button',{name:/^(tiếp|tiếp tục|continue|next|confirm|xác nhận|gửi|submit)$/i}));
-        if(!button)throw Error('confirm_missing');await button.click();
+        if(!button)throw Error('confirm_missing');await pressMobileOrClick(button,isMobile);
       },
       async agreeToTerms(){
-        const button=await agreeButton();if(!button)throw Error('terms_button_missing');await button.click();
+        const button=await agreeButton();if(!button)throw Error('terms_button_missing');await pressMobileOrClick(button,isMobile);
       },
       async skipOnboarding(){
         const button=await visible(
-          page.getByRole('button',{name:/^(lúc khác|not now|bỏ qua|skip)$/i})
-            .or(page.getByRole('link',{name:/^(lúc khác|not now|bỏ qua|skip)$/i}))
+          page.getByRole('button',{name:/^(lúc khác|not now|bỏ qua|skip|đăng ký bằng email|sign up with email|bắt đầu|get started)$/i})
+            .or(page.getByRole('link',{name:/^(lúc khác|not now|bỏ qua|skip|đăng ký bằng email|sign up with email|bắt đầu|get started)$/i}))
+            .or(page.locator('[role="button"]').filter({hasText:/^\s*(lúc khác|not now|bỏ qua|skip|đăng ký bằng email|sign up with email|bắt đầu|get started)\s*$/i}))
         );
         if(!button)throw Error('skip_onboarding_missing');
-        await button.click();
+        await pressMobileOrClick(button,isMobile);
       },
       async state(){
         if(page.isClosed())throw Error('browser_closed');
         const url=new URL(page.url());
         if(/challenge|checkpoint|two_factor|two_step/i.test(url.pathname) || await visible(page.locator('iframe[src*="recaptcha"],iframe[src*="hcaptcha"],iframe[src*="captcha"],input[name="captcha_response"]')))return {kind:'checkpoint'};
-        if(platform==='instagram'&&/\/accounts\/(?:signup|emailsignup)(?:\/|$)/i.test(url.pathname)&&await agreeButton()&&await visible(page.getByText(/để đăng ký|to sign up|terms and policies/i)))return {kind:'consent'};
+        if((platform==='facebook'||/\/accounts\/(?:signup|emailsignup)(?:\/|$)/i.test(url.pathname))&&await agreeButton()&&await visible(page.getByText(/để đăng ký|to sign up|terms|điều khoản/i)))return {kind:'consent'};
         const emailField=await findInput('input[name="reg_email__"],input[name="emailOrPhone"],input[name="email"],input[type="email"]',/số di động hoặc email|mobile number or email|email/i);
         let currentEmail=emailField?String(await emailField.inputValue().catch(()=>'')).trim():'';
         if(!currentEmail){
@@ -356,7 +418,34 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
         }
         if(await visible(page.getByRole('alert')))return {kind:'error',...(validEmail?{email:validEmail}:{})};
         if(platform==='facebook'){
+          const lastEl=await findInput('input[name="lastname"]',/^họ$|surname|last name/i);
+          const passEl=await findInput('input[name="reg_passwd__"],input[type="password"]',/mật khẩu|password/i);
+          if(lastEl&&!emailField&&!passEl)return {kind:'step',step:'fb_name'};
+          if(!lastEl){
+            if(await visible(page.getByText(/bạn tên gì|what'?s your name/i)))return {kind:'step',step:'fb_name'};
+            const startBtn=await visible(
+              page.getByRole('button',{name:/^(bắt đầu|get started)$/i})
+                .or(page.getByRole('link',{name:/^(bắt đầu|get started)$/i}))
+                .or(page.locator('[role="button"]').filter({hasText:/^\s*(bắt đầu|get started)\s*$/i}))
+            );
+            if(startBtn)return {kind:'onboarding'};
+            if(await visible(page.getByText(/chọn tên của bạn|choose your name/i)))return {kind:'step',step:'fb_name_choice'};
+            if(await visible(page.getByText(/giới tính của bạn là gì|what'?s your gender/i)))return {kind:'step',step:'fb_gender'};
+            const switchEmailBtn=await visible(
+              page.getByRole('button',{name:/^(đăng ký bằng email|sign up with email)$/i})
+                .or(page.getByRole('link',{name:/^(đăng ký bằng email|sign up with email)$/i}))
+            );
+            if(switchEmailBtn)return {kind:'onboarding'};
+            if(await visible(page.getByText(/lưu thông tin đăng nhập|save your login info/i))&&await visible(page.getByRole('button',{name:/^(lúc khác|not now)$/i})))return {kind:'onboarding'};
+            if(emailField&&!(await visible(page.locator('input[type="password"]'))))return {kind:'step',step:'fb_email'};
+            if(await findInput('input[name="reg_passwd__"],input[type="password"]',/mật khẩu|password/i))return {kind:'step',step:'password'};
+          }
           if(!/\/r\.php|\/reg/.test(url.pathname)){
+            const skipBtn=await visible(
+              page.getByRole('button',{name:/^(bỏ qua|skip|lúc khác|not now)$/i})
+                .or(page.getByRole('link',{name:/^(bỏ qua|skip|lúc khác|not now)$/i}))
+            );
+            if(skipBtn)return {kind:'onboarding'};
             const cookies=await context.cookies(['https://www.facebook.com','https://m.facebook.com']).catch(()=>[]);
             const cUser=cookies.find(c=>c.name==='c_user'&&/^\d+$/.test(c.value));
             if(cUser){

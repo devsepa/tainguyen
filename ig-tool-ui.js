@@ -101,11 +101,15 @@
       otp:'',
     };
 
+    const pickBestWarehouseMail=(list,plat,inUse=new Set())=>{
+      const ok=m=>!m.usedOn?.[plat]&&!inUse.has(String(m.email||'').trim().toLowerCase());
+      return list.find(m=>ok(m)&&!!m.accessKey)||list.find(ok)||list[0]||null;
+    };
     const mailList=readMails();
     const pickAvailableMail=(plat)=>{
       const cur=mailList.find(m=>m.email===draft.email&&!m.usedOn?.[plat]);
-      if(cur)return cur;
-      return mailList.find(m=>!m.usedOn?.[plat])||mailList[0]||null;
+      if(cur&&cur.accessKey)return cur;
+      return pickBestWarehouseMail(mailList,plat);
     };
     const initMail=pickAvailableMail(draft.platform);
     if(initMail){
@@ -378,7 +382,8 @@
           mailSelect.dataset.plat=draft.platform;
           mailSelect.innerHTML=optsHtml;
           if(selectedUsed){
-            const avail=readMails().find(m=>!m.usedOn?.[draft.platform]);
+            const inUse=new Set(jobs.map(j=>String(j.email||'').trim().toLowerCase()).filter(Boolean));
+            const avail=pickBestWarehouseMail(readMails(),draft.platform,inUse);
             if(avail){draft.email=avail.email;draft.accessKey=avail.accessKey||'';mailSelect.value=avail.email;}
           }
         }
@@ -543,7 +548,7 @@
       const dom=(draft.zohoDomain||'devsepa.id.vn').trim();
       draft.customEmail=`${next.mailLocal}@${dom}`;
       const inUse=new Set(jobs.map(j=>String(j.email||'').trim().toLowerCase()).filter(Boolean));
-      const avail=readMails().find(m=>!m.usedOn?.[draft.platform]&&!inUse.has(String(m.email||'').trim().toLowerCase()));
+      const avail=pickBestWarehouseMail(readMails(),draft.platform,inUse);
       if(avail){
         draft.email=avail.email;draft.accessKey=avail.accessKey||'';
         const ms=element.querySelector('[data-ig="email"]');if(ms)ms.value=avail.email;
