@@ -18,7 +18,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=2" />
   </head>
   <body>
 
@@ -64,6 +64,7 @@
     <dialog id="drawer" class="drawer"></dialog>
     <div id="toast" popover="manual" hidden role="status"></div>
     <div id="mailNotifStack" popover="manual" hidden aria-live="polite"></div>
+    <div id="batchCheckCorner" hidden style="position:fixed;right:20px;bottom:20px;width:min(360px,calc(100vw - 24px));z-index:9999990;background:rgba(24,24,27,0.97);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;box-shadow:0 14px 38px rgba(0,0,0,0.55),0 0 20px rgba(16,185,129,0.22);display:grid;gap:8px"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
@@ -1060,7 +1061,7 @@
   <button data-act="bCheck">Đánh dấu đã kiểm tra</button><button data-act="bCopy">Sao chép UID</button><button data-act="bExport">Xuất</button><button class="danger" data-act="bDel">Xoá</button><button class="link" data-act="selNone">Bỏ chọn</button></div>`
               : ""
           }
-  <div class="tablewrap mobile-cards"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length && shown.every((a) => sel.has(a.uid)) ? "checked" : ""}></th>${show.map((k) => `<th aria-sort="${sort.k === k ? (sort.d > 0 ? "ascending" : "descending") : "none"}">${SECRETS.includes(k) ? LABEL[k] : `<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`}</th>`).join("")}</tr></thead>
+  <details class="mobile-table-options"><summary>Sắp xếp / Chọn cả trang</summary><div><label><input type="checkbox" id="mobilePageAll" ${shown.length && shown.every(a => sel.has(a.uid)) ? "checked" : ""}> Chọn cả trang</label>${show.filter(k => !SECRETS.includes(k)).map(k => `<button class="mini" data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`).join("")}</div></details><div class="tablewrap mobile-cards"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length && shown.every((a) => sel.has(a.uid)) ? "checked" : ""}></th>${show.map((k) => `<th aria-sort="${sort.k === k ? (sort.d > 0 ? "ascending" : "descending") : "none"}">${SECRETS.includes(k) ? LABEL[k] : `<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`}</th>`).join("")}</tr></thead>
   <tbody>${shown.map((a) => `<tr data-uid="${esc(a.uid)}" title="Nhấp vào dòng để chỉnh sửa"><td data-label="Chọn tài khoản"><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid) ? "checked" : ""}></td>${show.map((k) => `<td data-label="${esc(LABEL[k])}">${cell(a, k)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${show.length + 1}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
   <div class="tools" style="justify-content:space-between;align-items:center;padding:6px 2px;margin-top:6px"><span class="muted" style="font-size:13px">${rows.length} kết quả · trang ${page}/${pages}</span><span class="tools" style="gap:8px"><select id="per" aria-label="Số dòng mỗi trang" style="padding:6px 12px;font-size:13px;border-radius:8px;font-weight:600">${opts(
     [25, 50, 100].map((n) => [String(n), n + " dòng"]),
@@ -1300,7 +1301,7 @@
   </div>`
       : ""
   }
-  <div class="tablewrap mobile-cards"><table>
+  <details class="mobile-table-options"><summary>Sắp xếp / Chọn cả trang</summary><div><label><input type="checkbox" id="mobilePageAllGmail" ${shownRows.length && shownRows.every(a => selGmail.has(a.uid)) ? "checked" : ""}> Chọn cả trang</label><button class="mini" data-act="sortGmail" data-v="email">Email ${sortGmail.k === "email" ? (sortGmail.d > 0 ? "↑" : "↓") : ""}</button><button class="mini" data-act="sortGmail" data-v="status">Trạng thái ${sortGmail.k === "status" ? (sortGmail.d > 0 ? "↑" : "↓") : ""}</button></div></details><div class="tablewrap mobile-cards"><table>
     <thead><tr>
       <th style="width:36px"><input type="checkbox" id="pageAllGmail" aria-label="Chọn cả trang" ${shownRows.length && shownRows.every((a) => selGmail.has(a.uid)) ? "checked" : ""}></th>
       <th style="min-width:240px"><button data-act="sortGmail" data-v="email">Địa chỉ Email &amp; Thời gian ${sortGmail.k === "email" ? (sortGmail.d > 0 ? " ↑" : " ↓") : ""}</button></th>
@@ -1478,7 +1479,11 @@
           } catch (e) {}
         }
 
+        function isMobileMailbox() {
+          return typeof matchMedia === "function" && matchMedia("(max-width: 760px)").matches;
+        }
         function showMailCornerPopup({ email, subject, from, otp }) {
+          if (isMobileMailbox()) return;
           const stack = $("#mailNotifStack");
           if (!stack) return;
           const openDlg = $("#dlg")?.open ? $("#dlg") : null;
@@ -1544,6 +1549,7 @@
         }
 
         function requestNotificationPermission() {
+          if (isMobileMailbox()) return;
           if (
             "Notification" in window &&
             Notification.permission === "default"
@@ -1553,6 +1559,7 @@
         }
 
         function notifyDesktopOtp(otp, email, subject) {
+          if (isMobileMailbox()) return;
           if (!("Notification" in window)) return;
           if (Notification.permission === "granted") {
             try {
@@ -2149,49 +2156,66 @@
           };
         }
 
+        function createCornerProgressCard(title) {
+          const box = $("#batchCheckCorner");
+          let stopped = false;
+          if (!box) {
+            return {
+              isStopped: () => stopped,
+              setProgress: () => {},
+              setCounts: () => {},
+              close: () => { stopped = true; },
+            };
+          }
+          box.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <div style="font-size:13px;font-weight:700;color:var(--fg);display:flex;align-items:center;gap:6px">
+                <span style="color:var(--ok)">${icon("check")}</span> ⚡ ${esc(title)}
+              </div>
+              <button type="button" class="mini danger" id="btnCornerStop" style="padding:3px 9px;font-size:11.5px">Dừng</button>
+            </div>
+            <div id="cProgText" style="font-size:12px;color:var(--mute)">Đang khởi tạo...</div>
+            <div class="track" style="margin:2px 0"><i id="cBar" style="--c:var(--ok);width:0%"></i></div>
+            <div id="cCurrent" class="mono" style="font-size:11.5px;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:16px"></div>
+            <div style="display:flex;gap:12px;font-size:12px;padding:6px 10px;background:var(--bg);border-radius:8px;border:1px solid var(--line)">
+              <span style="color:var(--ok);font-weight:600">Live: <b id="cCntL">0</b></span>
+              <span style="color:var(--danger);font-weight:600">Die: <b id="cCntD">0</b></span>
+              <span style="color:var(--mute);font-weight:500">Bỏ qua: <b id="cCntS">0</b></span>
+            </div>
+          `;
+          box.hidden = false;
+          const progText = box.querySelector("#cProgText"),
+            bar = box.querySelector("#cBar"),
+            cur = box.querySelector("#cCurrent"),
+            cntL = box.querySelector("#cCntL"),
+            cntD = box.querySelector("#cCntD"),
+            cntS = box.querySelector("#cCntS");
+          const close = () => {
+            stopped = true;
+            box.hidden = true;
+            box.innerHTML = "";
+          };
+          box.querySelector("#btnCornerStop").onclick = close;
+          return {
+            isStopped: () => stopped,
+            setProgress: (pct, text, current) => {
+              if (bar) bar.style.width = `${pct}%`;
+              if (progText) progText.textContent = text;
+              if (cur && current !== undefined) cur.textContent = current;
+            },
+            setCounts: (l, d, s) => {
+              if (cntL) cntL.textContent = l;
+              if (cntD) cntD.textContent = d;
+              if (cntS) cntS.textContent = s;
+            },
+            close,
+          };
+        }
+
         async function runBatchCheckMailLive(list) {
           if (!list || !list.length)
             return toast("Không có tài khoản mail nào để kiểm tra", "error");
-          const d = $("#dlg");
-          let stopped = false;
-          d.innerHTML = `<div style="display:grid;gap:12px;padding:4px">
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
-      <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
-        <span style="color:#2fbf71">${icon("check")}</span> ⚡ Kiểm Tra Live / Die Kho Mail
-      </h2>
-      <button type="button" class="ico" id="btnMailStop">${icon("x")}</button>
-    </div>
-    <div id="mProgText" style="font-size:13px;color:var(--mute)">Đang khởi tạo danh sách kiểm tra...</div>
-    <div class="track" style="margin:4px 0"><i id="mBar" style="--c:#2fbf71;width:0%"></i></div>
-    <div id="mCurrent" style="font-size:12px;font-family:var(--mono);color:var(--fg);min-height:18px"></div>
-    <div style="display:flex;gap:14px;font-size:13px;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--line)">
-      <span style="color:#2fbf71;font-weight:600">Live: <b id="mCntL">0</b></span>
-      <span style="color:#ef5350;font-weight:600">Die: <b id="mCntD">0</b></span>
-      <span style="color:var(--mute);font-weight:500">Bỏ qua: <b id="mCntS">0</b></span>
-    </div>
-    <div class="actions">
-      <button type="button" id="btnCancelMailCheck" class="danger">Dừng kiểm tra</button>
-    </div>
-  </div>`;
-          d.showModal();
-
-          const progText = d.querySelector("#mProgText"),
-            bar = d.querySelector("#mBar"),
-            cur = d.querySelector("#mCurrent"),
-            cntL = d.querySelector("#mCntL"),
-            cntD = d.querySelector("#mCntD"),
-            cntS = d.querySelector("#mCntS");
-          const stop = () => {
-            stopped = true;
-          };
-          d.querySelector("#btnMailStop").onclick = () => {
-            stop();
-            d.close();
-          };
-          d.querySelector("#btnCancelMailCheck").onclick = () => {
-            stop();
-            d.close();
-          };
+          const ui = createCornerProgressCard("Kiểm Tra Live / Die Kho Mail");
 
           let live = 0,
             dead = 0,
@@ -2200,19 +2224,16 @@
           const updated = [];
 
           for (let i = 0; i < total; i++) {
-            if (stopped) break;
+            if (ui.isStopped()) break;
             const a = list[i];
             const pct = Math.round(((i + 1) / total) * 100);
-            bar.style.width = `${pct}%`;
-            progText.textContent = `Đang kiểm tra mail [${i + 1}/${total}]...`;
-            cur.textContent = `${a.email}`;
+            ui.setProgress(pct, `Đang kiểm tra mail [${i + 1}/${total}]...`, `${a.email}`);
 
             const res = await checkMailLive(a);
-            if (stopped) break;
+            if (ui.isStopped()) break;
 
             if (res.status === "live") {
               live++;
-              cntL.textContent = live;
               const rev = revise(
                 a,
                 { status: "live", checked: today() },
@@ -2221,7 +2242,6 @@
               if (rev) updated.push(rev);
             } else if (res.status === "dead") {
               dead++;
-              cntD.textContent = dead;
               const rev = revise(
                 a,
                 { status: "dead", checked: today() },
@@ -2230,16 +2250,17 @@
               if (rev) updated.push(rev);
             } else {
               skip++;
-              cntS.textContent = skip;
             }
+            ui.setCounts(live, dead, skip);
             await new Promise((r) => setTimeout(r, 120));
           }
 
           if (updated.length) {
+            ui.setProgress(100, "Đang lưu kết quả vào kho...");
             await commit(updated);
           }
           playChime("success");
-          d.close();
+          ui.close();
           render();
           toast(
             `Hoàn tất kiểm tra: ${live} Mail Live, ${dead} Mail Die${skip ? `, ${skip} bỏ qua` : ""}!`,
@@ -2249,46 +2270,7 @@
         async function runBatchCheckLive(list) {
           if (!list || !list.length)
             return toast("Không có tài khoản nào để kiểm tra", "error");
-          const d = $("#dlg");
-          let stopped = false;
-          d.innerHTML = `<div style="display:grid;gap:12px;padding:4px">
-    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px">
-      <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
-        <span style="color:#2fbf71">${icon("check")}</span> ⚡ Kiểm Tra Live/Die Tự Động
-      </h2>
-      <button type="button" class="ico" id="btnDlgStop">${icon("x")}</button>
-    </div>
-    <div id="chkProgText" style="font-size:13px;color:var(--mute)">Đang khởi tạo danh sách...</div>
-    <div class="track" style="margin:4px 0"><i id="chkBar" style="--c:#2fbf71;width:0%"></i></div>
-    <div id="chkCurrent" style="font-size:12px;font-family:var(--mono);color:var(--fg);min-height:18px"></div>
-    <div style="display:flex;gap:14px;font-size:13px;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--line)">
-      <span style="color:#2fbf71;font-weight:600">Live: <b id="cntL">0</b></span>
-      <span style="color:#ef5350;font-weight:600">Die: <b id="cntD">0</b></span>
-      <span style="color:var(--mute);font-weight:500">Bỏ qua: <b id="cntS">0</b></span>
-    </div>
-    <div class="actions">
-      <button type="button" id="btnCancelCheck" class="danger">Dừng kiểm tra</button>
-    </div>
-  </div>`;
-          d.showModal();
-
-          const progText = $("#chkProgText"),
-            bar = $("#chkBar"),
-            cur = $("#chkCurrent"),
-            cntL = $("#cntL"),
-            cntD = $("#cntD"),
-            cntS = $("#cntS");
-          const stop = () => {
-            stopped = true;
-          };
-          $("#btnDlgStop").onclick = () => {
-            stop();
-            d.close();
-          };
-          $("#btnCancelCheck").onclick = () => {
-            stop();
-            d.close();
-          };
+          const ui = createCornerProgressCard("Kiểm Tra Live/Die Tự Động");
 
           let live = 0,
             dead = 0,
@@ -2297,19 +2279,20 @@
           const updated = [];
 
           for (let i = 0; i < total; i++) {
-            if (stopped) break;
+            if (ui.isStopped()) break;
             const a = list[i];
-            cur.textContent = `[${i + 1}/${total}] UID: ${a.uid} (${a.platform || "facebook"})`;
-            bar.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
-            progText.textContent = `Đang kiểm tra ${i + 1}/${total} tài khoản...`;
+            ui.setProgress(
+              Math.round(((i + 1) / total) * 100),
+              `Đang kiểm tra ${i + 1}/${total} tài khoản...`,
+              `[${i + 1}/${total}] UID: ${a.uid} (${a.platform || "facebook"})`,
+            );
 
             const res = await checkAccountLive(a);
             if (res.stale) continue;
-            if (stopped) break;
+            if (ui.isStopped()) break;
 
             if (res.status === "live") {
               live++;
-              cntL.textContent = live;
               const rev = revise(
                 a,
                 { status: "live", checked: today(), ...(a.platform === "instagram" ? igResultPatch(res) : {}) },
@@ -2318,7 +2301,6 @@
               if (rev) updated.push(rev);
             } else if (res.status === "dead") {
               dead++;
-              cntD.textContent = dead;
               const rev = revise(
                 a,
                 { status: "dead", checked: today() },
@@ -2328,18 +2310,18 @@
             } else {
               if (a.platform === "instagram") { const rev = revise(a, igResultPatch(res), "Kiểm tra IG", "IG: " + (res.reason || res.status)); if (rev) updated.push(rev); }
               skip++;
-              cntS.textContent = skip;
             }
+            ui.setCounts(live, dead, skip);
             await new Promise((r) => setTimeout(r, 120));
           }
 
           if (updated.length) {
-            progText.textContent = "Đang lưu kết quả vào kho...";
+            ui.setProgress(100, "Đang lưu kết quả vào kho...");
             await commit(updated);
           }
 
           playChime("success");
-          d.close();
+          ui.close();
           render();
           toast(
             `Hoàn tất kiểm tra: ${live} Live, ${dead} Die${skip ? `, ${skip} bỏ qua` : ""}!`,
@@ -2561,8 +2543,8 @@
 
           const d = $("#dlg");
           requestNotificationPermission();
-          d.innerHTML = `<div style="display:grid;gap:12px;max-height:80vh;overflow-y:auto">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:10px;gap:10px">
+          d.innerHTML = `<div class="inbox-shell" style="display:grid;gap:12px;max-height:80vh;overflow-y:auto">
+    <div class="inbox-heading" style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:10px;gap:10px">
       <div>
         <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
           <span style="color:#2fbf71">${icon("mail")}</span> Hộp Thư &amp; OTP
@@ -2577,15 +2559,14 @@
       </div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--line);font-size:12px">
+    <div class="inbox-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);padding:8px 12px;border-radius:8px;border:1px solid var(--line);font-size:12px">
       <div id="inboxStatus" style="display:flex;align-items:center;gap:6px;color:#2fbf71">
         <span>Đang kết nối hộp thư...</span>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
+      <div class="inbox-controls" style="display:flex;align-items:center;gap:8px">
         <button type="button" class="mini" id="btnNotifToggle" title="Bật/Tắt thông báo đẩy góc màn hình máy tính" style="display:inline-flex;align-items:center;gap:4px">
           ${"Notification" in window && Notification.permission === "granted" ? "🔔 Báo Desktop: Bật" : "🔔 Báo Desktop"}
         </button>
-        <button type="button" class="mini" id="btnTestMailNotif" title="Kiểm tra âm thanh và popup góc màn hình">🔔 Thử</button>
         <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
           <input type="checkbox" id="autoCheck" checked> Tự động (3s)
         </label>
@@ -2606,21 +2587,7 @@
             btnRefresh = d.querySelector("#btnRefreshInbox"),
             autoCheck = d.querySelector("#autoCheck"),
             btnClose = d.querySelector("#btnCloseInbox"),
-            btnNotif = d.querySelector("#btnNotifToggle"),
-            btnTestNotif = d.querySelector("#btnTestMailNotif");
-
-          if (btnTestNotif) {
-            btnTestNotif.onclick = () => {
-              playChime("otp");
-              showMailCornerPopup({
-                email,
-                subject: "Thử thông báo thư mới & OTP",
-                from: "Hệ thống",
-                otp: "123456",
-              });
-              notifyDesktopOtp("123456", email, "Thử thông báo Desktop");
-            };
-          }
+            btnNotif = d.querySelector("#btnNotifToggle");
 
           if (btnNotif) {
             btnNotif.onclick = async () => {
@@ -2650,6 +2617,7 @@
             isFetching = false,
             isInitialLoad = true,
             seenMsgIds = new Set(),
+            highlightedMessages = new Map(),
             openMsgIds = new Set();
 
           const stopPolling = () => {
@@ -2738,13 +2706,15 @@
                   : "";
                 const msgId = "msg_" + m.id;
                 const isOpen = openMsgIds.has(msgId);
+                if (!seenMsgIds.has(m.id) && (!isInitialLoad || m === messages[0])) highlightedMessages.set(m.id, Date.now() + 60000);
+                const isNewMessage = (highlightedMessages.get(m.id) || 0) > Date.now();
 
                 if (!seenMsgIds.has(m.id)) {
                   newMessages.push({ otp, subject, fromRaw });
                 }
                 seenMsgIds.add(m.id);
 
-                html += `<div style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px">
+                html += `<div class="inbox-message ${isNewMessage ? "inbox-message--new" : ""} ${otp ? "inbox-message--otp" : ""}" style="background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
             <div>
               <div style="font-weight:600;color:var(--fg);font-size:13.5px">${esc(subject)}</div>
@@ -2756,7 +2726,7 @@
           ${
             otp
               ? `
-          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(47,191,113,0.12);border:1px solid #2fbf71;border-radius:10px;padding:10px 14px;margin-top:4px;animation:pulseOtpBox 2.5s infinite ease-in-out">
+          <div class="inbox-otp" style="display:flex;justify-content:space-between;align-items:center;background:rgba(47,191,113,0.12);border:1px solid #2fbf71;border-radius:10px;padding:10px 14px;margin-top:4px;animation:pulseOtpBox 2.5s infinite ease-in-out">
             <div>
               <div style="font-size:11px;font-weight:700;color:#2fbf71;text-transform:uppercase;letter-spacing:0.5px">MÃ XÁC NHẬN OTP:</div>
               <div style="font-size:24px;font-weight:800;letter-spacing:4px;color:#2fbf71;font-family:var(--mono)">${esc(otp)}</div>
@@ -2793,7 +2763,7 @@
                       ?.writeText(notifyTarget.otp)
                       .catch(() => {});
                   } catch (e) {}
-                  toast(
+                  if (!isMobileMailbox()) toast(
                     `🔥 Đã nhận & tự động sao chép mã OTP: ${notifyTarget.otp}`,
                     "success",
                     true,
@@ -4247,10 +4217,24 @@
           )
             openAccount(tr.dataset.uid);
         });
-        for (const d of [$("#dlg"), $("#drawer")])
+        for (const d of [$("#dlg"), $("#drawer")]) {
+          let startedOnBackdrop = false;
+          const outsideDialog = (e) => {
+            const r = d.getBoundingClientRect();
+            return e.target === d && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+          };
+          d.addEventListener("pointerdown", (e) => {
+            startedOnBackdrop = outsideDialog(e);
+          });
+          d.addEventListener("pointercancel", () => { startedOnBackdrop = false; });
+          d.addEventListener("click", (e) => {
+            if (startedOnBackdrop && outsideDialog(e) && d.open) d.close();
+            startedOnBackdrop = false;
+          });
           d.addEventListener("close", () => {
             if (!d.open) d.innerHTML = "";
           });
+        }
         $("#btnAdd").onclick = () => {
           if (route() === "gmail") openGmail();
           else openAccount();
@@ -4287,7 +4271,7 @@
               updateBgStatus("", false);
               toast("Đã tắt tự động quét Live/Die ngầm");
             }
-          } else if (t.id === "pageAllGmail") {
+          } else if ((t.id === "pageAllGmail" || t.id === "mobilePageAllGmail")) {
             $("#view")
               .querySelectorAll("[data-gsel]")
               .forEach((c) =>
@@ -4347,7 +4331,7 @@
               r = a && revise(a, { status: t.value, checked: today() });
             if (r && (await commit([r])))
               toast("Đã cập nhật, ngày kiểm tra là hôm nay");
-          } else if (t.id === "pageAll") {
+          } else if ((t.id === "pageAll" || t.id === "mobilePageAll")) {
             $("#tbl")
               .querySelectorAll("[data-sel]")
               .forEach((c) =>

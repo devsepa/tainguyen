@@ -2,7 +2,7 @@
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process');
 const server=http.createServer((req,res)=>{
  const file=req.url.split('?')[0]==='/styles.css'?'styles.css':'index.html';let data=fs.readFileSync(path.join(__dirname,file),'utf8');
- if(file==='index.html')data=data.replace('boot();',`globalThis.mobileTest={setup(){mode='ready';localMode=true;const a={uid:'mobile_test_user',platform:'instagram',status:'dead',email:'long-email@example.com',sec:{pass:'sample-password'}};shards[hash(a.uid)][a.uid]=a;const m={uid:'mobile_mail',platform:'gmail',email:'long-mobile-test@example.edu',isEdu:true,status:'live',sec:{pass:'sample-mail-password'},note:'Ghi chú kiểm tra trên điện thoại'};shards[hash(m.uid)][m.uid]=m;render();},render,openAccount};`);
+ if(file==='index.html')data=data.replace('boot();',`globalThis.mobileTest={setup(){mode='ready';localMode=true;const a={uid:'mobile_test_user',platform:'instagram',status:'dead',email:'long-email@example.com',sec:{pass:'sample-password'}};shards[hash(a.uid)][a.uid]=a;const m={uid:'mobile_mail',platform:'gmail',email:'long-mobile-test@example.edu',isEdu:true,status:'live',sec:{pass:'https://tempamail.com/access?key=12345678-1234-4234-8234-123456789abc'},note:'Ghi chú kiểm tra trên điện thoại'};shards[hash(m.uid)][m.uid]=m;render();},render,openAccount,openTempMailInbox};`);
  res.setHeader('Content-Type',file.endsWith('.css')?'text/css':'text/html');res.end(data);
 });
 (async()=>{
@@ -36,7 +36,14 @@ const server=http.createServer((req,res)=>{
     const mail=await evaluate(`({page:document.documentElement.scrollWidth,card:document.querySelector('.mobile-cards').scrollWidth,container:document.querySelector('.mobile-cards').clientWidth,cells:[...document.querySelectorAll('.mobile-cards tbody td')].map(td=>({width:td.scrollWidth,visible:td.clientWidth}))})`);
     assert(mail.page<=width+1 && mail.card<=mail.container+1 && mail.cells.every(c=>c.width<=c.visible+1),JSON.stringify({width,mail}));
    }
-   console.log('PASS account and mail layout '+width+'x'+height);
+   await evaluate(`mobileTest.openTempMailInbox('mobile_mail')`);
+   const inbox=await evaluate(`(()=>{const b=document.querySelector('#btnRefreshInbox');const d=document.querySelector('#dlg');return {exists:!!b,overflow:d.scrollWidth>d.clientWidth+1,button:b?b.getBoundingClientRect().width:0}})()`);
+   assert(inbox.exists && !inbox.overflow && inbox.button>=50,JSON.stringify({width,inbox}));
+   const backdrop=await evaluate(`(()=>{const r=document.querySelector('#dlg').getBoundingClientRect();return r.top>2?{x:innerWidth/2,y:r.top/2}:{x:Math.max(0,r.left/2),y:innerHeight/2}})()`);
+   await call('Input.dispatchMouseEvent',{type:'mousePressed',...backdrop,button:'left',clickCount:1});
+   await call('Input.dispatchMouseEvent',{type:'mouseReleased',...backdrop,button:'left',clickCount:1});
+   assert(await evaluate(`!document.querySelector('#dlg').open`),'Backdrop tap must close inbox');
+   console.log('PASS account, mail and inbox layout '+width+'x'+height);
   }
  }finally{if(ws)ws.close();chrome.kill();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1});

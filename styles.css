@@ -1457,3 +1457,222 @@ tbody tr:hover td { background: rgba(16, 185, 129, 0.06); }
   .mobile-cards td button.ico { min-width: 36px !important; }
   .mobile-cards tbody td[colspan] { display: block; }
 }
+
+.mobile-table-options { display: none; }
+@media (max-width: 760px) {
+  .mobile-table-options { display: block; margin-bottom: 8px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+  .mobile-table-options summary { min-height: 40px; padding: 10px 0; color: var(--mute); font-size: 12px; cursor: pointer; }
+  .mobile-table-options > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-bottom: 10px; }
+  .mobile-table-options label { display: flex; align-items: center; gap: 8px; min-height: 40px; flex-basis: 100%; }
+  .mobile-cards thead { display: none; }
+  .mobile-cards tbody td { justify-items: start; grid-template-columns: 74px minmax(0, 1fr); }
+  .mobile-cards tbody td > * { justify-self: start; }
+  .mobile-cards td .pill { width: auto; max-width: 100%; }
+  .mobile-cards td[data-label="Email / Thời gian"],
+  .mobile-cards td[data-label="UID"] { display: flex; flex-direction: column; align-items: flex-start; padding-block: 10px !important; }
+  .mobile-cards td[data-label="Email / Thời gian"]::before,
+  .mobile-cards td[data-label="UID"]::before { display: none; }
+  .mobile-cards td[data-label="Email / Thời gian"] > div { width: 100%; gap: 4px !important; }
+  .mobile-cards td[data-label="Email / Thời gian"] .sec { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; width: 100%; }
+  .mobile-cards td[data-label="Email / Thời gian"] b { font-size: 13px; overflow-wrap: anywhere; }
+  .mobile-cards td[data-label="Chọn email"], .mobile-cards td[data-label="Chọn tài khoản"] { padding-block: 4px !important; }
+  .mobile-cards td[data-label="Ghi chú"] { width: 100%; }
+  .mobile-cards td[data-label="Ghi chú"] input { justify-self: stretch; }
+  .mobile-cards td[data-label="Thao tác"] { display: flex; align-items: center; }
+  .mobile-cards td[data-label="Thao tác"]::before { display: none; }
+  .mobile-cards td[data-label="Thao tác"] button { flex: 0 1 auto; }
+}
+
+/* Balanced mobile card alignment. */
+@media (max-width: 760px) {
+  .mobile-cards tbody tr { padding: 6px 12px; }
+  .mobile-cards tbody td { grid-template-columns: 76px minmax(0, 1fr); column-gap: 10px; padding: 9px 0 !important; align-items: center; }
+  .mobile-cards td[data-label]::before { line-height: 1.45; }
+  .mobile-cards td[data-label="Email / Thời gian"] > div { align-items: stretch !important; gap: 5px !important; }
+  .mobile-cards td[data-label="Email / Thời gian"] .sec {
+    display: flex !important;
+    justify-content: flex-start;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+  .mobile-cards td[data-label="Email / Thời gian"] .sec > :first-child { margin-right: 0; flex: 0 0 auto; }
+  .mobile-cards td[data-label="Email / Thời gian"] .sec > b { flex: 0 1 auto; text-align: left; }
+  .mobile-cards td[data-label="Email / Thời gian"] .sec > button { margin-left: auto; }
+  .mobile-cards td[data-label="Email / Thời gian"] > div > .muted,
+  .mobile-cards td[data-label="Email / Thời gian"] > div > div { padding-left: 0 !important; }
+  .mobile-cards td[data-label="Trạng thái"] > .muted { margin-top: 0 !important; }
+  .mobile-cards td[data-label="Mật khẩu / Key"] .sec { gap: 5px; align-items: center; }
+  .mobile-cards td[data-label="Mật khẩu / Key"] .sec > .mono { margin-right: 3px; }
+  .mobile-cards td[data-label="Ghi chú"] input { padding-left: 0 !important; }
+  .mobile-cards td[data-label="Thao tác"] { gap: 7px; padding-top: 10px !important; }
+  .mobile-cards td[data-label="Thao tác"] button { min-height: 40px; }
+  .mobile-cards td[data-label="Thao tác"] button:not(.danger) { flex: 1 1 auto; }
+  .mobile-cards td[data-label="Thao tác"] button.danger { flex: 0 0 40px; padding-inline: 8px; }
+}
+
+/* Button & interactive micro-animations */
+@keyframes btnSpin360 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes btnHop {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px) scale(1.12); }
+  75% { transform: translateY(1px); }
+}
+@keyframes btnShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px) rotate(-6deg); }
+  75% { transform: translateX(3px) rotate(6deg); }
+}
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+#logo {
+  display: inline-flex;
+  animation: logoFloat 3s ease-in-out infinite;
+}
+button svg,
+.tabs button svg {
+  display: inline-block;
+  transform-origin: center;
+}
+
+button,
+.tabs button,
+.stat {
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease;
+}
+button:hover:not(:disabled),
+.tabs button:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+button:active:not(:disabled),
+.tabs button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+button.link:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+/* Spin icon on reload / live-check buttons */
+#btnRefresh:hover svg,
+#btnRefreshInbox:hover svg,
+[data-act="checkOneLive"]:hover svg,
+[data-act="checkAllLive"]:hover svg,
+[data-act="checkAllMailLive"]:hover svg,
+[data-act="checkSingleMailLive"]:hover svg {
+  animation: btnSpin360 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Hop icon on primary / add / mail / 2FA buttons */
+button.primary:hover:not(:disabled) svg,
+[data-act="genTempMail"]:hover svg,
+[data-act="inboxTempMail"]:hover svg,
+[data-act="inboxTempMailByEmail"]:hover svg,
+.totp-pill:hover {
+  animation: btnHop 0.45s ease;
+}
+
+/* Subtle shake on delete / danger buttons */
+button.danger:hover:not(:disabled) svg {
+  animation: btnShake 0.36s ease;
+}
+
+/* Sidebar nav slide */
+nav a {
+  transition: transform 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+nav a:hover {
+  transform: translateX(3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .tabs button,
+  .stat,
+  nav a {
+    transition: none !important;
+  }
+  button:hover:not(:disabled),
+  .tabs button:hover:not(:disabled),
+  nav a:hover {
+    transform: none !important;
+  }
+  #btnRefresh:hover svg,
+  #btnRefreshInbox:hover svg,
+  [data-act="checkOneLive"]:hover svg,
+  [data-act="checkAllLive"]:hover svg,
+  [data-act="checkAllMailLive"]:hover svg,
+  [data-act="checkSingleMailLive"]:hover svg,
+  button.primary:hover:not(:disabled) svg,
+  [data-act="genTempMail"]:hover svg,
+  [data-act="inboxTempMail"]:hover svg,
+  [data-act="inboxTempMailByEmail"]:hover svg,
+  .totp-pill:hover,
+  button.danger:hover:not(:disabled) svg {
+    animation: none !important;
+  }
+}
+
+.inbox-shell, .inbox-message, .inbox-controls { min-width: 0; }
+.inbox-heading > :first-child { min-width: 0; flex: 1; }
+.inbox-heading > :last-child { flex-shrink: 0; }
+.inbox-toolbar { flex-wrap: wrap; }
+.inbox-controls { flex-wrap: wrap; }
+.inbox-controls button, .inbox-controls label { flex-shrink: 0; white-space: nowrap; word-break: normal; }
+.inbox-message { overflow-wrap: anywhere; }
+.inbox-message--otp { border-color: rgba(47,191,113,.55) !important; }
+.inbox-message--new { animation: inboxBorderGlow 2.8s ease-in-out 3; }
+@keyframes inboxBorderGlow {
+  0%,100% { border-color: rgba(47,191,113,.4); box-shadow: 0 0 0 1px rgba(47,191,113,.06); }
+  50% { border-color: #2fbf71; box-shadow: 0 0 0 1px rgba(47,191,113,.25), 0 0 16px rgba(47,191,113,.2); }
+}
+@media (max-width: 760px) {
+  .inbox-shell { max-height: none !important; overflow: visible !important; gap: 10px !important; }
+  .inbox-toolbar { display: grid !important; grid-template-columns: minmax(0,1fr); padding: 8px !important; gap: 8px !important; }
+  #inboxStatus { min-width: 0; font-size: 11px; flex-wrap: wrap; }
+  .inbox-controls { display: grid !important; grid-template-columns: minmax(0,1fr) auto; gap: 6px !important; align-items: center; }
+  .inbox-controls #btnNotifToggle { grid-column: 1 / -1; width: 100%; }
+  .inbox-controls label { min-width: 0; min-height: 40px; font-size: 12px; }
+  .inbox-controls #btnRefreshInbox { padding-inline: 10px; min-width: 76px; }
+  .inbox-message { padding: 10px !important; gap: 6px !important; }
+  .inbox-message > div:first-child > div { min-width: 0; max-width: 100%; }
+  .inbox-otp { flex-wrap: wrap; gap: 8px; padding: 10px !important; }
+  .inbox-otp > div { min-width: 0; }
+  .inbox-otp > button { flex: 0 0 auto; padding: 8px 10px !important; }
+  #mailNotifStack { bottom: calc(130px + env(safe-area-inset-bottom,0px)); max-height: 35dvh; overflow-y: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inbox-message--new, .inbox-otp { animation: none !important; }
+}
+
+@media (max-width: 760px) {
+  #mailNotifStack { display: none !important; }
+  .inbox-message--new {
+    border-color: #2fbf71 !important;
+    box-shadow: inset 3px 0 0 #2fbf71, 0 0 12px rgba(47,191,113,.15);
+    animation: inboxBorderGlow 2.8s ease-in-out 3;
+  }
+  .inbox-message--new > div:first-child::before {
+    content: "MỚI";
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #2fbf71;
+    letter-spacing: .4px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inbox-message--new { animation: none !important; }
+}
