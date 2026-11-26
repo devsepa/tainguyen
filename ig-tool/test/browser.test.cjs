@@ -1,8 +1,63 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const http=require('node:http');
-const {openBrowser}=require('../browser.cjs');
+const {openBrowser,navigateToRegistration}=require('../browser.cjs');
+const {chromium}=require('playwright');
+const {Runner}=require('../runner.cjs');
 async function waitFor(fn){for(let i=0;i<40;i++){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out waiting for form');}
+
+test('mobile completes username validation, accepts signup terms once and waits for authenticated identity',async t=>{
+  let accepted=0;
+  const server=http.createServer((req,res)=>{
+    if(req.url.startsWith('/api/v1/accounts/current_user/')){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({user:{username:'test.person'}}));}
+    if(req.url==='/agree'){accepted++;return res.end('{}');}
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body><h1>Tạo tên người dùng</h1><label>Tên người dùng<input name="username" value="test.person"></label><button disabled>Tiếp</button><script>
+      const next=document.querySelector('button');setTimeout(()=>{next.disabled=false},300);
+      next.onclick=()=>{document.body.innerHTML='<h1>Để đăng ký, hãy đọc cũng như đồng ý với các điều khoản và chính sách của chúng tôi</h1><button>Tôi đồng ý</button>';document.querySelector('button').onclick=async()=>{await fetch('/agree',{method:'POST'});document.body.innerHTML='<p>Đang tải…</p>';setTimeout(()=>{document.body.innerHTML='<a href="/direct/inbox/">Inbox</a>'},350);};};
+    </script></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const runner=new Runner({pollMs:20,proxyFactory:async()=>({close:async()=>{}}),browserFactory:async()=>{
+    const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port+'/accounts/signup/username/'});
+    // Start at a later wizard screen, as after an OTP/birthday transition.
+    let initial=true;
+    return {...browser,fill:async()=>true,submit:async()=>{if(initial){initial=false;return;}await browser.submit();}};
+  }});
+  t.after(()=>runner.stop());
+  runner.start({email:'person@example.edu',name:'Test Person',username:'test.person',password:'fake-password',birthday:'1995-05-05',device:'mobile'});
+  for(let i=0;i<120;i++){if(runner.status().state==='succeeded')break;await new Promise(r=>setTimeout(r,50));}
+  assert.equal(runner.status().state,'succeeded');assert.equal(accepted,1);assert.equal(runner.result().username,'test.person');
+});
+
+for(const entry of ['link','button','phone-button'])test(`mobile starts at home and follows signup in the same initialized browser session (${entry})`,async t=>{
+  const visits=[];
+  const server=http.createServer((req,res)=>{
+    if(req.url==='/favicon.ico')return res.end();
+    visits.push(req.url);res.setHeader('Content-Type','text/html; charset=utf-8');
+    if(req.url==='/'){
+      res.setHeader('Set-Cookie','registration_init=fixture-session; Path=/; HttpOnly');
+      const destination=entry==='phone-button'?'/accounts/signup/phone/':'/accounts/signup/email/';
+      return res.end(entry==='link'?`<!doctype html><html><body><a href="${destination}">Đăng ký</a></body></html>`:`<!doctype html><html><body><button onclick="location.href='${destination}'">đăng ký</button></body></html>`);
+    }
+    if(req.url==='/accounts/signup/phone/'){
+      res.setHeader('Set-Cookie','registration_stage=phone; Path=/; HttpOnly');
+      return res.end('<!doctype html><html><body><input type="tel"><button onclick="location.href=\'/accounts/signup/email/\'">Đăng ký bằng email</button></body></html>');
+    }
+    if(req.url==='/accounts/signup/email/'){
+      if(!/registration_init=fixture-session/.test(req.headers.cookie||'')){res.statusCode=400;return res.end('Missing registration initialization');}
+      if(entry==='phone-button'&&!/registration_stage=phone/.test(req.headers.cookie||'')){res.statusCode=400;return res.end('Missing phone-to-email initialization');}
+      return res.end('<!doctype html><html><body><input name="email"></body></html>');
+    }
+    res.statusCode=404;res.end();
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+  const page=await browser.newPage();
+  await navigateToRegistration(page,{platform:'instagram',device:'mobile',baseUrl:'http://127.0.0.1:'+server.address().port});
+  assert.deepEqual(visits,entry==='phone-button'?['/','/accounts/signup/phone/','/accounts/signup/email/']:['/','/accounts/signup/email/']);
+  assert.equal(await page.locator('input[name="email"]').count(),1);
+});
 test('real browser fills supplied form, submits OTP and checks authenticated identity',async t=>{
   let submitted;
   const server=http.createServer(async(req,res)=>{
@@ -84,6 +139,58 @@ test('real browser detects floating-label OTP input even when an alert element i
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
   const browser=await openBrowser({headless:true,startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
   assert.deepEqual(await browser.state(),{kind:'otp'});
+});
+
+test('mobile OTP reports invalid or expired code even without an alert role',async t=>{
+  const server=http.createServer((req,res)=>{
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body><h1>Nhập mã xác nhận</h1><p>Chúng tôi đã gửi đến person@example.edu.</p><label>Mã xác nhận<input name="confirmationCode" aria-invalid="true" value="113499"></label><p>The confirmation code you entered is invalid or has expired. Please make sure you entered your confirmation code correctly.</p><button>Tiếp</button></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  const state=await browser.state();
+  assert.equal(state.kind,'otp_rejected');assert.equal(state.email,'person@example.edu');
+  assert.equal(state.reason,'invalid_or_expired');
+});
+
+test('mobile native birthday is not OTP and submits the requested calendar date',async t=>{
+  let submitted;
+  const server=http.createServer(async(req,res)=>{
+    if(req.url==='/birthday'){let body='';for await(const chunk of req)body+=chunk;submitted=JSON.parse(body);return res.end('{}');}
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body><h1>Ngày sinh của bạn là khi nào?</h1><form><label>Ngày sinh (0 tuổi)<input type="date" name="birthday" inputmode="numeric" value="2026-11-26"></label><button>Tiếp</button></form><script>
+      let changed=false;document.querySelector('input').addEventListener('change',()=>{changed=true;});
+      document.querySelector('form').onsubmit=async e=>{e.preventDefault();await fetch('/birthday',{method:'POST',body:JSON.stringify({birthday:document.querySelector('input').value,changed})});};
+    </script></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  assert.equal((await browser.state()).kind,'birthday');
+  await assert.rejects(()=>browser.submitOtp('123456'),/otp_missing/);
+  await browser.fillBirthday('1995-05-05');await browser.submit();await waitFor(()=>!!submitted);
+  assert.deepEqual(submitted,{birthday:'1995-05-05',changed:true});
+});
+
+test('mobile diagnostics observe direct manual confirmation without reading request credentials',async t=>{
+  const server=http.createServer((req,res)=>{
+    if(req.url.startsWith('/api/v1/accounts/check_confirmation_code/')){
+      res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({status:'fail',error_type:'invalid_nonce',message:'849920 should not be exposed',token:'private-token'}));
+    }
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body><input name="confirmationCode"><p id="message"></p><button>Tiếp</button><script>
+      document.querySelector('button').onclick=async()=>{await fetch('/api/v1/accounts/check_confirmation_code/?secret=do-not-log',{method:'POST',body:JSON.stringify({code:'849920',password:'do-not-log'})});document.querySelector('#message').textContent='The confirmation code you entered is invalid or has expired.';};
+      setTimeout(()=>document.querySelector('button').click(),250);
+    </script></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  await waitFor(async()=>(await browser.state()).kind==='otp_rejected');
+  await waitFor(()=>browser.diagnostics().events.some(event=>event.errors.includes('invalid_nonce')));
+  const data=browser.diagnostics();
+  assert.equal(data.engine,'chromium');
+  assert.equal(data.events.at(-1).stage,'verify_code');assert.equal(data.events.at(-1).httpStatus,200);
+  assert.deepEqual(data.events.at(-1).errors,['invalid_nonce']);
+  for(const sensitive of ['849920','do-not-log','private-token'])assert(!JSON.stringify(data).includes(sensitive));
 });
 
 test('real browser fills Facebook registration form and detects Facebook OTP screen',async t=>{
@@ -184,4 +291,74 @@ test('real browser supports mobile device emulation mode',async t=>{
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
   const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
   assert.equal(await browser.fill({email:'m@example.edu',password:'fake-secret',name:'Mobile User',username:'mob.user',birthday:'2000-01-15'}),true);
+});
+
+test('mobile uses a Chromium mobile profile consistently in HTTP and JavaScript',async t=>{
+  let profile;
+  const server=http.createServer(async(req,res)=>{
+    if(req.url==='/profile'){
+      let body='';for await(const chunk of req)body+=chunk;
+      profile={httpUa:req.headers['user-agent'],...JSON.parse(body)};return res.end('{}');
+    }
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><input name="email"><script>
+      fetch('/profile',{method:'POST',body:JSON.stringify({jsUa:navigator.userAgent,touch:navigator.maxTouchPoints,width:innerWidth})});
+    </script></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  await waitFor(()=>!!profile);
+  assert.match(profile.httpUa,/Android/);assert.match(profile.httpUa,/Chrome\//);
+  assert(!/iPhone|Version\/.*Safari\//.test(profile.httpUa));
+  assert.equal(profile.jsUa,profile.httpUa);assert(profile.touch>0);assert(profile.width<500);
+  assert.equal(browser.diagnostics().profile,'chrome-android');
+});
+
+test('facebook mobile starts at home and follows signup into registration',async t=>{
+  const {chromium}=require('playwright');
+  const {navigateToRegistration}=require('../browser.cjs');
+  const seen=[];
+  const server=http.createServer((req,res)=>{
+    seen.push(req.url);
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    if(req.url==='/'){
+      res.end('<!doctype html><html><body><a href="/reg/">Tạo tài khoản mới</a></body></html>');
+    }else if(req.url==='/reg/'){
+      res.end('<!doctype html><html><body><button onclick="location.href=\'/reg/phone/\'">Bắt đầu</button></body></html>');
+    }else if(req.url==='/reg/phone/'){
+      res.end('<!doctype html><html><body><input name="reg_phone__"><a href="/reg/email/">Đăng ký bằng email</a></body></html>');
+    }else{
+      res.end('<!doctype html><html><body><input name="reg_email__"></body></html>');
+    }
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());
+  const page=await browser.newPage();
+  const base='http://127.0.0.1:'+server.address().port;
+  await navigateToRegistration(page,{platform:'facebook',device:'mobile',baseUrl:base});
+  assert.deepEqual(seen,['/','/reg/','/reg/phone/','/reg/email/']);
+  assert.match(page.url(),/\/reg\/email\/$/);
+});
+
+test('birthday selects match month text before zero-indexed option values',async t=>{
+  let picked={};
+  const server=http.createServer(async(req,res)=>{
+    if(req.url==='/picked'){
+      let body='';for await(const chunk of req)body+=chunk;
+      picked=JSON.parse(body);return res.end('{}');
+    }
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body>
+      <select title="Day:"><option value="1">1</option><option value="15">15</option></select>
+      <select title="Month:"><option value="0">Tháng 1</option><option value="1">Tháng 2</option><option value="2">Tháng 3</option><option value="3">Tháng 4</option></select>
+      <select title="Year:"><option value="2000">2000</option></select>
+      <button type="button" onclick="fetch('/picked',{method:'POST',body:JSON.stringify({day:document.querySelector('[title=\\'Day:\\']').value,month:document.querySelector('[title=\\'Month:\\']').selectedOptions[0].textContent,year:document.querySelector('[title=\\'Year:\\']').value})})">Tiếp</button>
+    </body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  await browser.fillBirthday('2000-03-15');
+  await browser.submit();
+  await waitFor(()=>!!picked.month);
+  assert.deepEqual(picked,{day:'15',month:'Tháng 3',year:'2000'});
 });

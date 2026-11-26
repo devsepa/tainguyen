@@ -4,6 +4,23 @@ const {chromium}=require('playwright');
 const {createToolServer}=require('../server.cjs');
 const {Runner}=require('../runner.cjs');
 
+test('UI shows rejected OTP diagnostics without rendering the code or credentials',async t=>{
+  const app=createToolServer({prefsFile:null,runner:{status:()=>({state:'paused',message:'Instagram đã từ chối mã OTP hoặc mã hết hạn.',email:'person@example.edu',otpDiagnostic:{device:'mobile',source:'mailbox',email:'person@example.edu',messageId:'message-17',submittedAt:1795687200000,rejectedAt:1795687203000,reason:'invalid_or_expired'},networkDiagnostic:{engine:'chromium',device:'mobile',profile:'iphone-safari-ua',events:[{at:1795687200000,stage:'verify_code',httpStatus:200,outcome:'fail',errors:['invalid_nonce']}]}}),stop:async()=>{}}});
+  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());const page=await browser.newPage();
+  const base='http://127.0.0.1:'+app.server.address().port;
+  await page.route('**/test-diagnostics',route=>route.fulfill({contentType:'text/html',body:'<div id="mount"></div><script src="/ig-tool-ui.js"></script>'}));
+  await page.goto(base+'/test-diagnostics');
+  await page.evaluate(()=>{window.IgTool.mount(document.getElementById('mount'),{canWrite:true,mails:[]});});
+  await page.waitForSelector('[data-ig-slot="otp-diagnostic"]');
+  const diagnostic=await page.locator('[data-ig-slot="otp-diagnostic"]').innerText();
+  assert.match(diagnostic,/Mobile/);assert.match(diagnostic,/message-17/);assert.match(diagnostic,/bị từ chối|hết hạn/);
+  const network=await page.locator('[data-ig-slot="network-diagnostic"]').innerText();
+  assert.match(network,/invalid_nonce/);assert.match(network,/HTTP 200/);assert.match(network,/fail/);
+  assert.equal(await page.locator('button[data-act="submit-otp"]').count(),0);
+  assert.equal(await page.locator('button[data-act="resume"]').count(),1);
+});
+
 test('UI handles proxy test, manual OTP, failed save retry and read-only role',async t=>{
   let stage='otp';
   const runner=new Runner({

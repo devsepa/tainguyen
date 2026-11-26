@@ -49,3 +49,36 @@ test('checkpoint pauses until explicit resume and timeout offers manual OTP',asy
   f.state={kind:'otp'};f.runner.resume();await until(()=>f.runner.status().state==='waiting_otp');
   await until(()=>f.runner.status().manualOnly===true);await f.runner.stop();
 });
+
+test('mobile rejected OTP stops automatic polling and records metadata without the code',async t=>{
+  let readCount=0;
+  const f=fixture();t.after(()=>f.runner.stop());
+  f.runner.mailboxFactory=()=>({snapshot:async()=>new Set(),findOtp:async()=>{readCount++;return {id:'message-17',code:'113499'};}});
+  f.runner.browserFactory=async()=>({fill:async()=>true,submit:async()=>{},state:async()=>f.state,submitOtp:async()=>{f.state={kind:'otp_rejected',reason:'invalid_or_expired',email:'person@example.edu'};},close:async()=>{}});
+  f.runner.start({...input(),device:'mobile',accessKey:'12345678-1234-4234-8234-123456789abc'});
+  await until(()=>f.runner.status().state==='paused');
+  const status=f.runner.status();assert.equal(status.manualOnly,true);assert.match(status.message,/từ chối|hết hạn/i);
+  assert.equal(status.otpDiagnostic.device,'mobile');assert.equal(status.otpDiagnostic.source,'mailbox');
+  assert.equal(status.otpDiagnostic.messageId,'message-17');assert.equal(status.otpDiagnostic.reason,'invalid_or_expired');
+  assert(!JSON.stringify(status.otpDiagnostic).includes('113499'));
+  const before=readCount;await new Promise(r=>setTimeout(r,25));assert.equal(readCount,before);
+});
+
+test('moving from OTP to birthday clears waiting-OTP status before filling the date',async t=>{
+  let state={kind:'otp'},release,submits=0,date;
+  const runner=new Runner({pollMs:5,proxyFactory:async()=>({close:async()=>{}}),browserFactory:async()=>({fill:async()=>true,submit:async()=>{if(++submits===2)state={kind:'success',username:'test.person'};},state:async()=>state,fillBirthday:async value=>{date=value;await new Promise(r=>release=r);},close:async()=>{}})});
+  t.after(async()=>{release?.();await runner.stop();});runner.start(input());
+  await until(()=>runner.status().state==='waiting_otp');state={kind:'birthday'};
+  await until(()=>!!release);assert.equal(runner.status().state,'working');assert.equal(date,'2000-01-02');
+  release();await until(()=>runner.status().state==='succeeded');assert.equal(submits,2);
+});
+
+test('username advances after delayed validation and terms are accepted once before confirmed success',async t=>{
+  let state={kind:'step',step:'username'},submits=0,agreements=0,fills=0;
+  const runner=new Runner({pollMs:5,stepRetryMs:15,proxyFactory:async()=>({close:async()=>{}}),browserFactory:async()=>({fill:async()=>true,fillStep:async()=>{fills++;},submit:async()=>{if(++submits===3)state={kind:'consent'};},agreeToTerms:async()=>{agreements++;state={kind:'unknown'};},state:async()=>state,close:async()=>{}})});
+  t.after(()=>runner.stop());runner.start({...input(),device:'mobile'});
+  await until(()=>agreements===1);assert.equal(fills,1);assert.equal(submits,3);
+  assert.throws(()=>runner.result(),/chưa/);await new Promise(r=>setTimeout(r,25));assert.equal(agreements,1);
+  state={kind:'success',username:'test.person'};
+  await until(()=>runner.status().state==='succeeded');assert.equal(runner.result().username,'test.person');
+});

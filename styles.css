@@ -1335,6 +1335,17 @@ label > * {
 }
 
 tbody tr:hover td { background: rgba(16, 185, 129, 0.06); }
+tbody tr.row-die,
+tbody tr.row-die td {
+  background: rgba(239, 68, 68, 0.14);
+}
+tbody tr.row-die:hover,
+tbody tr.row-die:hover td {
+  background: rgba(239, 68, 68, 0.22) !important;
+}
+.secret-mask {
+  -webkit-text-security: disc;
+}
 
 /* Stack account/mail rows into cards while retaining the same controls. */
 @media (max-width: 760px) {

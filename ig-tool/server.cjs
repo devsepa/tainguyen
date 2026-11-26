@@ -5,7 +5,7 @@ const path=require('node:path');
 const {randomBytes,timingSafeEqual}=require('node:crypto');
 const {parseProxy}=require('./input.cjs');
 const {connectProxy}=require('./proxy.cjs');
-const {Runner}=require('./runner.cjs');
+const {Runner,MultiRunner}=require('./runner.cjs');
 const {ImapMailbox}=require('./imap.cjs');
 
 const ROOT=path.resolve(__dirname,'..');
@@ -72,8 +72,13 @@ function tokensEqual(a,b){
   return ba.length===bb.length&&timingSafeEqual(ba,bb);
 }
 
-function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFactory,keepBrowserOnSuccess:true}),prefsFile=PREFS_FILE}={}){
+function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({proxyFactory,keepBrowserOnSuccess:true}),prefsFile=PREFS_FILE}={}){
   const token=randomBytes(24).toString('hex');
+  const resolveTarget=(jobId)=>{
+    if(typeof runner.resolve!=='function')return runner;
+    if(!jobId&&runner.jobs?.size===1)return [...runner.jobs.values()][0];
+    return runner.resolve(jobId);
+  };
   const server=http.createServer(async(req,res)=>{
     try{
       const url=new URL(req.url||'/',`http://${req.headers.host||'127.0.0.1'}`);
@@ -92,10 +97,15 @@ function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFac
           return sendJson(res,401,{error:'Thiếu hoặc sai token phiên.'});
         }
         if(req.method==='GET'&&pathname==='/api/ig-tool/status'){
-          return sendJson(res,200,runner.status());
+          return sendJson(res,200,typeof runner.list==='function'?runner.list():runner.status());
         }
         if(req.method==='GET'&&pathname==='/api/ig-tool/mailbox-url'){
-          return sendJson(res,200,{url:runner.mailboxUrl()});
+          const target=resolveTarget(url.searchParams.get('jobId'));
+          return sendJson(res,200,{url:target.mailboxUrl()});
+        }
+        if(req.method==='GET'&&pathname==='/api/ig-tool/cookies'){
+          const target=resolveTarget(url.searchParams.get('jobId'));
+          return sendJson(res,200,{cookie:await target.cookies()});
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/proxy'){
           const body=await readJson(req);
@@ -116,26 +126,35 @@ function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFac
           return sendJson(res,200,runner.start(body));
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/stop'){
-          return sendJson(res,200,await runner.stop());
+          const body=await readJson(req);
+          const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
+          return sendJson(res,200,await target.stop());
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/resume'){
-          runner.resume();
-          return sendJson(res,200,runner.status());
+          const body=await readJson(req);
+          const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
+          target.resume();
+          return sendJson(res,200,target.status());
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/email'){
           const body=await readJson(req);
-          return sendJson(res,200,await runner.updateEmail(body.email));
+          const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
+          return sendJson(res,200,await target.updateEmail(body.email));
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/otp'){
           const body=await readJson(req);
-          runner.submitOtp(body.code);
-          return sendJson(res,200,runner.status());
+          const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
+          target.submitOtp(body.code);
+          return sendJson(res,200,target.status());
         }
         if(req.method==='GET'&&pathname==='/api/ig-tool/result'){
-          return sendJson(res,200,runner.result());
+          const target=resolveTarget(url.searchParams.get('jobId'));
+          return sendJson(res,200,target.result());
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/acknowledge'){
-          return sendJson(res,200,runner.acknowledge());
+          const body=await readJson(req);
+          const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
+          return sendJson(res,200,target.acknowledge());
         }
         if(req.method==='GET'&&pathname==='/api/ig-tool/prefs'){
           if(!prefsFile)return sendJson(res,200,{});
@@ -152,6 +171,38 @@ function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFac
           await fs.promises.mkdir(path.dirname(prefsFile),{recursive:true});
           await fs.promises.writeFile(prefsFile,JSON.stringify(allowed,null,2),'utf8');
           return sendJson(res,200,{ok:true});
+        }
+        if(req.method==='POST'&&pathname==='/api/ig-tool/check-ig'){
+          const body=await readJson(req);
+          const username=String(body.username||'').trim().replace(/^@/,'');
+          const cookie=String(body.cookie||'').trim();
+          if(!username)return sendJson(res,400,{error:'Thiếu username Instagram.'});
+          const headers={
+            'X-IG-App-ID':'936619743392459',
+            'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            ...(cookie?{Cookie:cookie}:{}),
+          };
+          if(/sessionid=/.test(cookie)){
+            try{
+              const meRes=await fetch('https://www.instagram.com/api/v1/accounts/current_user/?edit=true',{headers,signal:AbortSignal.timeout(10000)});
+              const meJson=await meRes.json().catch(()=>null);
+              if(meRes.ok&&meJson?.user?.username){
+                return sendJson(res,200,{status:'live',igId:String(meJson.user.pk||meJson.user.id||''),username:meJson.user.username});
+              }
+              if(meJson?.message==='checkpoint_required')return sendJson(res,200,{status:'unknown',reason:'checkpoint'});
+            }catch{}
+          }
+          try{
+            const pRes=await fetch(`https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,{headers,signal:AbortSignal.timeout(10000)});
+            const pJson=await pRes.json().catch(()=>null);
+            if(pRes.ok&&pJson?.data?.user?.id){
+              return sendJson(res,200,{status:'live',igId:String(pJson.data.user.id),username:pJson.data.user.username});
+            }
+            if(pRes.status===404)return sendJson(res,200,{status:'not_found',reason:'not_found'});
+            return sendJson(res,200,{status:'unknown',reason:'upstream_'+pRes.status});
+          }catch{
+            return sendJson(res,200,{status:'unknown',reason:'network'});
+          }
         }
         if(req.method==='POST'&&pathname==='/api/ig-tool/imap-test'){
           const body=await readJson(req);
@@ -201,7 +252,8 @@ function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFac
     }
   });
   const close=async()=>{
-    await runner.stop().catch(()=>{});
+    if(typeof runner.shutdown==='function')await runner.shutdown().catch(()=>{});
+    else await runner.stop().catch(()=>{});
     await new Promise(resolve=>server.close(()=>resolve()));
   };
   return {server,close,runner};

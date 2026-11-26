@@ -63,7 +63,11 @@
     let pollTimer=null;
     let prefsTimer=null;
     let dirtyKeys=new Set();
-    let status={state:'idle',message:'Đang kết nối máy chủ IG Tool…'};
+    let jobs=[];
+    let isLegacySingle=false;
+    let otpDrafts={};
+    let genKeysByEmail={};
+    let saveQueue=Promise.resolve();
     let serverError='';
     let proxyDiag=null;
     let imapDiag=null;
@@ -187,9 +191,11 @@
       const plat=draft.platform;
       const platName=plat==='facebook'?'FB':'IG';
       if(!list.length)return '<option value="">Chưa có email trong kho</option>';
+      const inUseSet=new Set(jobs.map(j=>String(j.email||'').trim().toLowerCase()).filter(Boolean));
       return list.map(m=>{
         const used=!!m.usedOn?.[plat];
-        const tag=used?`Đã sử dụng (${platName})`:(m.accessKey?'Auto OTP':'OTP thủ công');
+        const running=inUseSet.has(String(m.email||'').trim().toLowerCase());
+        const tag=used?`Đã sử dụng (${platName})`:running?'Đang chạy ở phiên khác':(m.accessKey?'Auto OTP':'OTP thủ công');
         return `<option value="${esc(m.email)}" ${m.email===draft.email?'selected':''} ${used?'disabled':''}>${esc(m.email)} (${tag})</option>`;
       }).join('');
     }
@@ -213,7 +219,7 @@
               <div class="ig-tool-field">
                 <label for="ig-device">Chế độ trình duyệt</label>
                 <select id="ig-device" data-ig="device">
-                  <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (iPhone 16 Pro Max)</option>
+                  <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (Chrome Android)</option>
                   <option value="desktop" ${draft.device==='desktop'?'selected':''}>Desktop (Máy tính)</option>
                 </select>
               </div>
@@ -340,9 +346,11 @@
 
     function syncFormControls(){
       const writable=readWritable();
-      const active=ACTIVE_STATES.has(status.state);
-      const unsaved=status.state==='succeeded'&&!status.saved;
-      const lockInputs=active||!writable;
+      const anyActive=jobs.some(j=>ACTIVE_STATES.has(j.state));
+      const atCapacity=isLegacySingle
+        ?(ACTIVE_STATES.has(jobs[0]?.state)||(jobs[0]?.state==='succeeded'&&!jobs[0]?.saved))
+        :jobs.length>=2;
+      const lockInputs=!writable||atCapacity;
 
       for(const key of ['platform','device','gender','mailMode','tempType','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol']){
         const el=element.querySelector(`[data-ig="${key}"]`);
@@ -360,18 +368,13 @@
       if(zohoSlot)zohoSlot.style.display=draft.mailMode==='zoho'?'flex':'none';
       const protoEl=element.querySelector('[data-ig="protocol"]');
       if(protoEl&&protoEl.value!==draft.protocol)protoEl.value=draft.protocol;
-      if((active||status.state==='succeeded')&&status.email&&draft.mailMode==='zoho'&&draft.customEmail!==status.email){
-        draft.customEmail=status.email;
-        const ce=element.querySelector('[data-ig="customEmail"]');
-        if(ce)ce.value=status.email;
-      }
 
       const mailSelect=element.querySelector('[data-ig="email"]');
       const currentMail=readMails().find(m=>m.email===draft.email);
       const selectedUsed=!!currentMail?.usedOn?.[draft.platform];
       if(mailSelect){
         const optsHtml=renderMailOptions();
-        if(mailSelect.dataset.plat!==draft.platform){
+        if(mailSelect.dataset.plat!==draft.platform||mailSelect.innerHTML!==optsHtml){
           mailSelect.dataset.plat=draft.platform;
           mailSelect.innerHTML=optsHtml;
           if(selectedUsed){
@@ -382,6 +385,8 @@
       }
       const mailAfter=readMails().find(m=>m.email===draft.email);
       const isMailUsed=draft.mailMode==='warehouse'&&!!mailAfter?.usedOn?.[draft.platform];
+      const chosenEmail=(draft.mailMode==='zoho'?draft.customEmail:draft.mailMode==='tempamail'?draft.genEmail:draft.email).trim().toLowerCase();
+      const isMailInUse=!!chosenEmail&&jobs.some(j=>String(j.email||'').trim().toLowerCase()===chosenEmail);
 
       const btnRand=element.querySelector('button[data-act="randomize"]');
       const btnGenMail=element.querySelector('button[data-act="gen-mail"]');
@@ -391,16 +396,16 @@
       const btnReadImap=element.querySelector('button[data-act="read-imap"]');
       const btnStart=element.querySelector('button[data-act="start"]');
       const btnStop=element.querySelector('button[data-act="stop"]');
-      if(btnRand)btnRand.disabled=active||!writable||busyAction;
-      if(btnGenMail)btnGenMail.disabled=active||!writable||busyAction;
+      if(btnRand)btnRand.disabled=lockInputs||busyAction;
+      if(btnGenMail)btnGenMail.disabled=lockInputs||busyAction;
       const genLink=element.querySelector('[data-ig-slot="gen-mail-link"]');
       if(genLink)genLink.style.display=draft.genKey?'inline-flex':'none';
-      if(btnTweak)btnTweak.disabled=(active&&status.state!=='paused')||!writable||busyAction;
-      if(btnTest)btnTest.disabled=active||!writable||busyAction;
-      if(btnTestImap)btnTestImap.disabled=active||!writable||busyAction;
-      if(btnReadImap)btnReadImap.disabled=active||!writable||busyAction;
-      if(btnStart)btnStart.disabled=active||unsaved||!writable||busyAction||isMailUsed;
-      if(btnStop)btnStop.disabled=!active||busyAction;
+      if(btnTweak)btnTweak.disabled=lockInputs||busyAction;
+      if(btnTest)btnTest.disabled=lockInputs||busyAction;
+      if(btnTestImap)btnTestImap.disabled=lockInputs||busyAction;
+      if(btnReadImap)btnReadImap.disabled=lockInputs||busyAction;
+      if(btnStart)btnStart.disabled=lockInputs||!writable||busyAction||isMailUsed||isMailInUse;
+      if(btnStop)btnStop.disabled=!anyActive||busyAction;
 
       const imapDiagSlot=element.querySelector('[data-ig-slot="imap-diag"]');
       if(imapDiagSlot){
@@ -415,67 +420,113 @@
 
       const errSlot=element.querySelector('[data-ig-slot="error-banner"]');
       const usedMsg=isMailUsed?`Email ${draft.email} đã được sử dụng cho ${draft.platform==='facebook'?'Facebook':'Instagram'}. Hãy chọn email khác.`:'';
-      const bannerMsg=serverError||usedMsg;
+      const dupMsg=isMailInUse?`Email ${chosenEmail} đang được dùng ở phiên khác. Hãy chọn email khác.`:'';
+      const bannerMsg=serverError||usedMsg||dupMsg;
       if(errSlot)errSlot.innerHTML=bannerMsg?`<div class="ig-tool-banner">${esc(bannerMsg)}</div>`:'';
 
       const diagSlot=element.querySelector('[data-ig-slot="proxy-diag"]');
       if(diagSlot)diagSlot.textContent=proxyDiag||'';
     }
 
+    function renderJobCard(job,idx,total){
+      const writable=readWritable();
+      const jid=job.id||'';
+      const okey=jid||'_single';
+      const unsaved=job.state==='succeeded'&&!job.saved;
+      const stateText=STATE_LABEL[job.state]||job.state||'Sẵn sàng';
+      const active=ACTIVE_STATES.has(job.state);
+      let inboxHref='';
+      let inboxKey='';
+      if(job.email){
+        const emLower=String(job.email||'').toLowerCase();
+        const matchedMail=readMails().find(m=>String(m.email||'').toLowerCase()===emLower);
+        inboxKey=matchedMail?.accessKey||genKeysByEmail[emLower]||(draft.genEmail&&draft.genEmail.toLowerCase()===emLower?draft.genKey:'');
+        if(inboxKey)inboxHref=`https://tempamail.com/access?key=${encodeURIComponent(inboxKey)}`;
+        else if(draft.mailMode==='zoho'||(draft.zohoDomain&&emLower.endsWith('@'+draft.zohoDomain.trim().toLowerCase())))inboxHref='https://mail.zoho.com';
+        else if(emLower.endsWith('@gmail.com'))inboxHref='https://mail.google.com';
+      }
+      const inboxActionHtml=(inboxKey&&typeof openInbox==='function')
+        ?`<button type="button" data-act="open-status-inbox" data-job-id="${esc(jid)}" style="padding:3px 9px;border:1px solid #2fbf71;color:#2fbf71;border-radius:6px;font-size:12px">Hộp thư &amp; OTP</button>`
+        :(inboxHref?`<a href="${esc(inboxHref)}" target="_blank" rel="noopener noreferrer" class="mini link" style="padding:2px 8px;border:1px solid var(--line);border-radius:6px;text-decoration:none;font-size:11.5px">Mở hộp thư ↗</a>`:'');
+
+      return `
+        <div class="ig-tool-job-card" data-job-id="${esc(jid)}" style="${total>1?'border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px':''}">
+          <div class="ig-tool-status" data-state="${esc(job.state||'idle')}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px">
+                ${total>1||jid?`<span class="ig-tool-badge" style="opacity:.8">Phiên ${idx+1}${total>1?(idx===0?' (Cửa sổ Trái)':' (Cửa sổ Phải)'):''}</span>`:''}
+                <span class="ig-tool-badge">${esc(stateText)}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                ${jid&&(active||job.state==='succeeded')?`<button type="button" data-act="copy-cookie" data-job-id="${esc(jid)}" style="padding:3px 10px;font-size:12px" ${busyAction?'disabled':''}>Copy Cookie</button>`:''}
+                ${jid&&(active||job.state==='succeeded'||job.state==='failed')?`<button type="button" class="danger" data-act="stop" data-job-id="${esc(jid)}" style="padding:3px 10px;font-size:12px" ${busyAction?'disabled':''}>${active?'Dừng phiên':'Đóng phiên'}</button>`:''}
+              </div>
+            </div>
+            <div>${esc(job.message||'')}</div>
+            ${job.email?`<div class="ig-tool-meta" style="align-items:center"><span>Email: ${esc(job.email)}</span>${inboxActionHtml}${job.otp?`<span>OTP: <b>${esc(job.otp)}</b></span>`:''}</div>`:''}
+            ${job.protocol||job.ip?`<div class="ig-tool-meta"><span>Giao thức: ${esc(job.protocol||'—')}</span><span>IP: ${esc(job.ip||'—')}</span></div>`:''}
+            ${job.otpDiagnostic?`
+              <div data-ig-slot="otp-diagnostic" class="ig-tool-stack" style="margin-top:8px">
+                <strong>Chi tiết lần xác nhận OTP</strong>
+                <div class="ig-tool-meta"><span>Chế độ: ${job.otpDiagnostic.device==='mobile'?'Mobile':'Desktop'}</span><span>Nguồn mã: ${job.otpDiagnostic.source==='mailbox'?'Hộp thư tự động':job.otpDiagnostic.source==='manual'?'Nhập trong tool':'Nhập trực tiếp hoặc chưa xác định'}</span></div>
+                ${job.otpDiagnostic.messageId?`<div class="ig-tool-meta">ID thư: ${esc(job.otpDiagnostic.messageId)}</div>`:''}
+                ${Number.isFinite(job.otpDiagnostic.submittedAt)?`<div class="ig-tool-meta">Gửi xác nhận lúc: ${esc(new Date(job.otpDiagnostic.submittedAt).toLocaleString('vi-VN'))}</div>`:''}
+                ${job.otpDiagnostic.reason?'<div class="ig-tool-meta">Kết quả: Mã bị từ chối hoặc hết hạn; đã dừng tự gửi.</div>':''}
+              </div>
+            `:''}
+            ${job.networkDiagnostic?`
+              <div data-ig-slot="network-diagnostic" class="ig-tool-stack" style="margin-top:8px">
+                <strong>Phản hồi đăng ký</strong>
+                ${job.networkDiagnostic.events?.length?job.networkDiagnostic.events.slice(-4).map(event=>`
+                  <div class="ig-tool-meta">
+                    <span>${esc(Number.isFinite(event.at)?new Date(event.at).toLocaleTimeString('vi-VN'):'—')}</span>
+                    <span>${esc(({verify_code:'Xác nhận mã',send_code:'Gửi mã',registration:'Đăng ký',other:'Yêu cầu khác'})[event.stage]||'Yêu cầu khác')}</span>
+                    <span>${event.networkError?'Lỗi kết nối':event.httpStatus?'HTTP '+esc(event.httpStatus):'Đang chờ phản hồi'}</span>
+                    ${event.outcome?`<span>${esc(event.outcome)}</span>`:''}
+                    ${event.errors?.length?`<span>Mã lỗi: ${esc(event.errors.join(', '))}</span>`:''}
+                  </div>
+                `).join(''):'<div class="ig-tool-meta">Chưa ghi nhận yêu cầu xác nhận trong phiên này.</div>'}
+              </div>
+            `:''}
+          </div>
+          ${job.state==='waiting_otp'?`
+            <div class="ig-tool-field" style="margin-top:10px">
+              <label for="ig-otp-${esc(okey)}">Nhập mã OTP 6 số</label>
+              <div class="ig-tool-actions">
+                <input id="ig-otp-${esc(okey)}" data-ig="otp" data-job-id="${esc(jid)}" type="text" inputmode="numeric" maxlength="6" value="${esc(otpDrafts[okey]||'')}" placeholder="123456" style="max-width:140px" ${!writable?'disabled':''} />
+                <button type="button" class="primary" data-act="submit-otp" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>Gửi OTP</button>
+              </div>
+            </div>
+          `:''}
+          ${job.state==='paused'?`
+            <div class="ig-tool-actions" style="margin-top:10px">
+              <button type="button" class="primary" data-act="resume" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>Tiếp tục</button>
+            </div>
+          `:''}
+          ${unsaved?`
+            <div class="ig-tool-actions" style="margin-top:10px">
+              <button type="button" class="primary" data-act="save-result" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>Xác nhận</button>
+            </div>
+          `:''}
+          ${job.saved?'<div class="ig-tool-meta" style="margin-top:8px">Đã lưu tài khoản vào kho.</div>':''}
+        </div>
+      `;
+    }
+
     function renderStatusPanel(){
       const writable=readWritable();
-      const unsaved=status.state==='succeeded'&&!status.saved;
-      const stateText=STATE_LABEL[status.state]||status.state||'Sẵn sàng';
-      const key=JSON.stringify([status,writable,busyAction]);
+      const displayJobs=jobs.length?jobs:[{state:'idle',message:'Sẵn sàng tạo phiên mới (tối đa 2 phiên song song).'}];
+      const key=JSON.stringify([displayJobs,writable,busyAction]);
       if(key===lastStatusKey)return;
       lastStatusKey=key;
 
-      const otpInput=element.querySelector('[data-ig="otp"]');
-      if(otpInput)draft.otp=otpInput.value;
+      element.querySelectorAll('[data-ig="otp"]').forEach(el=>{
+        otpDrafts[el.dataset.jobId||'_single']=el.value;
+      });
 
       const slot=element.querySelector('[data-ig-slot="status-body"]');
       if(!slot)return;
-      let inboxHref='';
-      let inboxKey='';
-      if(status.email){
-        const matchedMail=readMails().find(m=>String(m.email||'').toLowerCase()===String(status.email||'').toLowerCase());
-        inboxKey=matchedMail?.accessKey||(draft.genEmail&&draft.genEmail.toLowerCase()===String(status.email||'').toLowerCase()?draft.genKey:'');
-        if(inboxKey)inboxHref=`https://tempamail.com/access?key=${encodeURIComponent(inboxKey)}`;
-        else if(draft.mailMode==='zoho'||(draft.zohoDomain&&status.email.toLowerCase().endsWith('@'+draft.zohoDomain.trim().toLowerCase())))inboxHref='https://mail.zoho.com';
-        else if(status.email.toLowerCase().endsWith('@gmail.com'))inboxHref='https://mail.google.com';
-      }
-      const inboxActionHtml=(inboxKey&&typeof openInbox==='function')
-        ?`<button type="button" data-act="open-status-inbox" style="padding:3px 9px;border:1px solid #2fbf71;color:#2fbf71;border-radius:6px;font-size:12px">Hộp thư &amp; OTP</button>`
-        :(inboxHref?`<a href="${esc(inboxHref)}" target="_blank" rel="noopener noreferrer" class="mini link" style="padding:2px 8px;border:1px solid var(--line);border-radius:6px;text-decoration:none;font-size:11.5px">Mở hộp thư ↗</a>`:'');
-
-      slot.innerHTML=`
-        <div class="ig-tool-status" data-state="${esc(status.state||'idle')}">
-          <span class="ig-tool-badge">${esc(stateText)}</span>
-          <div>${esc(status.message||'')}</div>
-          ${status.email?`<div class="ig-tool-meta" style="align-items:center"><span>Email: ${esc(status.email)}</span>${inboxActionHtml}${status.otp?`<span>OTP: <b>${esc(status.otp)}</b></span>`:''}</div>`:''}
-          ${status.protocol||status.ip?`<div class="ig-tool-meta"><span>Giao thức: ${esc(status.protocol||'—')}</span><span>IP: ${esc(status.ip||'—')}</span></div>`:''}
-        </div>
-        ${status.state==='waiting_otp'?`
-          <div class="ig-tool-field" style="margin-top:10px">
-            <label for="ig-otp">Nhập mã OTP 6 số</label>
-            <div class="ig-tool-actions">
-              <input id="ig-otp" data-ig="otp" type="text" inputmode="numeric" maxlength="6" value="${esc(draft.otp)}" placeholder="123456" style="max-width:140px" ${!writable?'disabled':''} />
-              <button type="button" class="primary" data-act="submit-otp" ${!writable||busyAction?'disabled':''}>Gửi OTP</button>
-            </div>
-          </div>
-        `:''}
-        ${status.state==='paused'?`
-          <div class="ig-tool-actions" style="margin-top:10px">
-            <button type="button" class="primary" data-act="resume" ${!writable||busyAction?'disabled':''}>Tiếp tục</button>
-          </div>
-        `:''}
-        ${unsaved?`
-          <div class="ig-tool-actions" style="margin-top:10px">
-            <button type="button" class="primary" data-act="save-result" ${!writable||busyAction?'disabled':''}>Xác nhận</button>
-          </div>
-        `:''}
-        ${status.saved?'<div class="ig-tool-meta" style="margin-top:8px">Đã lưu tài khoản vào kho.</div>':''}
-      `;
+      slot.innerHTML=displayJobs.map((job,idx)=>renderJobCard(job,idx,displayJobs.length)).join('');
     }
 
     function render(){
@@ -484,34 +535,64 @@
       renderStatusPanel();
     }
 
-    async function performSave(){
-      if(!readWritable())throw Error('Bạn không có quyền lưu vào kho.');
-      const result=await api('/api/ig-tool/result');
-      const ok=typeof save==='function'?await save(result):false;
-      if(!ok)throw Error('Lưu vào kho thất bại hoặc bị từ chối. Kết quả vẫn được giữ để thử lại.');
-      status=await api('/api/ig-tool/acknowledge',{method:'POST'});
+    function rotateFormIdentity(){
       draft.genEmail='';draft.genKey='';
       const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value='';
       const next=randomIdentity();
       draft.name=next.name;draft.username=next.username;draft.birthday=randomBirthday();
       const dom=(draft.zohoDomain||'devsepa.id.vn').trim();
       draft.customEmail=`${next.mailLocal}@${dom}`;
+      const inUse=new Set(jobs.map(j=>String(j.email||'').trim().toLowerCase()).filter(Boolean));
+      const avail=readMails().find(m=>!m.usedOn?.[draft.platform]&&!inUse.has(String(m.email||'').trim().toLowerCase()));
+      if(avail){
+        draft.email=avail.email;draft.accessKey=avail.accessKey||'';
+        const ms=element.querySelector('[data-ig="email"]');if(ms)ms.value=avail.email;
+      }
       for(const [sel,val] of [['[data-ig="name"]',draft.name],['[data-ig="username"]',draft.username],['[data-ig="birthday"]',draft.birthday],['[data-ig="customEmail"]',draft.customEmail]]){
         const el=element.querySelector(sel);if(el)el.value=val;
       }
       saveDraftPrefs();
-      serverError='';
+    }
+
+    async function performSave(jobId){
+      const runSave=async()=>{
+        if(!readWritable())throw Error('Bạn không có quyền lưu vào kho.');
+        const q=jobId?`?jobId=${encodeURIComponent(jobId)}`:'';
+        const result=await api('/api/ig-tool/result'+q);
+        const ok=typeof save==='function'?await save(result):false;
+        if(!ok)throw Error('Lưu vào kho thất bại hoặc bị từ chối. Kết quả vẫn được giữ để thử lại.');
+        const ack=await api('/api/ig-tool/acknowledge',{method:'POST',body:JSON.stringify({jobId})});
+        if(isLegacySingle)jobs=[ack];
+        else await refreshStatus();
+        serverError='';
+      };
+      const next=saveQueue.then(runSave,runSave);
+      saveQueue=next.catch(()=>{});
+      return next;
     }
 
     async function refreshStatus(){
       if(destroyed||!element.isConnected){destroy();return;}
       try{
-        status=await api('/api/ig-tool/status');
-        if(ACTIVE_STATES.has(status.state)&&draft.mailMode==='tempamail'&&!draft.genKey){
-          const mb=await api('/api/ig-tool/mailbox-url').catch(()=>null);
-          if(mb?.url){
-            const m=mb.url.match(/key=([0-9a-f-]+)/i);
-            if(m){draft.genKey=m[1];draft.genEmail=status.email||draft.genEmail;}
+        const res=await api('/api/ig-tool/status');
+        if(Array.isArray(res?.jobs)){
+          isLegacySingle=false;
+          jobs=res.jobs;
+        }else if(res&&typeof res==='object'&&res.state){
+          isLegacySingle=true;
+          jobs=[res];
+        }else{
+          jobs=[];
+        }
+        for(const job of jobs){
+          const emLower=String(job.email||'').toLowerCase();
+          if(ACTIVE_STATES.has(job.state)&&emLower&&!genKeysByEmail[emLower]){
+            const q=job.id?`?jobId=${encodeURIComponent(job.id)}`:'';
+            const mb=await api('/api/ig-tool/mailbox-url'+q).catch(()=>null);
+            if(mb?.url){
+              const m=mb.url.match(/key=([0-9a-f-]+)/i);
+              if(m)genKeysByEmail[emLower]=m[1];
+            }
           }
         }
         serverError='';
@@ -546,15 +627,19 @@
         }else if(act==='open-gen-inbox'){
           if(typeof openInbox==='function'&&draft.genKey)openInbox({email:draft.genEmail,accessKey:draft.genKey});
         }else if(act==='open-status-inbox'){
-          const targetEmail=status.email||draft.genEmail;
-          const matched=readMails().find(m=>String(m.email||'').toLowerCase()===String(targetEmail||'').toLowerCase());
-          const key=matched?.accessKey||(draft.genEmail&&draft.genEmail.toLowerCase()===String(targetEmail||'').toLowerCase()?draft.genKey:'');
+          const jobId=btn.dataset.jobId||'';
+          const targetJob=jobs.find(j=>j.id===jobId)||jobs[0];
+          const targetEmail=targetJob?.email||draft.genEmail;
+          const emLower=String(targetEmail||'').toLowerCase();
+          const matched=readMails().find(m=>String(m.email||'').toLowerCase()===emLower);
+          const key=matched?.accessKey||genKeysByEmail[emLower]||(draft.genEmail&&draft.genEmail.toLowerCase()===emLower?draft.genKey:'');
           if(typeof openInbox==='function')openInbox({email:targetEmail,accessKey:key});
         }else if(act==='gen-mail'){
           if(typeof generateMail!=='function')throw Error('Chức năng tạo mail chưa sẵn sàng.');
           const gen=await generateMail(draft.tempType);
           if(!gen?.email||!gen?.accessKey)throw Error('Không tạo được Tempamail mới.');
           draft.genEmail=gen.email;draft.genKey=gen.accessKey;
+          genKeysByEmail[gen.email.toLowerCase()]=gen.accessKey;
           const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value=gen.email;
           saveDraftPrefs();
           serverError='';
@@ -568,8 +653,9 @@
           const ce=element.querySelector('[data-ig="customEmail"]');
           if(ce)ce.value=draft.customEmail;
           saveDraftPrefs();
-          if(ACTIVE_STATES.has(status.state)){
-            status=await api('/api/ig-tool/email',{method:'POST',body:JSON.stringify({email:draft.customEmail})});
+          if(jobs.length===1&&ACTIVE_STATES.has(jobs[0].state)){
+            const updated=await api('/api/ig-tool/email',{method:'POST',body:JSON.stringify({jobId:jobs[0].id,email:draft.customEmail})});
+            if(isLegacySingle)jobs=[updated];else await refreshStatus();
             serverError='';
           }
         }else if(act==='test-imap'){
@@ -594,6 +680,7 @@
             const gen=await generateMail(draft.tempType);
             if(!gen?.email||!gen?.accessKey)throw Error('Không tạo được Tempamail mới.');
             draft.genEmail=gen.email;draft.genKey=gen.accessKey;
+            genKeysByEmail[gen.email.toLowerCase()]=gen.accessKey;
             const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value=gen.email;
             saveDraftPrefs();
           }
@@ -604,7 +691,7 @@
           let birthday=draft.birthday.trim();
           const dmY=birthday.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
           if(dmY)birthday=`${dmY[3]}-${dmY[2].padStart(2,'0')}-${dmY[1].padStart(2,'0')}`;
-          status=await api('/api/ig-tool/start',{method:'POST',body:JSON.stringify({
+          const started=await api('/api/ig-tool/start',{method:'POST',body:JSON.stringify({
             platform:draft.platform,
             device:draft.device,
             gender:draft.gender,
@@ -618,19 +705,43 @@
             proxy:draft.proxy,
             protocol:draft.protocol,
           })});
+          if(isLegacySingle)jobs=[started];
+          else await refreshStatus();
+          rotateFormIdentity();
           serverError='';
         }else if(act==='stop'){
-          status=await api('/api/ig-tool/stop',{method:'POST'});
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          const stopped=await api('/api/ig-tool/stop',{method:'POST',body:JSON.stringify({jobId})});
+          if(isLegacySingle)jobs=[stopped];
+          else await refreshStatus();
           serverError='';
         }else if(act==='resume'){
-          status=await api('/api/ig-tool/resume',{method:'POST'});
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          const resumed=await api('/api/ig-tool/resume',{method:'POST',body:JSON.stringify({jobId})});
+          if(isLegacySingle)jobs=[resumed];
+          else await refreshStatus();
           serverError='';
         }else if(act==='submit-otp'){
-          status=await api('/api/ig-tool/otp',{method:'POST',body:JSON.stringify({code:draft.otp.trim()})});
-          draft.otp='';
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          const okey=jobId||'_single';
+          const otpEl=element.querySelector(`[data-ig="otp"][data-job-id="${jobId}"]`)||element.querySelector('[data-ig="otp"]');
+          const code=String((otpEl?otpEl.value:otpDrafts[okey])||'').trim();
+          const submitted=await api('/api/ig-tool/otp',{method:'POST',body:JSON.stringify({jobId,code})});
+          otpDrafts[okey]='';
+          if(isLegacySingle)jobs=[submitted];
+          else await refreshStatus();
           serverError='';
         }else if(act==='save-result'){
-          await performSave();
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          await performSave(jobId);
+        }else if(act==='copy-cookie'){
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          const q=jobId?`?jobId=${encodeURIComponent(jobId)}`:'';
+          const res=await api('/api/ig-tool/cookies'+q);
+          if(!res?.cookie)throw Error('Trình duyệt hiện chưa có cookie nào.');
+          if(global.navigator?.clipboard?.writeText)await global.navigator.clipboard.writeText(res.cookie);
+          proxyDiag='Đã copy Cookie từ trình duyệt ảo vào Clipboard!';
+          serverError='';
         }
       }catch(err){
         serverError=err.message||'Thao tác thất bại.';

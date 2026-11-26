@@ -100,6 +100,7 @@
         const FIELDS = [
           ["platform", "Nền tảng"],
           ["uid", "UID"],
+          ["cookie", "Cookie"],
           ["name", "Tên"],
           ["pass", "Mật khẩu"],
           ["twofa", "2FA"],
@@ -112,10 +113,11 @@
           ["source", "Nguồn"],
           ["note", "Ghi chú"],
         ];
-        const SECRETS = ["pass", "twofa", "mailpass"];
+        const SECRETS = ["pass", "twofa", "mailpass", "cookie"];
         const ORDER = [
           "platform",
           "uid",
+          "cookie",
           "name",
           "pass",
           "twofa",
@@ -319,8 +321,14 @@
             .get("cols3", ORDER)
             .filter((c) => !["group", "tags"].includes(c));
         if (!cols.includes("platform")) cols = ["platform", ...cols];
-        if (!cols.includes("name")) {
+        if (!cols.includes("cookie")) {
           const uIdx = cols.indexOf("uid");
+          if (uIdx >= 0) cols.splice(uIdx + 1, 0, "cookie");
+          else cols.unshift("cookie");
+        }
+        if (!cols.includes("name")) {
+          const cIdx = cols.indexOf("cookie");
+          const uIdx = cIdx >= 0 ? cIdx : cols.indexOf("uid");
           if (uIdx >= 0) cols.splice(uIdx + 1, 0, "name");
           else cols.unshift("name");
         }
@@ -1069,7 +1077,7 @@
               : ""
           }
   <details class="mobile-table-options"><summary>Sắp xếp / Chọn cả trang</summary><div><label><input type="checkbox" id="mobilePageAll" ${shown.length && shown.every(a => sel.has(a.uid)) ? "checked" : ""}> Chọn cả trang</label>${show.filter(k => !SECRETS.includes(k)).map(k => `<button class="mini" data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`).join("")}</div></details><div class="tablewrap mobile-cards"><table><thead><tr><th><input type="checkbox" id="pageAll" aria-label="Chọn cả trang" ${shown.length && shown.every((a) => sel.has(a.uid)) ? "checked" : ""}></th>${show.map((k) => `<th aria-sort="${sort.k === k ? (sort.d > 0 ? "ascending" : "descending") : "none"}">${SECRETS.includes(k) ? LABEL[k] : `<button data-act="sort" data-v="${k}">${LABEL[k]}${sort.k === k ? (sort.d > 0 ? " ↑" : " ↓") : ""}</button>`}</th>`).join("")}</tr></thead>
-  <tbody>${shown.map((a) => `<tr data-uid="${esc(a.uid)}" title="Nhấp vào dòng để chỉnh sửa"><td data-label="Chọn tài khoản"><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid) ? "checked" : ""}></td>${show.map((k) => `<td data-label="${esc(LABEL[k])}">${cell(a, k)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${show.length + 1}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
+  <tbody>${shown.map((a) => `<tr data-uid="${esc(a.uid)}" class="${a.status === "dead" ? "row-die" : ""}" title="Nhấp vào dòng để chỉnh sửa"><td data-label="Chọn tài khoản"><input type="checkbox" data-sel="${esc(a.uid)}" aria-label="Chọn ${esc(a.uid)}" ${sel.has(a.uid) ? "checked" : ""}></td>${show.map((k) => `<td data-label="${esc(LABEL[k])}">${cell(a, k)}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${show.length + 1}" class="empty">Không có tài khoản khớp bộ lọc. <button class="link" data-act="reset">Xoá bộ lọc</button></td></tr>`}</tbody></table></div>
   <div class="tools" style="justify-content:space-between;align-items:center;padding:6px 2px;margin-top:6px"><span class="muted" style="font-size:13px">${rows.length} kết quả · trang ${page}/${pages}</span><span class="tools" style="gap:8px"><select id="per" aria-label="Số dòng mỗi trang" style="padding:6px 12px;font-size:13px;border-radius:8px;font-weight:600">${opts(
     [25, 50, 100].map((n) => [String(n), n + " dòng"]),
     String(per),
@@ -2040,6 +2048,27 @@
             }
           } else if (plat === "instagram") {
             try {
+              if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+                try {
+                  const sRes = await fetch("/api/ig-tool/session", { headers: { "X-IG-Tool-Client": "1" } });
+                  const sData = sRes.ok ? await sRes.json().catch(() => null) : null;
+                  if (sData?.token) {
+                    const lRes = await fetch("/api/ig-tool/check-ig", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", "X-IG-Tool-Token": sData.token },
+                      body: JSON.stringify({ username: a.igUsername || a.uid, cookie: secretsOf(a).cookie || "" }),
+                    });
+                    const lJson = lRes.ok ? await lRes.json().catch(() => null) : null;
+                    if (lJson && ["live", "not_found"].includes(lJson.status)) {
+                      if (checkGeneration !== authGeneration || get(a.uid) !== a) return { status: "unknown", stale: true, reason: "stale_check", plat };
+                      if (lJson.status === "live" && (!/^\d+$/.test(lJson.igId || "") || !lJson.username || (a.igId && a.igId !== lJson.igId))) {
+                        return { status: "unknown", plat, reason: "identity_mismatch" };
+                      }
+                      return { ...lJson, plat };
+                    }
+                  }
+                } catch {}
+              }
               const cfg = globalThis.MXH_SUPABASE;
               if (!cfg?.url || !cfg?.key) {
                 return { status: "unknown", plat, reason: "no_supabase" };
@@ -3116,8 +3145,8 @@
                 ? (a.tags || []).join(", ")
                 : a[k];
           const inp = (k, extra = "", cls = "") =>
-            `<label class="${cls}">${LABEL[k]}<input id="e-${k}" value="${esc(val(k))}" maxlength="120" autocomplete="off" spellcheck="false" ${extra}></label>`;
-          const sec = (k) => inp(k, 'type="password" class="mono secretIn"');
+            `<label class="${cls}">${LABEL[k]}<input id="e-${k}" name="field_${k}" value="${esc(val(k))}" maxlength="${k === "cookie" ? 4000 : 120}" autocomplete="off" spellcheck="false" ${extra}></label>`;
+          const sec = (k, cls = "") => inp(k, 'type="text" class="mono secretIn secret-mask"', cls);
           const allRecords = all();
           const usedEmailCount = {};
           for (const rec of allRecords) {
@@ -3136,7 +3165,7 @@
             })
             .sort((x, y) => x.used - y.used || x.email.localeCompare(y.email, "vi"));
           const unusedCount = mailPool.filter((m) => m.used === 0).length;
-          d.innerHTML = `<form><h2>${old ? "Chỉnh sửa " + esc(a.uid) : "Thêm tài khoản"}</h2><div class="form">
+          d.innerHTML = `<form autocomplete="off"><h2>${old ? "Chỉnh sửa " + esc(a.uid) : "Thêm tài khoản"}</h2><div class="form">
   <label class="full">Nền tảng<select id="e-platform"><option value="facebook" ${(a.platform || "facebook") === "facebook" ? "selected" : ""}>Facebook</option><option value="instagram" ${a.platform === "instagram" ? "selected" : ""}>Instagram</option></select></label>
   ${inp("uid", old ? "readonly" : "required", "full")}${sec("pass")}${sec("twofa")}
   <div class="full" style="display:grid;gap:6px">
@@ -3151,7 +3180,7 @@
       <button type="button" class="mini" id="ePasteMailPass" style="height:36px;white-space:nowrap" title="Đọc Clipboard dạng email|pass và điền vào 2 ô bên dưới">📋 Dán Mail|Pass</button>
     </div>
   </div>
-  ${inp("email")}${sec("mailpass")}
+  ${inp("email")}${sec("mailpass")}${sec("cookie", "full")}
   <label class="full" style="display:flex;gap:8px"><input type="checkbox" id="eShow">Hiện mật khẩu</label>
   ${inp("born", 'type="date"')}${inp("checked", 'type="date"')}<label class="full">Live/Die<select id="e-status">${opts(
     settings.statuses.map((s) => [s.id, s.name]),
@@ -3165,7 +3194,7 @@
             d
               .querySelectorAll(".secretIn")
               .forEach(
-                (i) => (i.type = e.target.checked ? "text" : "password"),
+                (i) => i.classList.toggle("secret-mask", !e.target.checked),
               );
           const applyMailPair = (raw) => {
             const text = String(raw || "").trim();
@@ -4725,6 +4754,7 @@
                   ...(plat === "instagram" ? { igUsername: result.username } : {}),
                   name: result.name || "",
                   pass: result.password || "",
+                  cookie: result.cookie || "",
                   email: result.email || "",
                   mailpass: mailPass,
                   born: today(),
