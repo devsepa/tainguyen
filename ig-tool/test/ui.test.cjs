@@ -4,6 +4,44 @@ const {chromium}=require('playwright');
 const {createToolServer}=require('../server.cjs');
 const {Runner}=require('../runner.cjs');
 
+test('session mailbox uses session email even when preparation form has another email',async t=>{
+  const app=createToolServer({prefsFile:null,runner:{status:()=>({id:'job-one',state:'paused',email:'session@devsepa.id.vn'}),stop:async()=>{}}});
+  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());const page=await browser.newPage();
+  const base='http://127.0.0.1:'+app.server.address().port;
+  await page.route('**/test-session-mail',r=>r.fulfill({contentType:'text/html',body:'<div id="mount"></div><script src="/ig-tool-ui.js"></script>'}));
+  await page.goto(base+'/test-session-mail');
+  await page.evaluate(()=>{
+    localStorage.setItem('ig_tool_local_draft_v1',JSON.stringify({mailMode:'zoho',imapUser:'inbox@gmail.com',imapPass:'synthetic-password'}));
+    window.openedMailboxes=[];IgTool.mount(document.querySelector('#mount'),{canWrite:true,mails:[],openInbox:config=>window.openedMailboxes.push(config),pollMs:0});
+  });
+  await page.fill('[data-ig="customEmail"]','next@devsepa.id.vn');
+  await page.click('[data-act="open-status-inbox"]');
+  await page.waitForFunction(()=>window.openedMailboxes.length===1);
+  const config=await page.evaluate(()=>window.openedMailboxes[0]);
+  assert.equal(config.email,'session@devsepa.id.vn');assert.equal(config.zoho.showAll,false);
+});
+
+test('read selected email opens its mailbox dialog independently of the total inbox',async t=>{
+  const app=createToolServer({prefsFile:null});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());const page=await browser.newPage();
+  const base='http://127.0.0.1:'+app.server.address().port;
+  await page.route('**/test-read-selected',r=>r.fulfill({contentType:'text/html',body:'<div id="mount"></div><script src="/ig-tool-ui.js"></script>'}));
+  await page.route('**/api/ig-tool/imap-messages',r=>r.fulfill({contentType:'application/json',body:'{"messages":[]}'}));
+  await page.goto(base+'/test-read-selected');
+  await page.evaluate(()=>{
+    localStorage.setItem('ig_tool_local_draft_v1',JSON.stringify({mailMode:'zoho',imapUser:'inbox@gmail.com',imapPass:'synthetic-password'}));
+    window.openedMailboxes=[];IgTool.mount(document.querySelector('#mount'),{canWrite:true,mails:[],openInbox:config=>window.openedMailboxes.push(config),pollMs:0});
+  });
+  await page.fill('[data-ig="customEmail"]','chosen@devsepa.id.vn');
+  await page.click('button[data-act="read-imap"]');
+  await page.waitForFunction(()=>window.openedMailboxes.length===1,{},{timeout:1500});
+  const selected=await page.evaluate(()=>window.openedMailboxes[0]);
+  assert.equal(selected.email,'chosen@devsepa.id.vn');assert.equal(selected.zoho.user,'inbox@gmail.com');assert.equal(selected.zoho.showAll,false);
+  await page.click('button[data-act="open-zoho-inbox"]');
+  const total=await page.evaluate(()=>window.openedMailboxes[1]);assert.equal(total.email,'inbox@gmail.com');assert.equal(total.zoho.showAll,true);
+});
+
 test('UI shows rejected OTP diagnostics without rendering the code or credentials',async t=>{
   const app=createToolServer({prefsFile:null,runner:{status:()=>({state:'paused',message:'Instagram đã từ chối mã OTP hoặc mã hết hạn.',email:'person@example.edu',otpDiagnostic:{device:'mobile',source:'mailbox',email:'person@example.edu',messageId:'message-17',submittedAt:1795687200000,rejectedAt:1795687203000,reason:'invalid_or_expired'},networkDiagnostic:{engine:'chromium',device:'mobile',profile:'iphone-safari-ua',events:[{at:1795687200000,stage:'verify_code',httpStatus:200,outcome:'fail',errors:['invalid_nonce']}]}}),stop:async()=>{}}});
   await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());

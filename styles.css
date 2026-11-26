@@ -1693,3 +1693,34 @@ nav a:hover {
 @media (max-width: 760px) {
   .mail-body-frame { height: min(400px, 55dvh); }
 }
+
+@media (min-width: 761px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    padding-left: max(22px, env(safe-area-inset-left, 0px));
+  }
+  .app > nav {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 232px;
+    margin-left: 0;
+    z-index: 60;
+    transform: translateX(calc(-100% + 10px));
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+  }
+  .app > nav::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: -12px;
+    width: 12px;
+    height: 100%;
+  }
+  .app > nav:hover,
+  .app > nav:focus-within {
+    transform: translateX(0);
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.45);
+  }
+}

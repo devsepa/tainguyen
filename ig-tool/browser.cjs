@@ -1,9 +1,36 @@
 'use strict';
 const {chromium,devices}=require('playwright');
 const {observePage}=require('./diagnostics.cjs');
+const {generateTotp}=require('./totp.cjs');
 
 async function visible(locator){for(const item of await locator.all())if(await item.isVisible())return item;return null;}
 const otpSelector='input[name="confirmationCode"],input[name="email_confirmation_code"],input[name="code"],input[name="c"],#code_in_cliff,input[autocomplete="one-time-code"]';
+
+async function dismissMetaAccountPrompt(page){
+  const prompt=page.locator('[role="dialog"]:visible,[aria-modal="true"]:visible')
+    .filter({hasText:/nếu đã đăng nhập vào instagram|if you(?:'re| are| have).*logged in.*instagram/i}).first();
+  if(!await prompt.isVisible().catch(()=>false))return false;
+  const cancel=prompt.getByRole('button',{name:/^(hủy|cancel|đóng|close|không phải bây giờ|not now)$/i}).first();
+  try{
+    if(await cancel.isVisible().catch(()=>false))await cancel.click({timeout:2500});
+    else await page.keyboard.press('Escape');
+    await prompt.waitFor({state:'hidden',timeout:2500});
+  }catch{
+    throw Object.assign(Error('Hộp thoại Meta chưa đóng được. Hãy đóng hộp thoại rồi chạy lại phiên.'),{code:'META_DIALOG_BLOCKED'});
+  }
+  return true;
+}
+
+async function clickRegistrationControl(page,control){
+  await dismissMetaAccountPrompt(page);
+  try{await control.click({timeout:5000});}
+  catch(error){
+    if(await dismissMetaAccountPrompt(page))await control.click({timeout:8000});
+    else if(await page.locator('[role="dialog"]:visible,[aria-modal="true"]:visible').count()){
+      throw Object.assign(Error('Hộp thoại trên trang đang che nút đăng ký. Đóng hộp thoại rồi chạy lại phiên.'),{code:'META_DIALOG_BLOCKED'});
+    }else throw error;
+  }
+}
 
 async function pressMobileOrClick(btn,isMobile){
   await btn.scrollIntoViewIfNeeded().catch(()=>{});
@@ -13,12 +40,12 @@ async function pressMobileOrClick(btn,isMobile){
   await btn.click({force:true});
 }
 
-async function navigateToRegistration(page,{platform='instagram',device='desktop',startUrl,baseUrl}={}){
+async function navigateToRegistration(page,{platform='instagram',device='desktop',startUrl,baseUrl,headless=false}={}){
   const isMobile=device==='mobile';
   const isFb=platform==='facebook';
   const fromHome=device==='mobile'&&!startUrl;
   const igBase=baseUrl||'https://www.instagram.com';
-  const fbBase=baseUrl||'https://m.facebook.com';
+  const fbBase=baseUrl||'https://www.facebook.com';
   const target=startUrl || (isFb?(fromHome?fbBase+'/':'https://www.facebook.com/r.php'):(fromHome?igBase+'/':igBase+'/accounts/emailsignup/'));
   await page.goto(target,{waitUntil:'domcontentloaded',timeout:45000});
   if(fromHome){
@@ -31,7 +58,8 @@ async function navigateToRegistration(page,{platform='instagram',device='desktop
       .or(page.getByRole('button',{name:/^(đăng ký|sign up|create (?:new )?account|tạo tài khoản(?: mới)?)$/i}))
       .or(page.getByRole('link',{name:/^(đăng ký|sign up|create (?:new )?account|tạo tài khoản(?: mới)?)$/i})).first();
     await signup.waitFor({state:'visible',timeout:15000});
-    await signup.click();
+    if(!headless)await page.waitForTimeout(1500);
+    await clickRegistrationControl(page,signup);
     if(isFb){
       const startLocator=page.getByRole('button',{name:/^(bắt đầu|get started)$/i})
         .or(page.getByRole('link',{name:/^(bắt đầu|get started)$/i}));
@@ -41,7 +69,8 @@ async function navigateToRegistration(page,{platform='instagram',device='desktop
       ]);
       const startBtn=await visible(startLocator);
       if(!(await page.locator('input').first().isVisible().catch(()=>false))&&startBtn){
-        await pressMobileOrClick(startBtn,isMobile);
+        if(!headless)await page.waitForTimeout(1500);
+        await clickRegistrationControl(page,startBtn);
       }
     }
     await page.locator('input').first().waitFor({state:'visible',timeout:15000});
@@ -68,10 +97,11 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
   const zoomVal=isMobile?'0.82':(isIg?'0.85':'0.75');
   const posX=Number.isFinite(windowPosition?.x)?windowPosition.x:20;
   const posY=Number.isFinite(windowPosition?.y)?windowPosition.y:20;
+  const launchArgs=headless?[]:[`--window-size=${winW},${winH}`,`--window-position=${posX},${posY}`];
   const browser=await chromium.launch({
     headless,
     proxy:proxy?{server:proxy}:undefined,
-    args:headless?[]:[`--window-size=${winW},${winH}`,`--window-position=${posX},${posY}`],
+    args:launchArgs,
   });
   const close=async()=>{await browser.close().catch(()=>{});};
   const abort=()=>{void close();};signal?.addEventListener('abort',abort,{once:true});
@@ -84,6 +114,19 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
       : {locale:'vi-VN',viewport:{width:vpW,height:vpH}};
     const context=await browser.newContext(ctxOpts);
     if(!headless){
+      if(isMobile){
+        await context.addInitScript(()=>{
+          const addCursor=()=>{
+            if(!document.head||document.getElementById('__ig_tool_touch_cursor'))return;
+            const st=document.createElement('style');
+            st.id='__ig_tool_touch_cursor';
+            st.textContent=`*{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='9' fill='rgba(128,128,128,0.45)' stroke='rgba(255,255,255,0.85)' stroke-width='1.5'/%3E%3C/svg%3E") 11 11, auto !important;}`;
+            document.head.appendChild(st);
+          };
+          if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addCursor,{once:true});
+          else addCursor();
+        });
+      }
       await context.exposeFunction('__igToolGetCookie',async()=>{
         const targetUrl=platform==='facebook'?'https://www.facebook.com':'https://www.instagram.com';
         const cookies=await context.cookies(targetUrl).catch(()=>[]);
@@ -92,11 +135,69 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
       await context.addInitScript(()=>{
         if(window.top!==window.self)return;
         const mountBtn=()=>{
-          if(!document.body||document.getElementById('__ig_tool_cookie_pill'))return;
+          if(!document.body||document.getElementById('__ig_tool_controls'))return;
+          const wrap=document.createElement('div');
+          wrap.id='__ig_tool_controls';
+          wrap.style.cssText='position:fixed;bottom:10px;right:10px;z-index:2147483647;display:flex;gap:6px;align-items:center';
+          const pillCss='padding:4px 9px;border-radius:999px;background:rgba(15,23,42,0.88);color:#34d399;border:1px solid rgba(52,211,153,0.45);font:600 11px/1.2 system-ui,sans-serif;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.35)';
+
+          const scrollBtn=document.createElement('div');
+          scrollBtn.textContent='▶ Auto lướt';
+          scrollBtn.style.cssText=pillCss+';color:#60a5fa;border-color:rgba(96,165,250,0.45)';
+          let scrollTimer=null,scrollRaf=null;
+          const easeOutCubic=t=>1-Math.pow(1-t,3);
+          const getScroller=()=>{
+            const doc=document.scrollingElement||document.documentElement;
+            if(doc&&doc.scrollHeight>doc.clientHeight+10)return doc;
+            for(const node of document.querySelectorAll('div,main,section')){
+              const st=getComputedStyle(node);
+              if((st.overflowY==='auto'||st.overflowY==='scroll')&&node.scrollHeight>node.clientHeight+20)return node;
+            }
+            return doc||window;
+          };
+          const glide=(totalDy,duration)=>{
+            const target=getScroller();
+            const startY=target===window?window.scrollY:target.scrollTop;
+            const t0=performance.now();
+            const frame=now=>{
+              if(!scrollTimer){scrollRaf=null;return;}
+              const p=Math.min(1,(now-t0)/duration);
+              const nextY=startY+totalDy*easeOutCubic(p);
+              if(target===window)window.scrollTo(0,nextY);
+              else target.scrollTop=nextY;
+              if(p<1)scrollRaf=requestAnimationFrame(frame);
+              else scrollRaf=null;
+            };
+            if(scrollRaf)cancelAnimationFrame(scrollRaf);
+            scrollRaf=requestAnimationFrame(frame);
+          };
+          const stepScroll=()=>{
+            if(!scrollTimer)return;
+            const sc=getScroller();
+            const curY=sc===window?window.scrollY:sc.scrollTop;
+            const up=Math.random()<0.15&&curY>300;
+            const dy=up?-(120+Math.random()*140):(260+Math.random()*340);
+            const dur=650+Math.random()*450;
+            glide(dy,dur);
+            scrollTimer=setTimeout(stepScroll,dur+1100+Math.random()*2000);
+          };
+          scrollBtn.onclick=()=>{
+            if(scrollTimer){
+              clearTimeout(scrollTimer);scrollTimer=null;
+              if(scrollRaf){cancelAnimationFrame(scrollRaf);scrollRaf=null;}
+              scrollBtn.textContent='▶ Auto lướt';
+              scrollBtn.style.color='#60a5fa';
+            }else{
+              scrollBtn.textContent='⏸ Đang lướt';
+              scrollBtn.style.color='#34d399';
+              scrollTimer=setTimeout(stepScroll,150);
+            }
+          };
+
           const el=document.createElement('div');
           el.id='__ig_tool_cookie_pill';
           el.textContent='📋 Copy Cookie';
-          el.style.cssText='position:fixed;bottom:10px;right:10px;z-index:2147483647;padding:4px 9px;border-radius:999px;background:rgba(15,23,42,0.88);color:#34d399;border:1px solid rgba(52,211,153,0.45);font:600 11px/1.2 system-ui,sans-serif;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.35)';
+          el.style.cssText=pillCss;
           el.onclick=async()=>{
             try{
               const c=await window.__igToolGetCookie();
@@ -107,7 +208,9 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
               setTimeout(()=>{el.textContent='📋 Copy Cookie';},1600);
             }catch{el.textContent='Lỗi copy';setTimeout(()=>{el.textContent='📋 Copy Cookie';},1500);}
           };
-          document.body.appendChild(el);
+          wrap.appendChild(scrollBtn);
+          wrap.appendChild(el);
+          document.body.appendChild(wrap);
         };
         if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountBtn,{once:true});
         else mountBtn();
@@ -137,7 +240,7 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
         const regLink=await visible(page.locator('a[href*="emailsignup"],a[href*="/accounts/signup"],a[href*="/r.php"],a[href*="/reg/"]'));
         if(regLink)await regLink.click();
       }else{
-        await navigateToRegistration(page,{platform,device,startUrl});
+        await navigateToRegistration(page,{platform,device,startUrl,headless});
       }
     }
     await page.locator('input').first().waitFor({state:'visible',timeout:15000}).catch(()=>{});
@@ -461,8 +564,15 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
           if(await findInput('input[name="fullName"],input[name="full_name"]',/^tên$|tên đầy đủ|full name/i))return {kind:'step',step:'name'};
           if(await findInput('input[name="username"]',/tên người dùng|username/i))return {kind:'step',step:'username'};
         }
-        if(platform==='instagram'&&await visible(page.getByText(/lưu thông tin đăng nhập|save your login info|kết nối với facebook|connect to facebook|thêm ảnh đại diện|add a profile photo|tải ứng dụng instagram|get the instagram app|thêm số điện thoại|add phone number/i))&&await visible(page.getByRole('button',{name:/^(lúc khác|not now|bỏ qua|skip)$/i}).or(page.getByRole('link',{name:/^(lúc khác|not now|bỏ qua|skip)$/i})))){
-          return {kind:'onboarding'};
+        if(platform==='instagram'){
+          const igSkipBtn=await visible(
+            page.getByRole('button',{name:/^(lúc khác|not now|bỏ qua|skip)$/i})
+              .or(page.getByRole('link',{name:/^(lúc khác|not now|bỏ qua|skip)$/i}))
+              .or(page.locator('[role="button"]').filter({hasText:/^\s*(lúc khác|not now|bỏ qua|skip)\s*$/i}))
+          );
+          if(igSkipBtn&&(/\/accounts\/register/i.test(url.pathname)||await visible(page.getByText(/lưu thông tin đăng nhập|save your login info|kết nối với facebook|connect to facebook|thêm ảnh đại diện|add a profile photo|tải ứng dụng instagram|get the instagram app|thêm số điện thoại|add phone number/i)))){
+            return {kind:'onboarding'};
+          }
         }
         const igCookies=await context.cookies('https://www.instagram.com').catch(()=>[]);
         const hasIgSession=igCookies.some(c=>c.name==='ds_user_id'&&/^\d+$/.test(c.value));
@@ -506,7 +616,207 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
         const cookies=await context.cookies(targetUrls).catch(()=>[]);
         return cookies.map(c=>`${c.name}=${c.value}`).join('; ');
       },
+      async enable2fa({password=''}={}){
+        if(page.isClosed())throw Error('browser_closed');
+        const targetUrl=platform==='facebook'
+          ?'https://accountscenter.facebook.com/password_and_security/two_factor/'
+          :'https://accountscenter.instagram.com/password_and_security/two_factor/';
+        await page.goto(targetUrl,{waitUntil:'domcontentloaded',timeout:45000});
+        let secret='',submittedCode=false;
+        const clickNext=async()=>{
+          const nextBtn=await visible(
+            page.getByRole('button',{name:/^(tiếp|tiếp tục|xác nhận|gửi|xong|hoàn tất|next|continue|confirm|submit|done)$/i})
+              .or(page.locator('[role="button"]').filter({hasText:/^\s*(tiếp|tiếp tục|xác nhận|gửi|xong|hoàn tất|next|continue|confirm|submit|done)\s*$/i}))
+          );
+          if(nextBtn){await pressMobileOrClick(nextBtn,isMobile);return true;}
+          return false;
+        };
+        for(let step=0;step<25;step++){
+          if(page.isClosed())throw Error('browser_closed');
+          await page.waitForTimeout(1200);
+          if(secret&&submittedCode){
+            const done=await visible(page.getByText(/đã bật xác thực 2 yếu tố|two-factor authentication is on|xác thực 2 yếu tố đang bật/i));
+            const doneBtn=await visible(page.getByRole('button',{name:/^(xong|done|đóng|close)$/i}));
+            if(done||doneBtn){
+              if(doneBtn)await pressMobileOrClick(doneBtn,isMobile).catch(()=>{});
+              return {twofa:secret};
+            }
+          }
+          const passEl=await visible(page.locator('input[type="password"]'));
+          if(passEl&&password){
+            await typeField(passEl,password);
+            await clickNext();
+            continue;
+          }
+          if(!secret){
+            const found=await page.evaluate(()=>{
+              const txt=document.body?.innerText||'';
+              const spaced=txt.match(/(?:^|\s)([A-Z2-7]{4}(?:\s+[A-Z2-7]{4}){3,7})(?:\s|$)/);
+              if(spaced)return spaced[1].replace(/\s+/g,'');
+              const els=[...document.querySelectorAll('code,span,div,p,strong,b')];
+              for(const el of els){
+                const t=(el.textContent||'').trim();
+                if(/^[A-Z2-7\s]{16,40}$/.test(t)&&t.replace(/\s+/g,'').length>=16&&el.children.length===0){
+                  return t.replace(/\s+/g,'');
+                }
+              }
+              return '';
+            }).catch(()=>'');
+            if(found){
+              secret=found;
+              await clickNext();
+              continue;
+            }
+          }
+          if(secret){
+            const codeEl=await visible(page.locator('input[autocomplete="one-time-code"],input[inputmode="numeric"],input[type="tel"],input[type="text"]'));
+            if(codeEl&&!submittedCode){
+              const code=generateTotp(secret);
+              await typeField(codeEl,code);
+              submittedCode=true;
+              await clickNext();
+              continue;
+            }
+            if(await clickNext())continue;
+          }
+          const authApp=await visible(
+            page.getByRole('radio',{name:/ứng dụng xác thực|authentication app/i})
+              .or(page.getByText(/ứng dụng xác thực|authentication app/i))
+          );
+          if(authApp){
+            await pressMobileOrClick(authApp,isMobile);
+            await page.waitForTimeout(400);
+            await clickNext();
+            continue;
+          }
+          const profileBtn=await visible(page.locator('[role="button"]:has(img),a[role="link"]:has(img)').filter({hasText:/instagram|facebook/i}));
+          if(profileBtn){
+            await pressMobileOrClick(profileBtn,isMobile);
+            continue;
+          }
+          await clickNext();
+        }
+        throw Error('Chưa hoàn tất bật 2FA tự động (có thể Meta yêu cầu xác minh email/mật khẩu). Hãy hoàn tất nốt trên trình duyệt.');
+      },
     };
   }catch(error){signal?.removeEventListener('abort',abort);await close();throw error;}
 }
-module.exports={openBrowser,navigateToRegistration};
+async function openWithCookie({platform='instagram',cookie='',proxy,device='mobile',headless=false,onClose}={}){
+  const isMobile=device==='mobile';
+  const isIg=platform!=='facebook';
+  const winW=isMobile?460:(isIg?620:450), winH=isMobile?860:(isIg?800:700);
+  const vpW=isMobile?430:(isIg?600:430), vpH=isMobile?760:(isIg?720:620);
+  const launchArgs=['--disable-blink-features=AutomationControlled'];
+  if(!headless)launchArgs.push(`--window-size=${winW},${winH}`,'--window-position=40,40');
+  const browser=await chromium.launch({headless,proxy:proxy?{server:proxy}:undefined,args:launchArgs});
+  const close=async()=>{await browser.close().catch(()=>{});if(onClose)await Promise.resolve(onClose()).catch(()=>{});};
+  browser.on('disconnected',()=>{if(onClose)void Promise.resolve(onClose()).catch(()=>{});});
+  try{
+    const {defaultBrowserType:mobileEngine,...mobileOptions}=devices['Pixel 7'];
+    const ctxOpts=isMobile&&mobileEngine==='chromium'?{...mobileOptions,locale:'vi-VN'}:{locale:'vi-VN',viewport:{width:vpW,height:vpH}};
+    const context=await browser.newContext(ctxOpts);
+    const targetUrl=isIg?'https://www.instagram.com/':'https://www.facebook.com/';
+    const cookies=String(cookie||'').split(';').map(part=>{
+      const idx=part.indexOf('=');
+      if(idx<=0)return null;
+      const name=part.slice(0,idx).trim();
+      const value=part.slice(idx+1).trim();
+      if(!name)return null;
+      return {name,value,url:targetUrl};
+    }).filter(Boolean);
+    if(cookies.length)await context.addCookies(cookies);
+    if(!headless){
+      if(isMobile){
+        await context.addInitScript(()=>{
+          const addCursor=()=>{
+            if(!document.head||document.getElementById('__ig_tool_touch_cursor'))return;
+            const st=document.createElement('style');
+            st.id='__ig_tool_touch_cursor';
+            st.textContent=`*{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='9' fill='rgba(128,128,128,0.45)' stroke='rgba(255,255,255,0.85)' stroke-width='1.5'/%3E%3C/svg%3E") 11 11, auto !important;}`;
+            document.head.appendChild(st);
+          };
+          if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addCursor,{once:true});
+          else addCursor();
+        });
+      }
+      await context.exposeFunction('__igToolGetCookie',async()=>{
+        const targetUrls=isIg?'https://www.instagram.com':['https://www.facebook.com','https://m.facebook.com'];
+        const cks=await context.cookies(targetUrls).catch(()=>[]);
+        return cks.map(c=>`${c.name}=${c.value}`).join('; ');
+      });
+      await context.addInitScript(()=>{
+        if(window.top!==window.self)return;
+        const mountBtn=()=>{
+          if(!document.body||document.getElementById('__ig_tool_controls'))return;
+          const wrap=document.createElement('div');
+          wrap.id='__ig_tool_controls';
+          wrap.style.cssText='position:fixed;bottom:10px;right:10px;z-index:2147483647;display:flex;gap:6px;align-items:center';
+          const pillCss='padding:4px 9px;border-radius:999px;background:rgba(15,23,42,0.88);color:#34d399;border:1px solid rgba(52,211,153,0.45);font:600 11px/1.2 system-ui,sans-serif;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.35)';
+          const scrollBtn=document.createElement('div');
+          scrollBtn.textContent='▶ Auto lướt';
+          scrollBtn.style.cssText=pillCss+';color:#60a5fa;border-color:rgba(96,165,250,0.45)';
+          let scrollTimer=null,scrollRaf=null;
+          const easeOutCubic=t=>1-Math.pow(1-t,3);
+          const getScroller=()=>{
+            const doc=document.scrollingElement||document.documentElement;
+            if(doc&&doc.scrollHeight>doc.clientHeight+10)return doc;
+            return doc||window;
+          };
+          const glide=(totalDy,duration)=>{
+            const target=getScroller();
+            const startY=target===window?window.scrollY:target.scrollTop;
+            const t0=performance.now();
+            const frame=now=>{
+              if(!scrollTimer){scrollRaf=null;return;}
+              const p=Math.min(1,(now-t0)/duration);
+              const nextY=startY+totalDy*easeOutCubic(p);
+              if(target===window)window.scrollTo(0,nextY);
+              else target.scrollTop=nextY;
+              if(p<1)scrollRaf=requestAnimationFrame(frame);
+              else scrollRaf=null;
+            };
+            if(scrollRaf)cancelAnimationFrame(scrollRaf);
+            scrollRaf=requestAnimationFrame(frame);
+          };
+          const stepScroll=()=>{
+            if(!scrollTimer)return;
+            const sc=getScroller();
+            const curY=sc===window?window.scrollY:sc.scrollTop;
+            const up=Math.random()<0.15&&curY>300;
+            const dy=up?-(120+Math.random()*140):(260+Math.random()*340);
+            const dur=650+Math.random()*450;
+            glide(dy,dur);
+            scrollTimer=setTimeout(stepScroll,dur+1100+Math.random()*2000);
+          };
+          scrollBtn.onclick=()=>{
+            if(scrollTimer){clearTimeout(scrollTimer);scrollTimer=null;if(scrollRaf){cancelAnimationFrame(scrollRaf);scrollRaf=null;}scrollBtn.textContent='▶ Auto lướt';scrollBtn.style.color='#60a5fa';}
+            else{scrollBtn.textContent='⏸ Đang lướt';scrollBtn.style.color='#34d399';scrollTimer=setTimeout(stepScroll,150);}
+          };
+          const el=document.createElement('div');
+          el.id='__ig_tool_cookie_pill';
+          el.textContent='📋 Copy Cookie';
+          el.style.cssText=pillCss;
+          el.onclick=async()=>{
+            try{
+              const c=await window.__igToolGetCookie();
+              if(!c){el.textContent='Chưa có cookie';setTimeout(()=>{el.textContent='📋 Copy Cookie';},1500);return;}
+              if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(c);
+              else{const ta=document.createElement('textarea');ta.value=c;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();}
+              el.textContent='✓ Đã copy Cookie';
+              setTimeout(()=>{el.textContent='📋 Copy Cookie';},1600);
+            }catch{el.textContent='Lỗi copy';setTimeout(()=>{el.textContent='📋 Copy Cookie';},1500);}
+          };
+          wrap.appendChild(scrollBtn);wrap.appendChild(el);document.body.appendChild(wrap);
+        };
+        if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountBtn,{once:true});
+        else mountBtn();
+      });
+    }
+    const page=await context.newPage();page.setDefaultTimeout(15000);
+    page.on('close',()=>{if(!context.pages().length)void close();});
+    await page.goto(targetUrl,{waitUntil:'domcontentloaded',timeout:45000}).catch(()=>{});
+    return {close};
+  }catch(err){await close();throw err;}
+}
+
+module.exports={openBrowser,openWithCookie,navigateToRegistration};

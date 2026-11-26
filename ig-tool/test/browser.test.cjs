@@ -6,6 +6,20 @@ const {chromium}=require('playwright');
 const {Runner}=require('../runner.cjs');
 async function waitFor(fn){for(let i=0;i<40;i++){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out waiting for form');}
 
+test('Facebook mobile dismisses the Meta account prompt before clicking signup underneath',async t=>{
+  let registered=0;
+  const server=http.createServer((req,res)=>{
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    if(req.url==='/reg/'){registered++;return res.end('<input name="firstname">');}
+    res.end(`<!doctype html><html><body><a href="/reg/">Tạo tài khoản mới</a><div role="dialog" aria-modal="true" style="position:fixed;inset:0;background:white;z-index:99"><span>Nếu đã đăng nhập vào Instagram, Messenger hoặc Threads, bạn có thể dùng tài khoản đó.</span><button onclick="this.parentElement.remove()">Hủy</button></div></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await chromium.launch({headless:true});t.after(()=>browser.close());const page=await browser.newPage();page.setDefaultTimeout(800);
+  await navigateToRegistration(page,{platform:'facebook',device:'mobile',headless:true,baseUrl:'http://127.0.0.1:'+server.address().port});
+  assert.equal(registered,1);assert.equal(await page.locator('[aria-modal="true"]').count(),0);
+  assert.equal(await page.locator('input[name="firstname"]').count(),1);
+});
+
 test('mobile completes username validation, accepts signup terms once and waits for authenticated identity',async t=>{
   let accepted=0;
   const server=http.createServer((req,res)=>{

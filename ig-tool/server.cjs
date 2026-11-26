@@ -7,6 +7,7 @@ const {parseProxy}=require('./input.cjs');
 const {connectProxy}=require('./proxy.cjs');
 const {Runner,MultiRunner}=require('./runner.cjs');
 const {ImapMailbox}=require('./imap.cjs');
+const {openWithCookie}=require('./browser.cjs');
 
 const ROOT=path.resolve(__dirname,'..');
 const PREFS_FILE=path.join(__dirname,'.local','prefs.json');
@@ -74,6 +75,7 @@ function tokensEqual(a,b){
 
 function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({proxyFactory,keepBrowserOnSuccess:true}),prefsFile=PREFS_FILE}={}){
   const token=randomBytes(24).toString('hex');
+  const cookieSessions=new Set();
   const resolveTarget=(jobId)=>{
     if(typeof runner.resolve!=='function')return runner;
     if(!jobId&&runner.jobs?.size===1)return [...runner.jobs.values()][0];
@@ -156,6 +158,33 @@ function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({pro
           const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
           return sendJson(res,200,target.acknowledge());
         }
+        if(req.method==='POST'&&pathname==='/api/ig-tool/enable-2fa'){
+          const body=await readJson(req);
+          const target=resolveTarget(body.jobId||url.searchParams.get('jobId'));
+          return sendJson(res,200,await target.enable2fa());
+        }
+        if(req.method==='POST'&&pathname==='/api/ig-tool/open-cookie'){
+          const body=await readJson(req);
+          const platform=body.platform==='facebook'?'facebook':'instagram';
+          const cookie=String(body.cookie||'').trim();
+          const device=body.device==='desktop'?'desktop':'mobile';
+          if(!cookie)return sendJson(res,400,{error:'Tài khoản chưa có Cookie.'});
+          const cfg=parseProxy(body.proxy||'',body.protocol||'auto');
+          const proxyHandle=cfg?await proxyFactory(cfg):null;
+          let session;
+          session=await openWithCookie({
+            platform,
+            cookie,
+            proxy:proxyHandle?.server,
+            device,
+            onClose:async()=>{
+              if(session)cookieSessions.delete(session);
+              await proxyHandle?.close().catch(()=>{});
+            },
+          });
+          cookieSessions.add(session);
+          return sendJson(res,200,{ok:true});
+        }
         if(req.method==='GET'&&pathname==='/api/ig-tool/prefs'){
           if(!prefsFile)return sendJson(res,200,{});
           const raw=await fs.promises.readFile(prefsFile,'utf8').catch(()=>'{}');
@@ -165,7 +194,7 @@ function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({pro
           if(!prefsFile)return sendJson(res,200,{ok:true});
           const body=await readJson(req);
           const allowed={};
-          for(const k of ['platform','device','gender','mailMode','zohoDomain','imapUser','imapPass','birthday','proxy','protocol']){
+          for(const k of ['platform','device','gender','mailMode','zohoDomain','imapUser','imapPass','birthday','proxy','proxyPool','protocol']){
             if(typeof body[k]==='string')allowed[k]=body[k];
           }
           await fs.promises.mkdir(path.dirname(prefsFile),{recursive:true});
@@ -226,9 +255,9 @@ function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({pro
           const controller=new AbortController();
           req.on('close',()=>controller.abort());
           const box=new ImapMailbox({email:filterEmail||user,imap:{host,port:993,user,pass}},{signal:controller.signal});
-          const msgs=await box.fetchRecent(15);
+          const msgs=await box.fetchRecent(8,{to:filterEmail});
           const filtered=filterEmail?msgs.filter(m=>String(m.to||'').toLowerCase().includes(filterEmail)):msgs;
-          return sendJson(res,200,{messages:filtered.slice(-8).reverse().map(m=>({id:m.id,from:m.from,to:m.to,subject:m.subject,created_at:m.created_at,snippet:String(m.body||'').replace(/\s+/g,' ').slice(0,180)}))});
+          return sendJson(res,200,{messages:filtered.slice(-8).reverse().map(m=>({id:m.id,from:m.from,to:m.to,subject:m.subject,created_at:m.created_at,snippet:String(m.body||'').replace(/\s+/g,' ').slice(0,180),body:String(m.body||'').slice(0,8000)}))});
         }
         return sendJson(res,404,{error:'Không tìm thấy API.'});
       }
@@ -252,6 +281,8 @@ function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({pro
     }
   });
   const close=async()=>{
+    await Promise.all([...cookieSessions].map(s=>s.close().catch(()=>{})));
+    cookieSessions.clear();
     if(typeof runner.shutdown==='function')await runner.shutdown().catch(()=>{});
     else await runner.stop().catch(()=>{});
     await new Promise(resolve=>server.close(()=>resolve()));

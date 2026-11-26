@@ -24,9 +24,9 @@ class Runner {
   active(){return this.job && !terminal.has(this.job.state);}
   status(){
     if(!this.job)return {state:'idle',message:'Sẵn sàng tạo phiên mới.'};
-    const {id,state,message,email,username,startedAt,protocol,ip,manualOnly,otp,saved,otpDiagnostic}=this.job;
+    const {id,state,message,email,username,startedAt,protocol,ip,manualOnly,otp,saved,twofa,otpDiagnostic}=this.job;
     const networkDiagnostic=this.job.browser?.diagnostics?.() || this.job.networkDiagnostic;
-    return {id,state,message,email,username,startedAt,protocol,ip,manualOnly,otp,saved,...(otpDiagnostic?{otpDiagnostic:{...otpDiagnostic}}:{}),...(networkDiagnostic?{networkDiagnostic}:{})};
+    return {id,state,message,email,username,startedAt,protocol,ip,manualOnly,otp,saved,twofa:Boolean(twofa),...(otpDiagnostic?{otpDiagnostic:{...otpDiagnostic}}:{}),...(networkDiagnostic?{networkDiagnostic}:{})};
   }
   start(raw){
     if(this.active())throw Error('Đang có một phiên chạy. Hãy dừng phiên trước.');
@@ -78,6 +78,17 @@ class Runner {
     const b=this.job?.browser||this.linger?.browser;
     if(!b?.getCookies)throw Error('Trình duyệt đã đóng hoặc chưa sẵn sàng.');
     return await b.getCookies();
+  }
+  async enable2fa(){
+    const j=this.job;
+    if(!j||j.state!=='succeeded')throw Error('Phiên chưa hoàn tất để bật 2FA.');
+    const b=this.linger?.browser;
+    if(!b?.enable2fa)throw Error('Trình duyệt đã đóng, không thể bật 2FA.');
+    const res=await b.enable2fa({password:j.result?.password||j.lastPassword||''});
+    if(!res?.twofa)throw Error('Không lấy được mã khóa 2FA.');
+    j.twofa=true;
+    if(j.result)j.result.twofa=res.twofa;
+    return {...this.status(),twofaKey:res.twofa};
   }
   async run(j){
     const signal=j.controller.signal;let proxy,browser,box,seen=new Set(),success=false;
@@ -193,7 +204,9 @@ class Runner {
     }catch (err) {
       if(!signal.aborted){
         console.error('[ig-tool] run error:',err?.stack||err?.message||err);
-        const msg=err?.message==='browser_closed'
+        const msg=err?.code==='META_DIALOG_BLOCKED'
+          ?'Hộp thoại Meta đang che nút đăng ký. Đóng hộp thoại đó rồi chạy lại phiên.'
+          :err?.message==='browser_closed'
           ?'Trình duyệt đã bị đóng.'
           :'Không thể tiếp tục phiên. Kiểm tra proxy, kết nối, hoặc cài đặt trình duyệt rồi chạy lại.';
         this.set(j,'failed',msg);
@@ -205,6 +218,7 @@ class Runner {
       }else{
         await browser?.close().catch(()=>{});await proxy?.close().catch(()=>{});
       }
+      j.lastPassword=j.input?.password||j.lastPassword;
       j.browser=null;j.input=null;j.pendingOtp=null;
       if(signal.aborted){j.result=null;j.state='cancelled';j.message='Đã dừng và đóng phiên.';}
       else if(success){j.state='succeeded';j.message='Đã xác nhận đúng tài khoản đăng nhập. Đang chờ lưu vào kho.';}

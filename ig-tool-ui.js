@@ -19,6 +19,16 @@
   }
 
   const STORAGE_KEY='ig_tool_local_draft_v1';
+  const DEFAULT_IMAP_USER='nguyenduynd1805@gmail.com';
+  function mailboxDefaults(prefs){
+    const next={...prefs};
+    const user=String(next.imapUser||'').trim();
+    if(!user||user.toLowerCase()==='contact@devsepa.id.vn'){
+      next.imapUser=DEFAULT_IMAP_USER;
+      next.imapPass='';
+    }
+    return next;
+  }
   const FIRST_NAMES=['Nguyen','Tran','Le','Pham','Hoang','Huynh','Phan','Vu','Vo','Dang','Bui','Do','Ho','Ngo','Duong'];
   const MID_NAMES=['Minh','Gia','Thao','Ngoc','Quoc','Khanh','Hoang','Duc','Thanh','Anh','Bao','Tuan','Hai','Linh'];
   const LAST_NAMES=['Anh','Huy','Vy','Linh','Nam','Bao','Han','Trang','Khang','Phuc','Nhi','Quan','Tu','My','Khoa'];
@@ -66,15 +76,19 @@
     let jobs=[];
     let isLegacySingle=false;
     let otpDrafts={};
+    let twofaDrafts={};
+    let twofaCodes={};
     let genKeysByEmail={};
     let saveQueue=Promise.resolve();
     let serverError='';
     let proxyDiag=null;
     let imapDiag=null;
     let imapMsgs=null;
+    let imapReadEmail='';
+    let activeMailAction=null;
     let busyAction=false;
     let lastStatusKey='';
-    const saved=readSavedDraft(global.localStorage);
+    const saved=mailboxDefaults(readSavedDraft(global.localStorage));
     const proxyHistory=Array.isArray(saved.proxyHistory)?saved.proxyHistory.filter(x=>typeof x==='string'&&x.trim()):[];
     const initId=randomIdentity();
     const initDomain=typeof saved.zohoDomain==='string'&&saved.zohoDomain?saved.zohoDomain:'devsepa.id.vn';
@@ -88,7 +102,7 @@
       genKey:typeof saved.genKey==='string'?saved.genKey:'',
       zohoDomain:initDomain,
       customEmail:`${initId.mailLocal}@${initDomain}`,
-      imapUser:typeof saved.imapUser==='string'&&saved.imapUser?saved.imapUser:`contact@${initDomain}`,
+      imapUser:saved.imapUser,
       imapPass:typeof saved.imapPass==='string'?saved.imapPass:'',
       email:'',
       accessKey:'',
@@ -97,6 +111,7 @@
       password:'nguyenduy1805',
       birthday:randomBirthday(),
       proxy:typeof saved.proxy==='string'?saved.proxy:'',
+      proxyPool:typeof saved.proxyPool==='string'?saved.proxyPool:'',
       protocol:['auto','http','socks5'].includes(saved.protocol)?saved.protocol:'auto',
       otp:'',
     };
@@ -154,6 +169,7 @@
         imapPass:draft.imapPass,
         birthday:draft.birthday,
         proxy:draft.proxy,
+        proxyPool:draft.proxyPool,
         protocol:draft.protocol,
         proxyHistory:nextHistory,
       };
@@ -166,9 +182,15 @@
 
     async function loadServerPrefs(){
       try{
-        const p=await api('/api/ig-tool/prefs');
+        const rawPrefs=await api('/api/ig-tool/prefs');
+        const p=mailboxDefaults(rawPrefs);
         if(!p||typeof p!=='object'||destroyed)return;
-        for(const k of ['platform','device','gender','mailMode','tempType','zohoDomain','imapUser','imapPass','proxy','protocol']){
+        for(const k of ['platform','device','gender','mailMode','tempType','zohoDomain','imapUser','imapPass','proxy','proxyPool','protocol']){
+          if((k==='imapUser'||k==='imapPass')&&(dirtyKeys.has('imapUser')||dirtyKeys.has('imapPass')))continue;
+          if(k==='imapUser'||k==='imapPass'){
+            const serverUser=String(rawPrefs?.imapUser||'').trim().toLowerCase();
+            if((!serverUser||serverUser==='contact@devsepa.id.vn')&&draft.imapUser.toLowerCase()!==DEFAULT_IMAP_USER)continue;
+          }
           if(typeof p[k]==='string'&&p[k]&&!dirtyKeys.has(k)){
             draft[k]=p[k];
             const el=element.querySelector(`[data-ig="${k}"]`);
@@ -181,7 +203,7 @@
 
     function captureInputs(e){
       if(e?.target?.dataset?.ig)dirtyKeys.add(e.target.dataset.ig);
-      for(const key of ['platform','device','gender','mailMode','tempType','genEmail','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol','otp']){
+      for(const key of ['platform','device','gender','mailMode','tempType','genEmail','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','proxyPool','protocol','otp']){
         const el=element.querySelector(`[data-ig="${key}"]`);
         if(el)draft[key]=el.value;
       }
@@ -207,143 +229,189 @@
     function renderFormShell(){
       const writable=readWritable();
       element.innerHTML=`
-        <div class="ig-tool-grid">
-          <section class="ig-tool-card">
-            <h3>Thông tin tạo tài khoản</h3>
-            <div data-ig-slot="readonly-banner">${!writable?'<div class="ig-tool-banner">Bạn đang ở chế độ Chỉ xem. Không thể chạy tạo tài khoản hoặc lưu vào kho.</div>':''}</div>
-            <div data-ig-slot="error-banner"></div>
-            <div class="ig-tool-row">
-              <div class="ig-tool-field">
-                <label for="ig-platform">Nền tảng</label>
-                <select id="ig-platform" data-ig="platform">
-                  <option value="instagram" ${draft.platform==='instagram'?'selected':''}>Instagram</option>
-                  <option value="facebook" ${draft.platform==='facebook'?'selected':''}>Facebook</option>
-                </select>
-              </div>
-              <div class="ig-tool-field">
-                <label for="ig-device">Chế độ trình duyệt</label>
-                <select id="ig-device" data-ig="device">
-                  <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (Chrome Android)</option>
-                  <option value="desktop" ${draft.device==='desktop'?'selected':''}>Desktop (Máy tính)</option>
-                </select>
-              </div>
+        <div class="ig-tool-shell">
+          <div class="ig-tool-topbar">
+            <div class="ig-tool-actions">
+              <span class="ig-tool-badge"><span style="color:#2fbf71">●</span> <span data-ig-slot="top-count">0/2 phiên đang chạy</span></span>
             </div>
-            <div class="ig-tool-field" data-ig-slot="gender-field" ${draft.platform==='facebook'?'':'style="display:none"'}>
-              <label for="ig-gender">Giới tính (FB)</label>
-              <select id="ig-gender" data-ig="gender">
-                <option value="female" ${draft.gender==='female'?'selected':''}>Nữ</option>
-                <option value="male" ${draft.gender==='male'?'selected':''}>Nam</option>
-              </select>
+            <div class="ig-tool-actions">
+              <button type="button" data-act="open-zoho-inbox">📬 Mở hòm thư tổng</button>
+              <button type="button" data-act="toggle-config">⚙️ Cấu hình cố định</button>
             </div>
-            <div class="ig-tool-field">
-              <label for="ig-mail-mode">Nguồn Email</label>
-              <select id="ig-mail-mode" data-ig="mailMode">
-                <option value="warehouse" ${draft.mailMode==='warehouse'?'selected':''}>Email từ kho (Kho Gmail)</option>
-                <option value="tempamail" ${draft.mailMode==='tempamail'?'selected':''}>Tạo mới Tempamail (Dùng tới đâu tạo tới đó)</option>
-                <option value="zoho" ${draft.mailMode==='zoho'?'selected':''}>Domain riêng (Zoho Catch-all Auto OTP)</option>
-              </select>
-            </div>
-            <div class="ig-tool-stack" data-ig-slot="tempamail-mail" style="display:${draft.mailMode==='tempamail'?'flex':'none'}">
-              <div class="ig-tool-row">
+          </div>
+
+          <div class="ig-tool-grid">
+            <section class="ig-tool-card">
+              <h3>Chạy phiên mới</h3>
+              <div data-ig-slot="readonly-banner">${!writable?'<div class="ig-tool-banner">Bạn đang ở chế độ Chỉ xem. Không thể chạy tạo tài khoản hoặc lưu vào kho.</div>':''}</div>
+              <div data-ig-slot="error-banner"></div>
+
+              <div class="ig-tool-actions" style="justify-content:space-between;gap:10px">
                 <div class="ig-tool-field">
-                  <label for="ig-temp-type">Loại Tempamail</label>
-                  <select id="ig-temp-type" data-ig="tempType">
-                    <option value="other" ${draft.tempType==='other'?'selected':''}>Temp Mail thường (ít bị chặn hơn)</option>
-                    <option value="edu" ${draft.tempType==='edu'?'selected':''}>Temp EDU (.edu.pl)</option>
+                  <label>Nền tảng</label>
+                  <div class="ig-tool-pills">
+                    <button type="button" data-act="set-pill" data-key="platform" data-val="instagram" aria-pressed="${draft.platform==='instagram'}">Instagram</button>
+                    <button type="button" data-act="set-pill" data-key="platform" data-val="facebook" aria-pressed="${draft.platform==='facebook'}">Facebook</button>
+                  </div>
+                  <select id="ig-platform" data-ig="platform" hidden>
+                    <option value="instagram" ${draft.platform==='instagram'?'selected':''}>Instagram</option>
+                    <option value="facebook" ${draft.platform==='facebook'?'selected':''}>Facebook</option>
                   </select>
                 </div>
                 <div class="ig-tool-field">
-                  <label for="ig-gen-email">Email vừa tạo (Auto OTP)</label>
-                  <input id="ig-gen-email" data-ig="genEmail" type="text" readonly value="${esc(draft.genEmail)}" placeholder="Tự tạo khi bấm Bắt đầu" />
+                  <label>Chế độ</label>
+                  <div class="ig-tool-pills">
+                    <button type="button" data-act="set-pill" data-key="device" data-val="mobile" aria-pressed="${draft.device==='mobile'}">Mobile</button>
+                    <button type="button" data-act="set-pill" data-key="device" data-val="desktop" aria-pressed="${draft.device==='desktop'}">Desktop</button>
+                  </div>
+                  <select id="ig-device" data-ig="device" hidden>
+                    <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (Chrome Android)</option>
+                    <option value="desktop" ${draft.device==='desktop'?'selected':''}>Desktop (Máy tính)</option>
+                  </select>
+                </div>
+                <div class="ig-tool-field" data-ig-slot="gender-field" ${draft.platform==='facebook'?'':'style="display:none"'}>
+                  <label>Giới tính</label>
+                  <div class="ig-tool-pills">
+                    <button type="button" data-act="set-pill" data-key="gender" data-val="male" aria-pressed="${draft.gender==='male'}">Nam</button>
+                    <button type="button" data-act="set-pill" data-key="gender" data-val="female" aria-pressed="${draft.gender==='female'}">Nữ</button>
+                  </div>
+                  <select id="ig-gender" data-ig="gender" hidden>
+                    <option value="female" ${draft.gender==='female'?'selected':''}>Nữ</option>
+                    <option value="male" ${draft.gender==='male'?'selected':''}>Nam</option>
+                  </select>
                 </div>
               </div>
-              <div class="ig-tool-actions">
-                <button type="button" data-act="gen-mail">Tạo 1 mail mới</button>
-                <button type="button" data-act="open-gen-inbox" data-ig-slot="gen-mail-link" style="display:${draft.genKey?'inline-flex':'none'};align-items:center;gap:5px;border-color:#2fbf71;color:#2fbf71">Hộp thư &amp; OTP</button>
-              </div>
-            </div>
-            <div class="ig-tool-field" data-ig-slot="warehouse-mail" ${draft.mailMode==='zoho'?'style="display:none"':''}>
-              <label for="ig-mail-select">Email từ kho</label>
-              <select id="ig-mail-select" data-ig="email">
-                ${renderMailOptions()}
-              </select>
-            </div>
-            <div class="ig-tool-stack" data-ig-slot="zoho-mail" style="display:${draft.mailMode==='zoho'?'flex':'none'}">
-              <div class="ig-tool-row">
-                <div class="ig-tool-field">
-                  <label for="ig-custom-email">Email đăng ký (tự sinh hoặc tự nhập)</label>
-                  <input id="ig-custom-email" data-ig="customEmail" type="text" autocomplete="off" value="${esc(draft.customEmail)}" placeholder="ten@devsepa.id.vn" />
-                </div>
-                <div class="ig-tool-field">
-                  <label for="ig-zoho-domain">Domain</label>
-                  <input id="ig-zoho-domain" data-ig="zohoDomain" type="text" autocomplete="off" value="${esc(draft.zohoDomain)}" placeholder="devsepa.id.vn" />
-                </div>
-              </div>
-              <div class="ig-tool-row">
-                <div class="ig-tool-field">
-                  <label for="ig-imap-user">Hộp thư tổng Zoho</label>
-                  <input id="ig-imap-user" data-ig="imapUser" type="text" autocomplete="off" value="${esc(draft.imapUser)}" placeholder="contact@devsepa.id.vn" />
-                </div>
-                <div class="ig-tool-field">
-                  <label for="ig-imap-pass">App Password Zoho</label>
-                  <input id="ig-imap-pass" data-ig="imapPass" type="password" autocomplete="new-password" value="${esc(draft.imapPass)}" placeholder="Mật khẩu ứng dụng Zoho" />
-                </div>
-              </div>
-              <div class="ig-tool-actions">
-                <button type="button" data-act="tweak-email">Đổi số email</button>
-                <button type="button" data-act="test-imap">Kiểm tra Zoho IMAP</button>
-                <button type="button" data-act="read-imap">Đọc thư email này</button>
-              </div>
-              <div class="ig-tool-meta" data-ig-slot="imap-diag"></div>
-            </div>
-            <div class="ig-tool-row">
+
               <div class="ig-tool-field">
-                <label for="ig-name">Tên đầy đủ</label>
-                <input id="ig-name" name="ig_full_name" data-ig="name" type="text" autocomplete="off" value="${esc(draft.name)}" placeholder="Ví dụ: Nguyen Van A" />
-              </div>
-              <div class="ig-tool-field" data-ig-slot="username-field" ${draft.platform==='facebook'?'style="display:none"':''}>
-                <label for="ig-username">Username</label>
-                <input id="ig-username" name="ig_new_username" data-ig="username" type="text" autocomplete="off" value="${esc(draft.username)}" placeholder="vd_username_01" />
-              </div>
-            </div>
-            <div class="ig-tool-row">
-              <div class="ig-tool-field">
-                <label for="ig-password">Mật khẩu</label>
-                <input id="ig-password" name="ig_new_password" data-ig="password" type="password" autocomplete="new-password" value="${esc(draft.password)}" placeholder="Ít nhất 6 ký tự" />
-              </div>
-              <div class="ig-tool-field">
-                <label for="ig-birthday">Ngày sinh (dd/mm/yyyy)</label>
-                <input id="ig-birthday" name="ig_birthday" data-ig="birthday" type="text" autocomplete="off" value="${esc(draft.birthday)}" placeholder="15/01/2000" />
-              </div>
-            </div>
-            <div class="ig-tool-row">
-              <div class="ig-tool-field">
-                <label for="ig-proxy">Proxy (tuỳ chọn: host:port:user:pass)</label>
-                <input id="ig-proxy" name="ig_proxy" data-ig="proxy" type="text" list="ig-proxy-history" autocomplete="off" value="${esc(draft.proxy)}" placeholder="1.2.3.4:8000:user:pass" />
-                <datalist id="ig-proxy-history">${proxyHistory.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
-              </div>
-              <div class="ig-tool-field">
-                <label for="ig-protocol">Giao thức proxy</label>
-                <select id="ig-protocol" data-ig="protocol">
-                  <option value="auto" ${draft.protocol==='auto'?'selected':''}>Tự phát hiện (HTTP / SOCKS5)</option>
-                  <option value="http" ${draft.protocol==='http'?'selected':''}>HTTP</option>
-                  <option value="socks5" ${draft.protocol==='socks5'?'selected':''}>SOCKS5</option>
+                <label for="ig-mail-mode">Nguồn Email</label>
+                <select id="ig-mail-mode" data-ig="mailMode">
+                  <option value="warehouse" ${draft.mailMode==='warehouse'?'selected':''}>Email từ kho (Kho Gmail)</option>
+                  <option value="tempamail" ${draft.mailMode==='tempamail'?'selected':''}>Tạo mới Tempamail (Dùng tới đâu tạo tới đó)</option>
+                  <option value="zoho" ${draft.mailMode==='zoho'?'selected':''}>Domain riêng (Gmail / Zoho IMAP Auto OTP)</option>
                 </select>
               </div>
-            </div>
-            <div class="ig-tool-actions">
-              <button type="button" data-act="randomize">Random tên &amp; user</button>
-              <button type="button" data-act="test-proxy">Kiểm tra proxy</button>
-              <button type="button" class="primary" data-act="start">Bắt đầu tạo tài khoản</button>
-              <button type="button" class="danger" data-act="stop">Dừng phiên</button>
-            </div>
-            <div class="ig-tool-meta" data-ig-slot="proxy-diag"></div>
-          </section>
 
-          <section class="ig-tool-card" data-ig-slot="status-card">
-            <h3>Tiến trình &amp; Kết quả</h3>
-            <div data-ig-slot="status-body"></div>
-          </section>
+              <div class="ig-tool-stack" data-ig-slot="tempamail-mail" style="display:${draft.mailMode==='tempamail'?'flex':'none'}">
+                <div class="ig-tool-row">
+                  <div class="ig-tool-field">
+                    <label for="ig-temp-type">Loại Tempamail</label>
+                    <select id="ig-temp-type" data-ig="tempType">
+                      <option value="other" ${draft.tempType==='other'?'selected':''}>Temp Mail thường</option>
+                      <option value="edu" ${draft.tempType==='edu'?'selected':''}>Temp EDU (.edu.pl)</option>
+                    </select>
+                  </div>
+                  <div class="ig-tool-field">
+                    <label for="ig-gen-email">Email vừa tạo</label>
+                    <div class="ig-tool-inline">
+                      <input id="ig-gen-email" data-ig="genEmail" type="text" readonly value="${esc(draft.genEmail)}" placeholder="Tự tạo khi bấm Bắt đầu" />
+                      <button type="button" data-act="gen-mail">Tạo mới</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="ig-tool-actions">
+                  <button type="button" data-act="open-gen-inbox" data-ig-slot="gen-mail-link" style="display:${draft.genKey?'inline-flex':'none'};align-items:center;gap:5px;border-color:#2fbf71;color:#2fbf71">Hộp thư &amp; OTP</button>
+                </div>
+              </div>
+
+              <div class="ig-tool-field" data-ig-slot="warehouse-mail" ${draft.mailMode==='zoho'||draft.mailMode==='tempamail'?'style="display:none"':''}>
+                <label for="ig-mail-select">Email từ kho</label>
+                <select id="ig-mail-select" data-ig="email">
+                  ${renderMailOptions()}
+                </select>
+              </div>
+
+              <div class="ig-tool-field" data-ig-slot="zoho-mail" style="display:${draft.mailMode==='zoho'?'flex':'none'}">
+                <label for="ig-custom-email">Email đăng ký (tự sinh hoặc tự nhập)</label>
+                <div class="ig-tool-inline">
+                  <input id="ig-custom-email" data-ig="customEmail" type="text" autocomplete="off" value="${esc(draft.customEmail)}" placeholder="ten@devsepa.id.vn" />
+                  <button type="button" data-act="tweak-email">🎲 Đổi</button>
+                  <button type="button" data-act="read-imap">Đọc thư</button>
+                </div>
+                <div class="ig-tool-meta" data-ig-slot="imap-diag"></div>
+              </div>
+
+              <div class="ig-tool-section-head">
+                <label>Danh tính tài khoản</label>
+                <button type="button" data-act="randomize" style="padding:3px 9px;font-size:12px">🎲 Random</button>
+              </div>
+              <div class="ig-tool-row">
+                <div class="ig-tool-field">
+                  <label for="ig-name">Tên đầy đủ</label>
+                  <input id="ig-name" name="ig_full_name" data-ig="name" type="text" autocomplete="off" value="${esc(draft.name)}" placeholder="Ví dụ: Nguyen Van A" />
+                </div>
+                <div class="ig-tool-field" data-ig-slot="username-field" ${draft.platform==='facebook'?'style="display:none"':''}>
+                  <label for="ig-username">Username</label>
+                  <input id="ig-username" name="ig_new_username" data-ig="username" type="text" autocomplete="off" value="${esc(draft.username)}" placeholder="vd_username_01" />
+                </div>
+                <div class="ig-tool-field">
+                  <label for="ig-password">Mật khẩu</label>
+                  <input id="ig-password" name="ig_new_password" data-ig="password" type="password" autocomplete="new-password" value="${esc(draft.password)}" placeholder="Ít nhất 6 ký tự" />
+                </div>
+                <div class="ig-tool-field">
+                  <label for="ig-birthday">Ngày sinh (dd/mm/yyyy)</label>
+                  <input id="ig-birthday" name="ig_birthday" data-ig="birthday" type="text" autocomplete="off" value="${esc(draft.birthday)}" placeholder="15/01/2000" />
+                </div>
+              </div>
+
+              <div class="ig-tool-field">
+                <label for="ig-proxy">Proxy phiên này (tuỳ chọn)</label>
+                <div class="ig-tool-inline">
+                  <input id="ig-proxy" name="ig_proxy" data-ig="proxy" type="text" list="ig-proxy-history" autocomplete="off" value="${esc(draft.proxy)}" placeholder="1.2.3.4:8000:user:pass" />
+                  <button type="button" data-act="pick-proxy">🎲 Đổi</button>
+                  <button type="button" data-act="test-proxy">Kiểm tra</button>
+                </div>
+                <datalist id="ig-proxy-history">${proxyHistory.map(p=>`<option value="${esc(p)}"></option>`).join('')}</datalist>
+              </div>
+              <div class="ig-tool-meta" data-ig-slot="proxy-diag"></div>
+
+              <button type="button" class="primary ig-tool-cta" data-act="start">▶ Bắt đầu tạo tài khoản</button>
+
+              <details class="ig-tool-details" data-ig-slot="fixed-config">
+                <summary data-ig-slot="config-summary">⚙️ Cấu hình cố định</summary>
+                <div class="ig-tool-stack">
+                  <div class="ig-tool-row">
+                    <div class="ig-tool-field">
+                      <label for="ig-zoho-domain">Domain riêng</label>
+                      <input id="ig-zoho-domain" data-ig="zohoDomain" type="text" autocomplete="off" value="${esc(draft.zohoDomain)}" placeholder="devsepa.id.vn" />
+                    </div>
+                    <div class="ig-tool-field">
+                      <label for="ig-protocol">Giao thức proxy</label>
+                      <select id="ig-protocol" data-ig="protocol">
+                        <option value="auto" ${draft.protocol==='auto'?'selected':''}>Tự phát hiện (HTTP / SOCKS5)</option>
+                        <option value="http" ${draft.protocol==='http'?'selected':''}>HTTP</option>
+                        <option value="socks5" ${draft.protocol==='socks5'?'selected':''}>SOCKS5</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="ig-tool-row">
+                    <div class="ig-tool-field">
+                      <label for="ig-imap-user">Hộp thư tổng IMAP (Gmail / Zoho)</label>
+                      <input id="ig-imap-user" data-ig="imapUser" type="text" autocomplete="off" value="${esc(draft.imapUser)}" placeholder="mailphu@gmail.com hoặc contact@domain" />
+                    </div>
+                    <div class="ig-tool-field">
+                      <label for="ig-imap-pass">App Password (Gmail / Zoho)</label>
+                      <input id="ig-imap-pass" data-ig="imapPass" type="password" autocomplete="new-password" value="${esc(draft.imapPass)}" placeholder="Mật khẩu ứng dụng 16 ký tự" />
+                    </div>
+                  </div>
+                  <div class="ig-tool-actions">
+                    <button type="button" data-act="test-imap">Kiểm tra IMAP</button>
+                  </div>
+                  <div class="ig-tool-field">
+                    <label for="ig-proxy-pool">Danh sách Proxy xoay vòng (<span data-ig-slot="proxy-count">0</span>)</label>
+                    <textarea id="ig-proxy-pool" data-ig="proxyPool" rows="3" placeholder="Mỗi dòng 1 proxy: host:port:user:pass" style="font-family:var(--mono);font-size:12px">${esc(draft.proxyPool)}</textarea>
+                    <div class="ig-tool-actions" style="margin-top:4px">
+                      <button type="button" data-act="filter-proxies">⚡ Lọc proxy sống</button>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            </section>
+
+            <section class="ig-tool-card" data-ig-slot="status-card">
+              <h3>Tiến trình &amp; Kết quả</h3>
+              <div data-ig-slot="status-body"></div>
+            </section>
+          </div>
         </div>
       `;
     }
@@ -356,9 +424,27 @@
         :jobs.length>=2;
       const lockInputs=!writable||atCapacity;
 
-      for(const key of ['platform','device','gender','mailMode','tempType','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol']){
+      for(const key of ['platform','device','gender','mailMode','tempType','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','proxyPool','protocol']){
         const el=element.querySelector(`[data-ig="${key}"]`);
-        if(el)el.disabled=lockInputs;
+        if(el){
+          el.disabled=(key==='customEmail'&&isLegacySingle&&jobs[0]?.state==='paused')?!writable:lockInputs;
+          if(el.tagName==='SELECT'&&el.value!==draft[key])el.value=draft[key];
+        }
+      }
+      element.querySelectorAll('button[data-act="set-pill"]').forEach(b=>{
+        const k=b.dataset.key,v=b.dataset.val;
+        b.disabled=lockInputs;
+        b.setAttribute('aria-pressed',String(draft[k]===v));
+      });
+      const poolCount=parseProxyPool().length;
+      const poolCountEl=element.querySelector('[data-ig-slot="proxy-count"]');
+      if(poolCountEl)poolCountEl.textContent=String(poolCount);
+      const topCountEl=element.querySelector('[data-ig-slot="top-count"]');
+      if(topCountEl)topCountEl.textContent=`${jobs.length}/2 phiên đang chạy`;
+      const cfgSumEl=element.querySelector('[data-ig-slot="config-summary"]');
+      if(cfgSumEl){
+        const imapLabel=draft.imapUser?draft.imapUser:'Chưa cài IMAP';
+        cfgSumEl.textContent=`⚙️ Cấu hình cố định: ${imapLabel} · ${poolCount} Proxy xoay vòng`;
       }
       const userSlot=element.querySelector('[data-ig-slot="username-field"]');
       const genderSlot=element.querySelector('[data-ig-slot="gender-field"]');
@@ -391,9 +477,12 @@
       const mailAfter=readMails().find(m=>m.email===draft.email);
       const isMailUsed=draft.mailMode==='warehouse'&&!!mailAfter?.usedOn?.[draft.platform];
       const chosenEmail=(draft.mailMode==='zoho'?draft.customEmail:draft.mailMode==='tempamail'?draft.genEmail:draft.email).trim().toLowerCase();
-      const isMailInUse=!!chosenEmail&&jobs.some(j=>String(j.email||'').trim().toLowerCase()===chosenEmail);
+      const dupIdx=chosenEmail?jobs.findIndex(j=>String(j.email||'').trim().toLowerCase()===chosenEmail):-1;
+      const isMailInUse=dupIdx>=0;
 
       const btnRand=element.querySelector('button[data-act="randomize"]');
+      const btnPickProxy=element.querySelector('button[data-act="pick-proxy"]');
+      const btnFilterProxies=element.querySelector('button[data-act="filter-proxies"]');
       const btnGenMail=element.querySelector('button[data-act="gen-mail"]');
       const btnTweak=element.querySelector('button[data-act="tweak-email"]');
       const btnTest=element.querySelector('button[data-act="test-proxy"]');
@@ -402,6 +491,8 @@
       const btnStart=element.querySelector('button[data-act="start"]');
       const btnStop=element.querySelector('button[data-act="stop"]');
       if(btnRand)btnRand.disabled=lockInputs||busyAction;
+      if(btnPickProxy)btnPickProxy.disabled=lockInputs||busyAction||!parseProxyPool().length;
+      if(btnFilterProxies)btnFilterProxies.disabled=lockInputs||busyAction||!parseProxyPool().length;
       if(btnGenMail)btnGenMail.disabled=lockInputs||busyAction;
       const genLink=element.querySelector('[data-ig-slot="gen-mail-link"]');
       if(genLink)genLink.style.display=draft.genKey?'inline-flex':'none';
@@ -409,6 +500,8 @@
       if(btnTest)btnTest.disabled=lockInputs||busyAction;
       if(btnTestImap)btnTestImap.disabled=lockInputs||busyAction;
       if(btnReadImap)btnReadImap.disabled=lockInputs||busyAction;
+      if(btnReadImap)btnReadImap.textContent=activeMailAction==='read-imap'?'Đang mở hộp thư…':'Đọc thư email này';
+      if(btnTestImap)btnTestImap.textContent=activeMailAction==='test-imap'?'Đang kiểm tra…':'Kiểm tra IMAP';
       if(btnStart)btnStart.disabled=lockInputs||!writable||busyAction||isMailUsed||isMailInUse;
       if(btnStop)btnStop.disabled=!anyActive||busyAction;
 
@@ -417,7 +510,7 @@
         if(imapMsgs){
           imapDiagSlot.innerHTML=imapMsgs.length
             ?imapMsgs.map(m=>`<div style="width:100%;border-top:1px solid var(--line);padding-top:4px"><b>${esc(m.subject||'(Không tiêu đề)')}</b> · ${esc(m.from)}<br><span>${esc(m.snippet)}</span></div>`).join('')
-            :'Chưa có thư nào gửi tới email này.';
+            :`Chưa có thư gửi tới ${esc(imapReadEmail||draft.customEmail)} trong các thư gần nhất. Bấm Mở hòm thư tổng để xem các địa chỉ khác.`;
         }else{
           imapDiagSlot.textContent=imapDiag||'';
         }
@@ -425,7 +518,9 @@
 
       const errSlot=element.querySelector('[data-ig-slot="error-banner"]');
       const usedMsg=isMailUsed?`Email ${draft.email} đã được sử dụng cho ${draft.platform==='facebook'?'Facebook':'Instagram'}. Hãy chọn email khác.`:'';
-      const dupMsg=isMailInUse?`Email ${chosenEmail} đang được dùng ở phiên khác. Hãy chọn email khác.`:'';
+      const dupJob=isMailInUse?jobs[dupIdx]:null;
+      const dupState=dupJob?(STATE_LABEL[dupJob.state]||dupJob.state):'';
+      const dupMsg=isMailInUse?`Email ${chosenEmail} đang được giữ bởi Phiên ${dupIdx+1} (${dupState}). Hãy bấm "🎲 Đổi" email hoặc bấm "Đóng phiên" ở Phiên ${dupIdx+1}.`:'';
       const bannerMsg=serverError||usedMsg||dupMsg;
       if(errSlot)errSlot.innerHTML=bannerMsg?`<div class="ig-tool-banner">${esc(bannerMsg)}</div>`:'';
 
@@ -447,10 +542,10 @@
         const matchedMail=readMails().find(m=>String(m.email||'').toLowerCase()===emLower);
         inboxKey=matchedMail?.accessKey||genKeysByEmail[emLower]||(draft.genEmail&&draft.genEmail.toLowerCase()===emLower?draft.genKey:'');
         if(inboxKey)inboxHref=`https://tempamail.com/access?key=${encodeURIComponent(inboxKey)}`;
-        else if(draft.mailMode==='zoho'||(draft.zohoDomain&&emLower.endsWith('@'+draft.zohoDomain.trim().toLowerCase())))inboxHref='https://mail.zoho.com';
+        else if(draft.mailMode==='zoho'||(draft.zohoDomain&&emLower.endsWith('@'+draft.zohoDomain.trim().toLowerCase())))inboxHref=/@gmail\.com$/i.test(draft.imapUser.trim())?'https://mail.google.com':'https://mail.zoho.com';
         else if(emLower.endsWith('@gmail.com'))inboxHref='https://mail.google.com';
       }
-      const inboxActionHtml=(inboxKey&&typeof openInbox==='function')
+      const inboxActionHtml=((inboxKey||inboxHref)&&typeof openInbox==='function')
         ?`<button type="button" data-act="open-status-inbox" data-job-id="${esc(jid)}" style="padding:3px 9px;border:1px solid #2fbf71;color:#2fbf71;border-radius:6px;font-size:12px">Hộp thư &amp; OTP</button>`
         :(inboxHref?`<a href="${esc(inboxHref)}" target="_blank" rel="noopener noreferrer" class="mini link" style="padding:2px 8px;border:1px solid var(--line);border-radius:6px;text-decoration:none;font-size:11.5px">Mở hộp thư ↗</a>`:'');
 
@@ -470,28 +565,33 @@
             <div>${esc(job.message||'')}</div>
             ${job.email?`<div class="ig-tool-meta" style="align-items:center"><span>Email: ${esc(job.email)}</span>${inboxActionHtml}${job.otp?`<span>OTP: <b>${esc(job.otp)}</b></span>`:''}</div>`:''}
             ${job.protocol||job.ip?`<div class="ig-tool-meta"><span>Giao thức: ${esc(job.protocol||'—')}</span><span>IP: ${esc(job.ip||'—')}</span></div>`:''}
-            ${job.otpDiagnostic?`
-              <div data-ig-slot="otp-diagnostic" class="ig-tool-stack" style="margin-top:8px">
-                <strong>Chi tiết lần xác nhận OTP</strong>
-                <div class="ig-tool-meta"><span>Chế độ: ${job.otpDiagnostic.device==='mobile'?'Mobile':'Desktop'}</span><span>Nguồn mã: ${job.otpDiagnostic.source==='mailbox'?'Hộp thư tự động':job.otpDiagnostic.source==='manual'?'Nhập trong tool':'Nhập trực tiếp hoặc chưa xác định'}</span></div>
-                ${job.otpDiagnostic.messageId?`<div class="ig-tool-meta">ID thư: ${esc(job.otpDiagnostic.messageId)}</div>`:''}
-                ${Number.isFinite(job.otpDiagnostic.submittedAt)?`<div class="ig-tool-meta">Gửi xác nhận lúc: ${esc(new Date(job.otpDiagnostic.submittedAt).toLocaleString('vi-VN'))}</div>`:''}
-                ${job.otpDiagnostic.reason?'<div class="ig-tool-meta">Kết quả: Mã bị từ chối hoặc hết hạn; đã dừng tự gửi.</div>':''}
-              </div>
-            `:''}
-            ${job.networkDiagnostic?`
-              <div data-ig-slot="network-diagnostic" class="ig-tool-stack" style="margin-top:8px">
-                <strong>Phản hồi đăng ký</strong>
-                ${job.networkDiagnostic.events?.length?job.networkDiagnostic.events.slice(-4).map(event=>`
-                  <div class="ig-tool-meta">
-                    <span>${esc(Number.isFinite(event.at)?new Date(event.at).toLocaleTimeString('vi-VN'):'—')}</span>
-                    <span>${esc(({verify_code:'Xác nhận mã',send_code:'Gửi mã',registration:'Đăng ký',other:'Yêu cầu khác'})[event.stage]||'Yêu cầu khác')}</span>
-                    <span>${event.networkError?'Lỗi kết nối':event.httpStatus?'HTTP '+esc(event.httpStatus):'Đang chờ phản hồi'}</span>
-                    ${event.outcome?`<span>${esc(event.outcome)}</span>`:''}
-                    ${event.errors?.length?`<span>Mã lỗi: ${esc(event.errors.join(', '))}</span>`:''}
+            ${(job.otpDiagnostic||job.networkDiagnostic)?`
+              <details class="ig-tool-details" style="margin-top:4px" ${(job.state==='paused'||job.state==='failed'||job.otpDiagnostic?.reason)?'open':''}>
+                <summary>▸ Chi tiết kỹ thuật</summary>
+                ${job.otpDiagnostic?`
+                  <div data-ig-slot="otp-diagnostic" class="ig-tool-stack" style="margin-top:6px">
+                    <strong>Chi tiết lần xác nhận OTP</strong>
+                    <div class="ig-tool-meta"><span>Chế độ: ${job.otpDiagnostic.device==='mobile'?'Mobile':'Desktop'}</span><span>Nguồn mã: ${job.otpDiagnostic.source==='mailbox'?'Hộp thư tự động':job.otpDiagnostic.source==='manual'?'Nhập trong tool':'Nhập trực tiếp hoặc chưa xác định'}</span></div>
+                    ${job.otpDiagnostic.messageId?`<div class="ig-tool-meta">ID thư: ${esc(job.otpDiagnostic.messageId)}</div>`:''}
+                    ${Number.isFinite(job.otpDiagnostic.submittedAt)?`<div class="ig-tool-meta">Gửi xác nhận lúc: ${esc(new Date(job.otpDiagnostic.submittedAt).toLocaleString('vi-VN'))}</div>`:''}
+                    ${job.otpDiagnostic.reason?'<div class="ig-tool-meta">Kết quả: Mã bị từ chối hoặc hết hạn; đã dừng tự gửi.</div>':''}
                   </div>
-                `).join(''):'<div class="ig-tool-meta">Chưa ghi nhận yêu cầu xác nhận trong phiên này.</div>'}
-              </div>
+                `:''}
+                ${job.networkDiagnostic?`
+                  <div data-ig-slot="network-diagnostic" class="ig-tool-stack" style="margin-top:6px">
+                    <strong>Phản hồi đăng ký</strong>
+                    ${job.networkDiagnostic.events?.length?job.networkDiagnostic.events.slice(-4).map(event=>`
+                      <div class="ig-tool-meta">
+                        <span>${esc(Number.isFinite(event.at)?new Date(event.at).toLocaleTimeString('vi-VN'):'—')}</span>
+                        <span>${esc(({verify_code:'Xác nhận mã',send_code:'Gửi mã',registration:'Đăng ký',other:'Yêu cầu khác'})[event.stage]||'Yêu cầu khác')}</span>
+                        <span>${event.networkError?'Lỗi kết nối':event.httpStatus?'HTTP '+esc(event.httpStatus):'Đang chờ phản hồi'}</span>
+                        ${event.outcome?`<span>${esc(event.outcome)}</span>`:''}
+                        ${event.errors?.length?`<span>Mã lỗi: ${esc(event.errors.join(', '))}</span>`:''}
+                      </div>
+                    `).join(''):'<div class="ig-tool-meta">Chưa ghi nhận yêu cầu xác nhận trong phiên này.</div>'}
+                  </div>
+                `:''}
+              </details>
             `:''}
           </div>
           ${job.state==='waiting_otp'?`
@@ -508,11 +608,20 @@
               <button type="button" class="primary" data-act="resume" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>Tiếp tục</button>
             </div>
           `:''}
-          ${unsaved?`
+          ${unsaved|| (job.state==='succeeded'&&jid&&!job.twofa)?`
             <div class="ig-tool-actions" style="margin-top:10px">
-              <button type="button" class="primary" data-act="save-result" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>Xác nhận</button>
+              ${unsaved?`<button type="button" class="primary" data-act="save-result" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>Xác nhận</button>`:''}
+              ${job.state==='succeeded'&&jid&&!job.twofa?`<button type="button" data-act="enable-2fa" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>🔐 Bật 2FA</button>`:''}
             </div>
+            ${unsaved?`
+              <div class="ig-tool-actions" style="margin-top:8px;align-items:center">
+                <input data-ig="twofa-input" data-job-id="${esc(jid)}" type="text" value="${esc(twofaDrafts[okey]||'')}" placeholder="Dán chuỗi khóa 2FA (Secret Key)..." style="flex:1;min-width:160px" ${!writable?'disabled':''} />
+                <button type="button" data-act="gen-2fa-code" data-job-id="${esc(jid)}" ${!writable||busyAction?'disabled':''}>🔑 Lấy mã</button>
+                ${twofaCodes[okey]?`<span class="mono" style="padding:4px 8px;border:1px solid rgba(47,191,113,0.45);border-radius:6px;color:#2fbf71;font-weight:700">${esc(twofaCodes[okey])}</span>`:''}
+              </div>
+            `:''}
           `:''}
+          ${job.twofa?'<div class="ig-tool-meta" style="margin-top:6px;color:#2fbf71">✓ Đã bật 2FA (TOTP) cho tài khoản này.</div>':''}
           ${job.saved?'<div class="ig-tool-meta" style="margin-top:8px">Đã lưu tài khoản vào kho.</div>':''}
         </div>
       `;
@@ -521,12 +630,15 @@
     function renderStatusPanel(){
       const writable=readWritable();
       const displayJobs=jobs.length?jobs:[{state:'idle',message:'Sẵn sàng tạo phiên mới (tối đa 2 phiên song song).'}];
-      const key=JSON.stringify([displayJobs,writable,busyAction]);
+      const key=JSON.stringify([displayJobs,writable,busyAction,twofaCodes]);
       if(key===lastStatusKey)return;
       lastStatusKey=key;
 
       element.querySelectorAll('[data-ig="otp"]').forEach(el=>{
         otpDrafts[el.dataset.jobId||'_single']=el.value;
+      });
+      element.querySelectorAll('[data-ig="twofa-input"]').forEach(el=>{
+        twofaDrafts[el.dataset.jobId||'_single']=el.value;
       });
 
       const slot=element.querySelector('[data-ig-slot="status-body"]');
@@ -540,11 +652,23 @@
       renderStatusPanel();
     }
 
+    function parseProxyPool(){
+      return [...new Set(String(draft.proxyPool||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean))];
+    }
+
+    function pickRandomProxy(excludeCurrent=true){
+      const pool=parseProxyPool();
+      if(!pool.length)return draft.proxy;
+      const cur=draft.proxy.trim();
+      const candidates=excludeCurrent&&pool.length>1?pool.filter(p=>p!==cur):pool;
+      return candidates[Math.floor(Math.random()*candidates.length)]||pool[0];
+    }
+
     function rotateFormIdentity(){
       draft.genEmail='';draft.genKey='';
       const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value='';
       const next=randomIdentity();
-      draft.name=next.name;draft.username=next.username;draft.birthday=randomBirthday();
+      draft.name=next.name;draft.username=next.username;
       const dom=(draft.zohoDomain||'devsepa.id.vn').trim();
       draft.customEmail=`${next.mailLocal}@${dom}`;
       const inUse=new Set(jobs.map(j=>String(j.email||'').trim().toLowerCase()).filter(Boolean));
@@ -553,20 +677,48 @@
         draft.email=avail.email;draft.accessKey=avail.accessKey||'';
         const ms=element.querySelector('[data-ig="email"]');if(ms)ms.value=avail.email;
       }
-      for(const [sel,val] of [['[data-ig="name"]',draft.name],['[data-ig="username"]',draft.username],['[data-ig="birthday"]',draft.birthday],['[data-ig="customEmail"]',draft.customEmail]]){
+      if(parseProxyPool().length){
+        draft.proxy=pickRandomProxy(true);
+        const px=element.querySelector('[data-ig="proxy"]');if(px)px.value=draft.proxy;
+      }
+      for(const [sel,val] of [['[data-ig="name"]',draft.name],['[data-ig="username"]',draft.username],['[data-ig="customEmail"]',draft.customEmail]]){
         const el=element.querySelector(sel);if(el)el.value=val;
       }
       saveDraftPrefs();
     }
 
+    async function computeTotp(secret){
+      const clean=String(secret||'').replace(/[\s=-]/g,'').toUpperCase();
+      if(!clean||!/^[A-Z2-7]+$/.test(clean))throw Error('Chuỗi khóa 2FA không hợp lệ.');
+      let bits='';
+      for(const ch of clean)bits+='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'.indexOf(ch).toString(2).padStart(5,'0');
+      const bytes=new Uint8Array(Math.floor(bits.length/8));
+      for(let i=0;i<bytes.length;i++)bytes[i]=parseInt(bits.slice(i*8,i*8+8),2);
+      const c=Math.floor(Date.now()/1000/30);
+      const buf=new ArrayBuffer(8);
+      new DataView(buf).setUint32(4,c>>>0,false);
+      new DataView(buf).setUint32(0,Math.floor(c/0x100000000),false);
+      const k=await global.crypto.subtle.importKey('raw',bytes,{name:'HMAC',hash:'SHA-1'},false,['sign']);
+      const sig=new Uint8Array(await global.crypto.subtle.sign('HMAC',k,buf));
+      const off=sig[sig.length-1]&0xf;
+      const num=((sig[off]&0x7f)<<24)|((sig[off+1]&0xff)<<16)|((sig[off+2]&0xff)<<8)|(sig[off+3]&0xff);
+      return String(num%1e6).padStart(6,'0');
+    }
+
     async function performSave(jobId){
       const runSave=async()=>{
         if(!readWritable())throw Error('Bạn không có quyền lưu vào kho.');
+        const okey=jobId||'_single';
+        const tfEl=element.querySelector(`[data-ig="twofa-input"][data-job-id="${jobId}"]`)||element.querySelector('[data-ig="twofa-input"]');
+        const manualTwofa=String((tfEl?tfEl.value:twofaDrafts[okey])||'').replace(/\s+/g,'').toUpperCase();
         const q=jobId?`?jobId=${encodeURIComponent(jobId)}`:'';
         const result=await api('/api/ig-tool/result'+q);
+        if(manualTwofa&&!result.twofa)result.twofa=manualTwofa;
         const ok=typeof save==='function'?await save(result):false;
         if(!ok)throw Error('Lưu vào kho thất bại hoặc bị từ chối. Kết quả vẫn được giữ để thử lại.');
         const ack=await api('/api/ig-tool/acknowledge',{method:'POST',body:JSON.stringify({jobId})});
+        delete twofaDrafts[okey];
+        delete twofaCodes[okey];
         if(isLegacySingle)jobs=[ack];
         else await refreshStatus();
         serverError='';
@@ -609,13 +761,37 @@
 
     async function handleClick(e){
       const btn=e.target.closest('button[data-act]');
-      if(!btn||btn.disabled)return;
+      if(!btn)return;
+      e.stopPropagation();
+      if(btn.disabled)return;
       captureInputs();
       const act=btn.dataset.act;
+      if(act==='read-imap'||act==='test-imap'){
+        activeMailAction=act;imapMsgs=null;
+        imapDiag=act==='read-imap'?'Đang mở hộp thư của email đã chọn…':'Đang kết nối hộp thư IMAP…';
+      }
       busyAction=true;
       render();
       try{
-        if(act==='randomize'){
+        if(act==='set-pill'){
+          const key=btn.dataset.key,val=btn.dataset.val;
+          if(key&&val){
+            draft[key]=val;
+            const sel=element.querySelector(`[data-ig="${key}"]`);
+            if(sel)sel.value=val;
+            if(key==='platform'){
+              const inUse=new Set(jobs.map(j=>String(j.email||'').trim().toLowerCase()).filter(Boolean));
+              const avail=pickBestWarehouseMail(readMails(),draft.platform,inUse);
+              if(avail&&readMails().find(m=>m.email===draft.email)?.usedOn?.[draft.platform]){
+                draft.email=avail.email;draft.accessKey=avail.accessKey||'';
+              }
+            }
+            saveDraftPrefs();
+          }
+        }else if(act==='toggle-config'){
+          const det=element.querySelector('[data-ig-slot="fixed-config"]');
+          if(det){det.open=!det.open;if(det.open)det.scrollIntoView({behavior:'smooth',block:'nearest'});}
+        }else if(act==='randomize'){
           const next=randomIdentity();
           draft.name=next.name;draft.username=next.username;draft.birthday=randomBirthday();
           const dom=(draft.zohoDomain||'devsepa.id.vn').trim();
@@ -629,6 +805,40 @@
           if(bdayEl)bdayEl.value=draft.birthday;
           if(customEl)customEl.value=draft.customEmail;
           saveDraftPrefs();
+        }else if(act==='pick-proxy'){
+          if(!parseProxyPool().length)throw Error('Chưa có proxy nào trong Danh sách Proxy xoay vòng.');
+          draft.proxy=pickRandomProxy(true);
+          const px=element.querySelector('[data-ig="proxy"]');if(px)px.value=draft.proxy;
+          saveDraftPrefs();
+          proxyDiag=`Đã chọn ngẫu nhiên proxy: ${draft.proxy}`;
+          serverError='';
+        }else if(act==='filter-proxies'){
+          const pool=parseProxyPool();
+          if(!pool.length)throw Error('Chưa có proxy nào trong Danh sách Proxy xoay vòng.');
+          const alive=[];
+          let dead=0;
+          for(let i=0;i<pool.length;i+=3){
+            const batch=pool.slice(i,i+3);
+            const results=await Promise.all(batch.map(async p=>{
+              try{
+                const r=await api('/api/ig-tool/proxy',{method:'POST',body:JSON.stringify({proxy:p,protocol:draft.protocol})});
+                return r?.ip?p:null;
+              }catch{return null;}
+            }));
+            for(const item of results){
+              if(item)alive.push(item);
+              else dead++;
+            }
+          }
+          draft.proxyPool=alive.join('\n');
+          const poolEl=element.querySelector('[data-ig="proxyPool"]');if(poolEl)poolEl.value=draft.proxyPool;
+          if(draft.proxy&&!alive.includes(draft.proxy.trim())){
+            draft.proxy=alive[0]||'';
+            const px=element.querySelector('[data-ig="proxy"]');if(px)px.value=draft.proxy;
+          }
+          saveDraftPrefs();
+          proxyDiag=`Đã lọc xong: ${alive.length} proxy sống, đã xoá ${dead} proxy lỗi.`;
+          serverError='';
         }else if(act==='open-gen-inbox'){
           if(typeof openInbox==='function'&&draft.genKey)openInbox({email:draft.genEmail,accessKey:draft.genKey});
         }else if(act==='open-status-inbox'){
@@ -638,7 +848,14 @@
           const emLower=String(targetEmail||'').toLowerCase();
           const matched=readMails().find(m=>String(m.email||'').toLowerCase()===emLower);
           const key=matched?.accessKey||genKeysByEmail[emLower]||(draft.genEmail&&draft.genEmail.toLowerCase()===emLower?draft.genKey:'');
-          if(typeof openInbox==='function')openInbox({email:targetEmail,accessKey:key});
+          if(typeof openInbox==='function'){
+            if(key)openInbox({email:targetEmail,accessKey:key});
+            else {
+              if(!draft.imapUser.trim()||!draft.imapPass)throw Error('Nhập hộp thư tổng và App Password để đọc thư của phiên.');
+              const tok=await ensureToken();
+              await openInbox({email:targetEmail,zoho:{user:draft.imapUser.trim(),pass:draft.imapPass,token:tok,showAll:false}});
+            }
+          }
         }else if(act==='gen-mail'){
           if(typeof generateMail!=='function')throw Error('Chức năng tạo mail chưa sẵn sàng.');
           const gen=await generateMail(draft.tempType);
@@ -666,11 +883,27 @@
         }else if(act==='test-imap'){
           const res=await api('/api/ig-tool/imap-test',{method:'POST',body:JSON.stringify({user:draft.imapUser,pass:draft.imapPass})});
           imapMsgs=null;
-          imapDiag=`Kết nối Zoho IMAP thành công (${res.count} thư gần nhất trong INBOX).`;
+          imapDiag=`Kết nối IMAP thành công (${res.count} thư gần nhất trong INBOX).`;
           serverError='';
         }else if(act==='read-imap'){
-          const res=await api('/api/ig-tool/imap-messages',{method:'POST',body:JSON.stringify({user:draft.imapUser,pass:draft.imapPass,email:draft.customEmail})});
-          imapMsgs=res.messages||[];
+          const selectedEmail=draft.customEmail.trim();
+          const mailbox={user:draft.imapUser.trim(),pass:draft.imapPass};
+          if(!mailbox.user||!mailbox.pass)throw Error('Nhập Gmail và App Password trước khi đọc thư.');
+          if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(selectedEmail))throw Error('Nhập email đăng ký cần xem thư.');
+          imapReadEmail=selectedEmail;
+          if(typeof openInbox==='function'){
+            const tok=await ensureToken();
+            await openInbox({email:selectedEmail,zoho:{...mailbox,token:tok,showAll:false}});
+            imapDiag=`Đã mở hộp thư của ${selectedEmail}.`;
+          }else{
+            const res=await api('/api/ig-tool/imap-messages',{method:'POST',signal:global.AbortSignal?.timeout?.(60000),body:JSON.stringify({...mailbox,email:selectedEmail})});
+            imapMsgs=res.messages||[];
+          }
+          serverError='';
+        }else if(act==='open-zoho-inbox'){
+          if(!draft.imapUser.trim()||!draft.imapPass)throw Error('Thiếu email tổng hoặc App Password.');
+          const tok=await ensureToken();
+          if(typeof openInbox==='function')openInbox({email:draft.imapUser.trim(),zoho:{user:draft.imapUser.trim(),pass:draft.imapPass,token:tok,showAll:true}});
           serverError='';
         }else if(act==='test-proxy'){
           const res=await api('/api/ig-tool/proxy',{method:'POST',body:JSON.stringify({proxy:draft.proxy,protocol:draft.protocol})});
@@ -693,6 +926,10 @@
             const chosen=readMails().find(m=>m.email===draft.email);
             if(chosen?.usedOn?.[draft.platform])throw Error(`Email này đã được sử dụng cho ${draft.platform==='facebook'?'Facebook':'Instagram'}.`);
           }
+          if(!draft.proxy.trim()&&parseProxyPool().length){
+            draft.proxy=pickRandomProxy(false);
+            const px=element.querySelector('[data-ig="proxy"]');if(px)px.value=draft.proxy;
+          }
           let birthday=draft.birthday.trim();
           const dmY=birthday.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
           if(dmY)birthday=`${dmY[3]}-${dmY[2].padStart(2,'0')}-${dmY[1].padStart(2,'0')}`;
@@ -712,7 +949,6 @@
           })});
           if(isLegacySingle)jobs=[started];
           else await refreshStatus();
-          rotateFormIdentity();
           serverError='';
         }else if(act==='stop'){
           const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
@@ -739,6 +975,27 @@
         }else if(act==='save-result'){
           const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
           await performSave(jobId);
+        }else if(act==='gen-2fa-code'){
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          const okey=jobId||'_single';
+          const tfEl=element.querySelector(`[data-ig="twofa-input"][data-job-id="${jobId}"]`)||element.querySelector('[data-ig="twofa-input"]');
+          const rawSecret=String((tfEl?tfEl.value:twofaDrafts[okey])||'').trim();
+          twofaDrafts[okey]=rawSecret;
+          const code=await computeTotp(rawSecret);
+          twofaCodes[okey]=code;
+          if(global.navigator?.clipboard?.writeText)await global.navigator.clipboard.writeText(code).catch(()=>{});
+          proxyDiag=`Đã lấy & copy mã 2FA: ${code}`;
+          serverError='';
+        }else if(act==='enable-2fa'){
+          const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
+          const res=await api('/api/ig-tool/enable-2fa',{method:'POST',body:JSON.stringify({jobId})});
+          if(res?.twofaKey&&global.navigator?.clipboard?.writeText){
+            await global.navigator.clipboard.writeText(res.twofaKey).catch(()=>{});
+          }
+          proxyDiag=res?.twofaKey?'Đã bật 2FA thành công và copy key 2FA vào Clipboard!':'Đã bật 2FA thành công!';
+          if(isLegacySingle)jobs=[res];
+          else await refreshStatus();
+          serverError='';
         }else if(act==='copy-cookie'){
           const jobId=btn.dataset.jobId||(jobs.length===1?jobs[0].id:'');
           const q=jobId?`?jobId=${encodeURIComponent(jobId)}`:'';
@@ -750,7 +1007,9 @@
         }
       }catch(err){
         serverError=err.message||'Thao tác thất bại.';
+        if(activeMailAction){imapMsgs=null;imapDiag=serverError;}
       }finally{
+        activeMailAction=null;
         busyAction=false;
         render();
       }

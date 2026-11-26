@@ -1030,7 +1030,7 @@
             if (!s[k]) return '<span class="muted">—</span>';
             const id = a.uid + "|" + k,
               on = shown.has(id);
-            return `<span class="sec"><span class="mono">${on ? esc(s[k]) : "••••••"}</span>${ib("show", esc(id), on ? "off" : "eye", (on ? "Ẩn " : "Hiện ") + LABEL[k])}${k === "twofa" ? `<button type="button" class="mini mono totp-pill" data-act="code" data-v="${u}" data-totp-uid="${u}" title="Bấm để Copy mã 2FA 6 số" style="padding:2px 7px;gap:5px;border-color:rgba(47,191,113,0.45);background:rgba(47,191,113,0.1);color:#2fbf71;display:inline-flex;align-items:center"><span>🔑</span><span class="totp-code">••••••</span><span class="totp-sec" style="font-size:11px;opacity:.85">--s</span></button>` : ib("cp", esc(id), "copy", "Chép " + LABEL[k])}</span>`;
+            return `<span class="sec"><span class="mono">${on ? esc(s[k]) : "••••••"}</span>${ib("show", esc(id), on ? "off" : "eye", (on ? "Ẩn " : "Hiện ") + LABEL[k])}${k === "twofa" ? `<button type="button" class="mini mono totp-pill" data-act="code" data-v="${u}" data-totp-uid="${u}" title="Bấm để Copy mã 2FA 6 số" style="padding:2px 7px;gap:5px;border-color:rgba(47,191,113,0.45);background:rgba(47,191,113,0.1);color:#2fbf71;display:inline-flex;align-items:center"><span>🔑</span><span class="totp-code">••••••</span><span class="totp-sec" style="font-size:11px;opacity:.85">--s</span></button>` : ib("cp", esc(id), "copy", "Chép " + LABEL[k])}${k === "cookie" ? ib("openByCookie", u, "ext", "Mở trình duyệt bằng Cookie") : ""}</span>`;
           }
           if (k === "email" && a.email)
             return `<span class="sec"><span>${esc(a.email)}</span>${ib("cpMail", u, "copy", "Chép Gmail")}<button class="ico" data-act="inboxTempMailByEmail" data-v="${esc(a.email)}" title="Mở hộp thư &amp; lấy mã OTP" style="color:#2fbf71;width:24px;height:24px">${icon("mail")}</button></span>`;
@@ -2589,21 +2589,23 @@
           showTempMailModal(email, emailUuid);
         }
 
-        function showTempMailModal(email, emailUuid) {
+        function showTempMailModal(email, emailUuid, zohoConfig = null) {
           const d = $("#dlg");
+          const isZoho = !!zohoConfig;
+          const imapProvider = /@gmail\.com$/i.test(String(zohoConfig?.user || "").trim()) ? "Gmail" : "Zoho";
           requestNotificationPermission();
           d.innerHTML = `<div class="inbox-shell" style="display:grid;gap:12px;max-height:80vh;overflow-y:auto">
     <div class="inbox-heading" style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:10px;gap:10px">
       <div>
         <h2 style="margin:0;font-size:16px;display:flex;align-items:center;gap:7px">
-          <span style="color:#2fbf71">${icon("mail")}</span> Hộp Thư &amp; OTP
+          <span style="color:#2fbf71">${icon("mail")}</span> Hộp Thư &amp; OTP ${isZoho ? `(${imapProvider} IMAP)` : ""}
         </h2>
         <div style="font-size:12px;color:var(--mute);margin-top:3px;word-break:break-all">
           Địa chỉ: <b style="color:var(--fg)">${esc(email)}</b>
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
-        <a href="https://tempamail.com/access?key=${esc(emailUuid)}" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px" title="Mở trên web">${icon("ext")} Web</a>
+        <a href="${isZoho ? imapProvider === "Gmail" ? "https://mail.google.com" : "https://mail.zoho.com" : "https://tempamail.com/access?key=" + esc(emailUuid)}" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px" title="Mở trên web">${icon("ext")} Web</a>
         <button type="button" class="ico" id="btnCloseInbox" title="Đóng">${icon("x")}</button>
       </div>
     </div>
@@ -2687,42 +2689,65 @@
             isFetching = true;
             const inboxGeneration = authGeneration;
             try {
-              if (clientUuid === "unknown") {
-                const accRes = await fetch(
-                  "https://api.tempamail.com/v1/manage",
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: new URLSearchParams({
-                      action: "access",
-                      email_uuid: emailUuid,
-                      client_uuid: "unknown",
-                      app_uuid: "a5x-cj6a-ka1q",
-                    }),
+              let rawMessages = [];
+              if (isZoho) {
+                const res = await fetch("/api/ig-tool/imap-messages", {
+                  method: "POST",
+                  signal: globalThis.AbortSignal?.timeout?.(60000),
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-IG-Tool-Token": zohoConfig.token,
                   },
-                );
-                const accData = await accRes.json();
-                if (accData && accData.client && accData.client.uuid) {
-                  clientUuid = accData.client.uuid;
+                  body: JSON.stringify({
+                    user: zohoConfig.user,
+                    pass: zohoConfig.pass,
+                    email: zohoConfig.showAll ? "" : email,
+                  }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw Error(data.error || "Không đọc được hộp thư Zoho IMAP.");
+                rawMessages = (data.messages || []).map((m) => ({
+                  ...m,
+                  body: m.body || m.snippet || "",
+                }));
+              } else {
+                if (clientUuid === "unknown") {
+                  const accRes = await fetch(
+                    "https://api.tempamail.com/v1/manage",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                      },
+                      body: new URLSearchParams({
+                        action: "access",
+                        email_uuid: emailUuid,
+                        client_uuid: "unknown",
+                        app_uuid: "a5x-cj6a-ka1q",
+                      }),
+                    },
+                  );
+                  const accData = await accRes.json();
+                  if (accData && accData.client && accData.client.uuid) {
+                    clientUuid = accData.client.uuid;
+                  }
                 }
-              }
 
-              const res = await fetch("https://api.tempamail.com/v1/messages", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                  client_uuid: clientUuid,
-                  email_uuid: emailUuid,
-                  last_message_id: 0,
-                }),
-              });
-              const data = await res.json();
+                const res = await fetch("https://api.tempamail.com/v1/messages", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                  },
+                  body: new URLSearchParams({
+                    client_uuid: clientUuid,
+                    email_uuid: emailUuid,
+                    last_message_id: 0,
+                  }),
+                });
+                const data = await res.json();
+                rawMessages = (data && data.messages) || [];
+              }
               if (inboxGeneration !== authGeneration || !d.open || !listEl.isConnected) return;
-              const rawMessages = (data && data.messages) || [];
               const messages = [...rawMessages].sort((a, b) => {
                 const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
                 const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
@@ -4084,6 +4109,30 @@
             const linkedPass = linkedAcc
               ? secretsOf(linkedAcc).mailpass || ""
               : "";
+            const uuidMatch = `${gm ? secretsOf(gm).pass || gm.pass || "" : ""} ${linkedPass}`.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+            if (!uuidMatch) {
+              let savedDraft = {};
+              try { savedDraft = JSON.parse(localStorage.getItem("ig_tool_draft_v1") || "{}"); } catch {}
+              let token = "", imapUser = savedDraft.imapUser || "", imapPass = savedDraft.imapPass || "";
+              if (location.hostname === "127.0.0.1" || location.hostname === "localhost") {
+                try {
+                  const sRes = await fetch("/api/ig-tool/session", { headers: { "X-IG-Tool-Client": "1" } });
+                  const sData = sRes.ok ? await sRes.json().catch(() => null) : null;
+                  if (sData?.token) {
+                    token = sData.token;
+                    if (!imapUser || !imapPass) {
+                      const pRes = await fetch("/api/ig-tool/prefs", { headers: { "X-IG-Tool-Token": token } });
+                      const pData = pRes.ok ? await pRes.json().catch(() => ({})) : {};
+                      imapUser = imapUser || pData.imapUser || "";
+                      imapPass = imapPass || pData.imapPass || "";
+                    }
+                  }
+                } catch {}
+              }
+              if (token && imapUser && imapPass) {
+                return showTempMailModal(email, "", { user: imapUser, pass: imapPass, token });
+              }
+            }
             if (!gm) {
               gm = {
                 uid: gmUid,
@@ -4106,6 +4155,40 @@
               if (rev) await commit([rev]);
             }
             openTempMailInbox(gm.uid);
+          },
+          openByCookie: async (uid) => {
+            const a = get(uid);
+            const cookie = a ? secretsOf(a).cookie || "" : "";
+            if (!cookie) return toast("Tài khoản này chưa có Cookie", "error");
+            if (location.hostname !== "127.0.0.1" && location.hostname !== "localhost") {
+              return toast("Hãy mở app qua IG-Tool.bat để dùng tính năng Mở bằng Cookie", "warn");
+            }
+            let savedDraft = {};
+            try { savedDraft = JSON.parse(localStorage.getItem("ig_tool_draft_v1") || "{}"); } catch {}
+            const pool = String(savedDraft.proxyPool || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+            const proxy = savedDraft.proxy || (pool.length ? pool[Math.floor(Math.random() * pool.length)] : "");
+            try {
+              const sRes = await fetch("/api/ig-tool/session", { headers: { "X-IG-Tool-Client": "1" } });
+              const sData = sRes.ok ? await sRes.json().catch(() => null) : null;
+              if (!sData?.token) return toast("Không kết nối được máy chủ IG Tool cục bộ", "error");
+              toast("Đang mở trình duyệt bằng Cookie...", "info");
+              const res = await fetch("/api/ig-tool/open-cookie", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "X-IG-Tool-Token": sData.token },
+                body: JSON.stringify({
+                  platform: a.platform || "instagram",
+                  cookie,
+                  proxy,
+                  protocol: savedDraft.protocol || "auto",
+                  device: savedDraft.device || "mobile",
+                }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) return toast(data.error || "Không mở được trình duyệt", "error");
+              toast("Đã mở trình duyệt bằng Cookie!", "success");
+            } catch {
+              toast("Chưa bật IG-Tool.bat hoặc lỗi kết nối cục bộ", "error");
+            }
           },
           confirmIgLive: async (uid) => {
             if (!canWrite()) return toast("Bạn không có quyền chỉnh sửa hoặc hệ thống đang lưu", "error");
@@ -4245,7 +4328,7 @@
           const b = e.target.closest("[data-act]");
           if (b) {
             e.preventDefault();
-            if (b.disabled) return;
+            if (b.disabled || b.closest(".ig-tool-shell, .ig-tool-grid")) return;
             try {
               const action = acts[b.dataset.act];
               if (!action) throw new Error("Missing action");
@@ -4684,7 +4767,8 @@
           igToolHandle = globalThis.IgTool.mount(v, {
             canWrite,
             mails,
-            openInbox: ({ email, accessKey }) => {
+            openInbox: ({ email, accessKey, zoho }) => {
+              if (zoho) return showTempMailModal(email, "", zoho);
               if (accessKey) return showTempMailModal(email, accessKey);
               const target = String(email || "").trim().toLowerCase();
               const rec = all().find(
@@ -4754,6 +4838,7 @@
                   ...(plat === "instagram" ? { igUsername: result.username } : {}),
                   name: result.name || "",
                   pass: result.password || "",
+                  twofa: result.twofa || "",
                   cookie: result.cookie || "",
                   email: result.email || "",
                   mailpass: mailPass,
@@ -4788,6 +4873,14 @@
           });
         }
         async function boot() {
+          if (location.hostname === "127.0.0.1" && location.hash === "#tao-ig" && window.outerWidth < screen.availWidth - 100) {
+            try {
+              const w = Math.min(760, Math.floor(screen.availWidth * 0.55));
+              const h = Math.max(680, screen.availHeight - 24);
+              window.resizeTo(w, h);
+              window.moveTo((screen.availLeft || 0) + screen.availWidth - w - 12, (screen.availTop || 0) + 12);
+            } catch {}
+          }
           render();
           try {
             if (

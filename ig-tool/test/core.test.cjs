@@ -2,6 +2,7 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {parseProxy, validateInput} = require('../input.cjs');
 const {Mailbox, selectOtp} = require('../mailbox.cjs');
+const {ImapMailbox}=require('../imap.cjs');
 
 const valid = () => ({email:'person@example.edu',name:'Test Person',username:'test.person',password:'example-password',birthday:'2000-04-12',proxy:'',protocol:'auto'});
 test('proxy parsing retains colons in passwords and encodes credentials', () => {
@@ -16,6 +17,23 @@ test('registration validates calendar dates and mandatory data before opening br
   assert.equal(validateInput(valid()).username,'test.person');
   for (const patch of [{birthday:'2001-02-29'},{birthday:'2099-01-01'},{email:'bad'},{username:'space name'},{name:''},{password:'123'}]) {
     assert.throws(()=>validateInput({...valid(),...patch}));
+  }
+});
+
+test('Gmail IMAP tests and registration use the same host and normalized app password',()=>{
+  const imap={user:' inbox@gmail.com ',pass:'abcd efgh ijkl mnop'};
+  const registration=validateInput({...valid(),imap}).imap;
+  const mailbox=new ImapMailbox({email:'person@example.edu',imap});
+  assert.equal(registration.host,'imap.gmail.com');assert.equal(registration.port,993);
+  assert.equal(registration.pass,'abcdefghijklmnop');
+  assert.deepEqual(mailbox.imap,registration);
+});
+
+test('IMAP keeps Zoho defaults and explicitly configured hosts',()=>{
+  for(const [user,override,wanted] of [['inbox@zoho.com',undefined,'imap.zoho.com'],['contact@example.com',undefined,'imappro.zoho.com'],['contact@example.com','imap.gmail.com','imap.gmail.com']]){
+    const imap={user,pass:'abcdefghijklmnop',...(override?{host:override}:{})};
+    assert.equal(validateInput({...valid(),imap}).imap.host,wanted);
+    assert.equal(new ImapMailbox({email:'person@example.edu',imap}).imap.host,wanted);
   }
 });
 const since = Date.parse('2026-11-26T10:00:00Z');
@@ -42,4 +60,9 @@ test('mailbox binds access and subsequent messages to the chosen key',async()=>{
 test('mailbox rejects provider failures rather than treating an unreadable inbox as empty',async()=>{
   const box=new Mailbox({email:'person@example.edu',accessKey:'12345678-1234-4234-8234-123456789abc'}, {fetch:async()=>({ok:true,json:async()=>({error:'denied'})})});
   await assert.rejects(()=>box.snapshot(),/hộp thư/i);
+});
+test('Facebook OTP prefers subject code when footer contains 5-digit zip code',()=>{
+  const opts={email:'person@example.edu',platform:'facebook',since,seen:new Set(),now:since+20000};
+  const fbMsg=message({id:9,from:'"Facebook" <registration@facebookmail.com>',subject:'80861 là mã xác nhận Facebook của bạn',body:'Mã của bạn là 80861. Meta Platforms, Inc., Menlo Park, CA 94025.'});
+  assert.deepEqual(selectOtp([fbMsg],opts),{id:'9',code:'80861'});
 });

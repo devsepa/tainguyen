@@ -31,6 +31,35 @@ tool thử lại Tiếp một lần mà không gõ lại username; không tự b
 
 ## Kiểm thử
 
+### Hộp thoại Meta che nút đăng ký
+
+Ở bước mở đăng ký mobile, tool nhận diện riêng lời nhắc tài khoản Meta
+(`Nếu đã đăng nhập vào Instagram...`) và đóng bằng Hủy/Đóng/Not now hoặc Escape
+trước khi bấm đăng ký. Nếu lời nhắc xuất hiện muộn, tool đóng rồi thử bấm lại một
+lần. Hộp thoại khác không được bấm xuyên qua; lỗi hiển thị đúng là hộp thoại đang
+chặn bước đăng ký thay vì gợi ý proxy lỗi.
+
+### Gmail nhận thư từ Cloudflare
+
+Chọn **Domain riêng (Gmail / Zoho IMAP Auto OTP)**. Email đăng ký vẫn là địa chỉ
+riêng tại domain, còn **Hộp thư tổng IMAP** là Gmail đích đã xác minh trên
+Cloudflare. Nhập App Password trực tiếp trong tool rồi bấm **Kiểm tra IMAP**.
+Cả phép kiểm tra và phiên đăng ký chọn `imap.gmail.com:993` cho địa chỉ Gmail;
+khoảng trắng phân nhóm trong App Password Gmail được loại bỏ khi kết nối.
+Không dùng mật khẩu đăng nhập Google thông thường. Sau khi kết nối thành công,
+bấm **Đọc thư email này** để kiểm tra đúng người nhận trước khi chạy phiên.
+
+Thư IMAP được tải bằng `BODY.PEEK[]` (không đánh dấu đã đọc) và giải mã MIME bằng
+MailParser, gồm tiêu đề mã hóa, multipart, Base64 và quoted-printable. Bộ đọc IMAP
+giữ các phần literal liên tiếp thay vì bỏ sót header khi máy chủ trả body trước.
+Nội dung HTML vẫn được hiển thị trong iframe sandbox hiện có.
+
+**Đọc thư email này** mở hộp thư lọc theo địa chỉ đăng ký đang chọn;
+**Mở hòm thư tổng** hiển thị các thư gần nhất của Gmail tổng. Nút đọc có trạng
+thái đang mở, và hộp thư hiển thị rõ khi chưa có thư phù hợp. Kết nối IMAP không
+phản hồi trong 20 giây sẽ đóng và trả lỗi; yêu cầu đọc trong giao diện có hạn
+chờ 60 giây, tránh giữ nút ở trạng thái chờ vô hạn.
+
 ### Khi Mobile báo mã OTP không hợp lệ
 
 Mobile dùng profile **Chrome Android (Pixel 7)** của Playwright, cùng engine

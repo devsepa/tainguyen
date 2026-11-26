@@ -24,9 +24,11 @@ function selectOtp(messages, {email,since,seen,platform='instagram',now=Date.now
       const recipients = (Array.isArray(recipient) ? recipient : [recipient]).map(v=>typeof v === 'object' ? v.address || '' : String(v));
       if (!recipients.some(v=>v.toLowerCase().match(/[^<>\s,;]+@[^<>\s,;]+/g)?.includes(email.toLowerCase()))) continue;
     }
-    const text = `${m.subject || ''} ${m.body || ''}`.replace(/<[^>]*>/g,' ').replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(Number(n)));
+    const subj=String(m.subject||'').replace(/<[^>]*>/g,' ').replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(Number(n)));
+    const text = `${subj} ${String(m.body || '').replace(/<[^>]*>/g,' ').replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(Number(n)))}`;
     if (!brandRe.test(text) || !/(?:code|confirm|verify|verification|mã|xác nhận|xác minh)/i.test(text)) continue;
-    const codes = [...new Set([...text.matchAll(codeRe)].map(x=>x[1]))];
+    const subjCodes = [...new Set([...subj.matchAll(codeRe)].map(x=>x[1]))];
+    const codes = subjCodes.length === 1 ? subjCodes : [...new Set([...text.matchAll(codeRe)].map(x=>x[1]))];
     if (codes.length === 1) matches.push({id,code:codes[0],time});
   }
   matches.sort((a,b)=>b.time-a.time);

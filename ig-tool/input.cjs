@@ -1,5 +1,12 @@
 'use strict';
 
+function normalizeImapConfig(config={}){
+  const user=String(config.user||'').trim();
+  const host=String(config.host||'').trim().toLowerCase()||(/@gmail\.com$/i.test(user)?'imap.gmail.com':/@(?:zoho|zohomail)\.com$/i.test(user)?'imap.zoho.com':'imappro.zoho.com');
+  const rawPass=String(config.pass||'');
+  return {user,host,port:Number(config.port||993),pass:host==='imap.gmail.com'?rawPass.replace(/\s/g,''):rawPass};
+}
+
 function parseProxy(raw = '', protocol = 'auto') {
   if (!['auto','http','https','socks5'].includes(protocol)) throw Error('Giao thức proxy không hợp lệ.');
   if (typeof raw !== 'string' || raw.length > 2048) throw Error('Proxy không hợp lệ.');
@@ -39,10 +46,7 @@ function validateInput(input, now = new Date()) {
   if (typeof accessKey !== 'string' || (accessKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accessKey))) throw Error('Access Key hộp thư không hợp lệ.');
   let imap = null;
   if (input.imap && typeof input.imap === 'object') {
-    const user = String(input.imap.user || '').trim();
-    const pass = String(input.imap.pass || '');
-    const host = String(input.imap.host || '').trim() || (/@(?:zoho|zohomail)\.com$/i.test(user) ? 'imap.zoho.com' : 'imappro.zoho.com');
-    const port = Number(input.imap.port || 993);
+    const {user,pass,host,port}=normalizeImapConfig(input.imap);
     if (user && pass) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user) || !/^[a-z0-9.-]+$/i.test(host) || port < 1 || port > 65535) throw Error('Cấu hình IMAP không hợp lệ.');
       imap = { host, port, user, pass };
@@ -51,4 +55,4 @@ function validateInput(input, now = new Date()) {
   return {...out,email:out.email.toLowerCase(),accessKey,imap,proxy:parseProxy(input.proxy || '',input.protocol || 'auto')};
 }
 
-module.exports = {parseProxy,validateInput};
+module.exports = {parseProxy,validateInput,normalizeImapConfig};
