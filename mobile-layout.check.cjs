@@ -36,7 +36,15 @@ const server=http.createServer((req,res)=>{
     const mail=await evaluate(`({page:document.documentElement.scrollWidth,card:document.querySelector('.mobile-cards').scrollWidth,container:document.querySelector('.mobile-cards').clientWidth,cells:[...document.querySelectorAll('.mobile-cards tbody td')].map(td=>({width:td.scrollWidth,visible:td.clientWidth}))})`);
     assert(mail.page<=width+1 && mail.card<=mail.container+1 && mail.cells.every(c=>c.width<=c.visible+1),JSON.stringify({width,mail}));
    }
-   await evaluate(`mobileTest.openTempMailInbox('mobile_mail')`);
+   await evaluate(`(()=>{window.__testMessages=[{id:'old',subject:'Old OTP 123456',body:'OTP 123456',created_at:'2026-11-26T00:00:00Z'}];window.fetch=async url=>({json:async()=>String(url).includes('/manage')?{client:{uuid:'test'}}:{messages:window.__testMessages}});window.__popupTimers=[];const originalTimer=window.setTimeout;window.setTimeout=(fn,ms,...args)=>{if(ms===7000){window.__popupTimers.push(fn);return 0;}return originalTimer(fn,ms,...args)};mobileTest.openTempMailInbox('mobile_mail')})()`);
+   await evaluate(`new Promise(r=>setTimeout(r,50))`);
+   assert(await evaluate(`document.querySelector('#mailNotifStack').children.length===0 && !document.querySelector('.inbox-message--new')`),'Opening old mail must not notify or highlight');
+   await evaluate(`(()=>{window.__testMessages=[{id:'new',subject:'New OTP 654321',body:'OTP 654321',created_at:'2026-11-26T01:00:00Z'},...window.__testMessages];document.querySelector('#btnRefreshInbox').click()})()`);
+   await evaluate(`new Promise(r=>setTimeout(r,50))`);
+   assert(await evaluate(`document.querySelectorAll('.inbox-message--new').length===1`),'Only incoming mail gets highlighted');
+   if(width>760){assert(await evaluate(`document.querySelector('#mailNotifStack').children.length===1`),'New mail popup missing');await evaluate(`window.__popupTimers.forEach(fn=>fn());window.__popupTimers=[]`);assert(await evaluate(`document.querySelector('#mailNotifStack').children.length===0`),'Popup must expire after 7 seconds');}
+   await evaluate(`document.querySelector('#btnRefreshInbox').click()`);await evaluate(`new Promise(r=>setTimeout(r,50))`);
+   assert(await evaluate(`document.querySelector('#mailNotifStack').children.length===0`),'Same mail must not notify twice');
    const inbox=await evaluate(`(()=>{const b=document.querySelector('#btnRefreshInbox');const d=document.querySelector('#dlg');return {exists:!!b,overflow:d.scrollWidth>d.clientWidth+1,button:b?b.getBoundingClientRect().width:0}})()`);
    assert(inbox.exists && !inbox.overflow && inbox.button>=50,JSON.stringify({width,inbox}));
    const backdrop=await evaluate(`(()=>{const r=document.querySelector('#dlg').getBoundingClientRect();return r.top>2?{x:innerWidth/2,y:r.top/2}:{x:Math.max(0,r.left/2),y:innerHeight/2}})()`);

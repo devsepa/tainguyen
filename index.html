@@ -353,11 +353,31 @@
             else if (line.includes(",")) parts = line.split(",");
             else if (line.includes(" ")) parts = line.split(/\s+/);
             else parts = [line];
-            const email = parts[0]?.trim();
+
+            const rawFirst = (parts[0] || "").trim();
+            const emailM = rawFirst.match(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})$/);
+            const email = emailM ? emailM[1].toLowerCase() : rawFirst;
             if (!email || !email.includes("@")) continue;
+            const prefixNote = emailM
+              ? rawFirst.slice(0, rawFirst.length - emailM[1].length).trim()
+              : "";
             const pass = parts[1]?.trim() || "";
-            const note = parts.slice(2).join("|").trim();
-            items.push({ email, pass, note });
+            let p2 = (parts[2] || "").trim();
+            let p3 = (parts[3] || "").trim();
+            const clientIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (clientIdPattern.test(p2) && p3.length > 30) [p2, p3] = [p3, p2];
+            const isOAuth =
+              p2.length > 30 &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p3);
+            const note = isOAuth
+              ? [prefixNote, ...parts.slice(4)].filter(Boolean).join(" ").trim()
+              : [prefixNote, ...parts.slice(2)].filter(Boolean).join("|").trim();
+            items.push({
+              email,
+              pass,
+              note,
+              ...(isOAuth ? { refreshToken: p2, clientId: p3 } : {}),
+            });
           }
           return items;
         }
@@ -1100,6 +1120,16 @@
         if (typeof setInterval === "function") {
           totpTicker = setInterval(refreshTotpCells, 1000);
         }
+        function isHotmailOAuthRecord(a) {
+          const s = secretsOf(a);
+          return Boolean(s.refreshToken && s.clientId);
+        }
+        function isHotmailTabRecord(a) {
+          return (
+            isHotmailOAuthRecord(a) ||
+            /@(hotmail|outlook|live)\./i.test(String(a?.email || ""))
+          );
+        }
         function isEduMailRecord(a) {
           const email = String(a.email || "").toLowerCase();
           const pass = String(secretsOf(a).pass || a.pass || "").toLowerCase();
@@ -1117,8 +1147,10 @@
           let base = all().filter((a) => a.platform === "gmail");
           if (mailSubTab === "edu") {
             base = base.filter((a) => isEduMailRecord(a));
+          } else if (mailSubTab === "hotmail") {
+            base = base.filter((a) => isHotmailTabRecord(a));
           } else if (mailSubTab === "cloud") {
-            base = base.filter((a) => !isEduMailRecord(a));
+            base = base.filter((a) => !isEduMailRecord(a) && !isHotmailTabRecord(a));
           }
           if (fStatusGmail) {
             base = base.filter((a) => (a.status || "new") === fStatusGmail);
@@ -1172,14 +1204,21 @@
         function gmailView(v, list) {
           const allMails = list.filter((a) => a.platform === "gmail");
           const eduCount = allMails.filter(isEduMailRecord).length;
-          const cloudCount = allMails.length - eduCount;
+          const hotmailCount = allMails.filter(isHotmailTabRecord).length;
+          const cloudCount = allMails.filter(
+            (a) => !isEduMailRecord(a) && !isHotmailTabRecord(a),
+          ).length;
 
           const currentTabMails =
             mailSubTab === "edu"
               ? allMails.filter(isEduMailRecord)
-              : mailSubTab === "cloud"
-                ? allMails.filter((a) => !isEduMailRecord(a))
-                : allMails;
+              : mailSubTab === "hotmail"
+                ? allMails.filter(isHotmailTabRecord)
+                : mailSubTab === "cloud"
+                  ? allMails.filter(
+                      (a) => !isEduMailRecord(a) && !isHotmailTabRecord(a),
+                    )
+                  : allMails;
           const domainCounts = {};
           for (const a of currentTabMails) {
             const d = (a.email || "").split("@")[1]?.toLowerCase().trim();
@@ -1196,6 +1235,9 @@
           const tabSwitcher = `<div class="tabs" style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
     <button class="${mailSubTab === "edu" ? "primary" : ""}" data-act="switchMailTab" data-v="edu" aria-pressed="${mailSubTab === "edu"}" style="font-weight:600">
       🎓 Temp Mail .EDU (${eduCount})
+    </button>
+    <button class="${mailSubTab === "hotmail" ? "primary" : ""}" data-act="switchMailTab" data-v="hotmail" aria-pressed="${mailSubTab === "hotmail"}" style="font-weight:600">
+      📨 Hotmail OAuth2 (${hotmailCount})
     </button>
     <button class="${mailSubTab === "cloud" ? "primary" : ""}" data-act="switchMailTab" data-v="cloud" aria-pressed="${mailSubTab === "cloud"}" style="font-weight:600">
       ☁️ Temp Mail Cloud (${cloudCount})
@@ -1216,6 +1258,18 @@
           <div style="font-size:12.5px;color:var(--mute)">Cơ chế <b>Access Key</b>: Không cần pass. Bấm nút <b>[Hộp thư &amp; OTP]</b> để đọc thư/OTP realtime trực tiếp trong app hoặc click link mở web.</div>
         </div>
         <a href="https://tempamail.com/edu" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:5px 12px;border-radius:7px;color:var(--fg);text-decoration:none;font-size:12.5px;font-weight:500" title="Mở trang TempMail Edu">${icon("ext")} Mở Tempamail.com/edu</a>
+      </div>
+    </div>`;
+          } else if (mailSubTab === "hotmail") {
+            noteBanner = `<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(0,120,212,0.08);border:1px solid rgba(0,120,212,0.3);border-radius:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;color:var(--fg);margin-bottom:4px;display:flex;align-items:center;gap:6px">
+            <span style="color:#38bdf8;display:inline-flex">${icon("mail")}</span> <b>Kho Hotmail / Outlook (OAuth2):</b>
+          </div>
+          <div style="font-size:12.5px;color:var(--mute)">Dán danh sách dạng <span class="mono">email|pass|refresh_token|client_id</span> vào nút <b>Nhập text / file TXT</b>. Bấm <b>[Hộp thư &amp; OTP]</b> để đọc thư &amp; nhận OTP trực tiếp không cần mở Outlook.</div>
+        </div>
+        <a href="https://outlook.live.com/mail/" target="_blank" rel="noopener noreferrer" class="link" style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.06);border:1px solid var(--line);padding:5px 12px;border-radius:7px;color:var(--fg);text-decoration:none;font-size:12px;font-weight:500">${icon("ext")} Mở Outlook</a>
       </div>
     </div>`;
           } else if (mailSubTab === "cloud") {
@@ -1248,6 +1302,9 @@
             actionBtns = `<button class="primary" data-act="genTempMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail .EDU</button>
       <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>
       <button data-act="importGmail">${icon("up")} Nhập text / file TXT</button>`;
+          } else if (mailSubTab === "hotmail") {
+            actionBtns = `<button class="primary" data-act="importGmail">${icon("up")} Nhập Hotmail (Text / TXT)</button>
+      <button data-act="checkAllMailLive" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600">${icon("check")} ⚡ Check Live Mail</button>`;
           } else if (mailSubTab === "cloud") {
             actionBtns = `<button class="primary" data-act="guideCloudMail" style="background:linear-gradient(135deg,#7b42ff,#078df5);border:none;font-weight:600">${icon("bolt")} Tạo Mail TempMail.cloud </button>
       <button data-act="quickPasteCloudMail" style="background:rgba(47,191,113,0.15);border-color:rgba(47,191,113,0.4);color:#2fbf71;font-weight:600">${icon("up")} 📋 Dán từ Clipboard &amp; Lưu</button>
@@ -1320,7 +1377,8 @@
               passId = a.uid + "|pass",
               on = shown.has(passId);
             const isUrlPass = /^https?:\/\//i.test(pass.trim()),
-              isEdu = isEduMailRecord(a);
+              isEdu = isEduMailRecord(a),
+              isHotmail = isHotmailOAuthRecord(a);
             const isTimeNote = /^\d{4}[-/]\d{1,2}[-/]\d{1,2}\b/.test(
               String(a.note || "").trim(),
             );
@@ -1332,7 +1390,7 @@
           <td data-label="Chọn email"><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid) ? "checked" : ""}></td>
           <td data-label="Email / Thời gian">
             <div style="display:flex;flex-direction:column;gap:2px">
-              <span class="sec"><span style="color:${isEdu ? "#2fbf71" : "#7b42ff"};display:inline-flex;align-items:center" title="${isEdu ? "Mail Edu" : "TempMail Cloud"}">${icon("mail")}</span> <button type="button" class="link" data-act="cpText" data-v="${email}" title="Bấm để sao chép Email" style="font-weight:600;color:var(--fg);text-decoration:none">${email}</button></span>
+              <span class="sec"><span style="color:${isEdu ? "#2fbf71" : isHotmail ? "#0078d4" : "#7b42ff"};display:inline-flex;align-items:center" title="${isEdu ? "Mail Edu" : isHotmail ? "Hotmail OAuth2" : "TempMail Cloud"}">${icon("mail")}</span> <button type="button" class="link" data-act="cpText" data-v="${email}" title="Bấm để sao chép Email" style="font-weight:600;color:var(--fg);text-decoration:none">${email}</button></span>
               <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
               <div style="padding-left:22px;display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">${
                 (linkedByEmail[String(a.email || "").trim().toLowerCase()] || []).length
@@ -1362,7 +1420,7 @@
           </td>
           <td data-label="Thao tác" style="white-space:nowrap">
             <button class="mini" data-act="cpMailPass" data-v="${u}" title="Sao chép email|pass">${icon("copy")} Mail|Pass</button>
-            ${isEdu
+            ${isEdu || isHotmail
               ? `<button class="mini" data-act="inboxTempMail" data-v="${u}" style="color:#2fbf71;border-color:rgba(47,191,113,0.35);font-weight:600" title="Mở hộp thư &amp; đọc mã OTP realtime">${icon("mail")} Hộp thư &amp; OTP</button>`
               : `<button class="mini" data-act="openCloudInbox" data-v="${u}" style="color:#a855f7;border-color:rgba(168,85,247,0.35);font-weight:600" title="Mở thông tin đăng nhập TempMail.cloud để xem OTP">${icon("ext")} Mở Web Đọc OTP</button>`
             }
@@ -1479,6 +1537,12 @@
           } catch (e) {}
         }
 
+        function renderMailBody(raw, plain = false) {
+          const policy = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src https: data:; font-src data:; base-uri 'none'; form-action 'none'";
+          const content = plain ? `<div style="white-space:pre-wrap">${esc(raw)}</div>` : raw;
+          const doc = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="${policy}"><style>:root{color-scheme:light}html,body{margin:0;padding:0;background:#fff;color:#17212b;font:14px/1.5 Arial,sans-serif}body{padding:12px;overflow-wrap:anywhere}*,*:before,*:after{box-sizing:border-box}img{max-width:100%!important;height:auto!important}table{max-width:100%!important;width:100%!important}td,th{overflow-wrap:anywhere}pre{white-space:pre-wrap}a{color:#0969da}</style></head><body>${content}<\/body><\/html>`;
+          return `<iframe class="mail-body-frame" title="Nội dung email" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" srcdoc="${esc(doc)}"></iframe>`;
+        }
         function isMobileMailbox() {
           return typeof matchMedia === "function" && matchMedia("(max-width: 760px)").matches;
         }
@@ -1534,12 +1598,7 @@
             }
           };
 
-          let timer = setTimeout(removeCard, 8000);
-          card.addEventListener("mouseenter", () => clearTimeout(timer));
-          card.addEventListener("mouseleave", () => {
-            clearTimeout(timer);
-            timer = setTimeout(removeCard, 4000);
-          });
+          setTimeout(removeCard, 7000);
           card.querySelector("[data-close-popup]").onclick = removeCard;
 
           stack.prepend(card);
@@ -1572,9 +1631,10 @@
               const notif = new Notification(title, {
                 body,
                 icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232fbf71'><path d='M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z'/></svg>",
-                requireInteraction: Boolean(otp),
+                requireInteraction: false,
                 tag: otp ? "otp-" + otp : "mail-" + email,
               });
+              setTimeout(() => notif.close(), 7000);
               notif.onclick = () => {
                 window.focus();
                 notif.close();
@@ -2509,12 +2569,14 @@
         async function openTempMailInbox(uid) {
           const a = get(uid);
           if (!a) return toast("Không tìm thấy thông tin tài khoản", "error");
-          if (!isEduMailRecord(a)) {
+          const isHotmail = isHotmailOAuthRecord(a);
+          if (!isEduMailRecord(a) && !isHotmail) {
             return openCloudInboxHelper(uid);
           }
           const email = a.email,
-            emailUuid = extractEmailUuid(a);
-          if (!emailUuid) {
+            secA = secretsOf(a),
+            emailUuid = isHotmail ? null : extractEmailUuid(a);
+          if (!isHotmail && !emailUuid) {
             return prompt_(
               "Nhập Access Key / Link hòm thư",
               "Dán mã Key hoặc Link hòm thư của " + email,
@@ -2554,7 +2616,7 @@
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
-        <a href="https://tempamail.com/access?key=${esc(emailUuid)}" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px" title="Mở trên web">${icon("ext")} Web</a>
+        <a href="${isHotmail ? "https://outlook.live.com/mail/" : `https://tempamail.com/access?key=${esc(emailUuid)}`}" target="_blank" rel="noopener noreferrer" class="mini link" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);text-decoration:none;font-size:12px" title="Mở trên web">${icon("ext")} Web</a>
         <button type="button" class="ico" id="btnCloseInbox" title="Đóng">${icon("x")}</button>
       </div>
     </div>
@@ -2568,7 +2630,7 @@
           ${"Notification" in window && Notification.permission === "granted" ? "🔔 Báo Desktop: Bật" : "🔔 Báo Desktop"}
         </button>
         <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
-          <input type="checkbox" id="autoCheck" checked> Tự động (3s)
+          <input type="checkbox" id="autoCheck" checked> Tự động (${isHotmail ? "10" : "3"}s)
         </label>
         <button type="button" class="mini" id="btnRefreshInbox" title="Làm mới">${icon("refresh")} Tải lại</button>
       </div>
@@ -2636,41 +2698,70 @@
           const fetchInbox = async () => {
             if (isFetching) return;
             isFetching = true;
+            const inboxGeneration = authGeneration;
             try {
-              if (clientUuid === "unknown") {
-                const accRes = await fetch(
-                  "https://api.tempamail.com/v1/manage",
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: new URLSearchParams({
-                      action: "access",
-                      email_uuid: emailUuid,
-                      client_uuid: "unknown",
-                      app_uuid: "a5x-cj6a-ka1q",
-                    }),
-                  },
-                );
-                const accData = await accRes.json();
-                if (accData && accData.client && accData.client.uuid) {
-                  clientUuid = accData.client.uuid;
+              let data;
+              if (isHotmail) {
+                const cfg = globalThis.MXH_SUPABASE;
+                if (!cfg?.url || !cfg?.key) {
+                  throw new Error("Thiếu cấu hình Supabase");
                 }
-              }
+                const sessionResult = await authClient?.auth.getSession();
+                const accessToken = sessionResult?.data?.session?.access_token;
+                if (!accessToken || sessionResult?.error) throw new Error("Hãy đăng nhập kho Supabase để đọc Outlook");
+                const res = await fetch(`${cfg.url}/functions/v1/read-hotmail`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    apikey: cfg.key,
+                    Authorization: `Bearer ${accessToken}`,
+                  },
+                  body: JSON.stringify({
+                    uid: a.uid,
+                  }),
+                  signal: AbortSignal.timeout(45000),
+                });
+                data = await res.json();
+                if (!res.ok || data?.error) {
+                  throw new Error(data?.error || `Lỗi read-hotmail (${res.status})`);
+                }
+              } else {
+                if (clientUuid === "unknown") {
+                  const accRes = await fetch(
+                    "https://api.tempamail.com/v1/manage",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                      },
+                      body: new URLSearchParams({
+                        action: "access",
+                        email_uuid: emailUuid,
+                        client_uuid: "unknown",
+                        app_uuid: "a5x-cj6a-ka1q",
+                      }),
+                    },
+                  );
+                  const accData = await accRes.json();
+                  if (accData && accData.client && accData.client.uuid) {
+                    clientUuid = accData.client.uuid;
+                  }
+                }
 
-              const res = await fetch("https://api.tempamail.com/v1/messages", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                  client_uuid: clientUuid,
-                  email_uuid: emailUuid,
-                  last_message_id: 0,
-                }),
-              });
-              const data = await res.json();
+                const res = await fetch("https://api.tempamail.com/v1/messages", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                  },
+                  body: new URLSearchParams({
+                    client_uuid: clientUuid,
+                    email_uuid: emailUuid,
+                    last_message_id: 0,
+                  }),
+                });
+                data = await res.json();
+              }
+              if (inboxGeneration !== authGeneration || !d.open || !listEl.isConnected) return;
               const rawMessages = (data && data.messages) || [];
               const messages = [...rawMessages].sort((a, b) => {
                 const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -2699,17 +2790,17 @@
                     ? m.from.name || m.from.address
                     : String(m.from || "");
                 const subject = m.subject || "(Không có tiêu đề)";
-                const body = m.body || "";
+                const body = isHotmail ? esc(m.body || "").replace(/\n/g, "<br>") : m.body || "";
                 const otp = extractOtp(body, subject);
                 const time = m.created_at
                   ? new Date(m.created_at).toLocaleString("vi-VN")
                   : "";
-                const msgId = "msg_" + m.id;
+                const msgId = "msg_" + Array.from(new TextEncoder().encode(String(m.id))).map(b => b.toString(16).padStart(2, "0")).join("");
                 const isOpen = openMsgIds.has(msgId);
-                if (!seenMsgIds.has(m.id) && (!isInitialLoad || m === messages[0])) highlightedMessages.set(m.id, Date.now() + 60000);
+                if (!isInitialLoad && !seenMsgIds.has(m.id)) highlightedMessages.set(m.id, Date.now() + 60000);
                 const isNewMessage = (highlightedMessages.get(m.id) || 0) > Date.now();
 
-                if (!seenMsgIds.has(m.id)) {
+                if (!isInitialLoad && !seenMsgIds.has(m.id)) {
                   newMessages.push({ otp, subject, fromRaw });
                 }
                 seenMsgIds.add(m.id);
@@ -2737,16 +2828,13 @@
               : ""
           }
 
-          <div id="${msgId}" style="display:${isOpen ? "block" : "none"};margin-top:8px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;max-height:300px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:10px">
-            <div style="font-family:inherit;word-break:break-word">${body}</div>
+          <div id="${msgId}" class="mail-body-container" style="display:${isOpen ? "block" : "none"}">
+            ${renderMailBody(m.body || "", isHotmail)}
           </div>
         </div>`;
               }
 
-              const latestOtpItem = newMessages.find((item) => item.otp);
-              const notifyTarget = !isInitialLoad
-                ? newMessages[0]
-                : latestOtpItem || null;
+              const notifyTarget = !isInitialLoad ? newMessages[0] : null;
               isInitialLoad = false;
 
               if (notifyTarget) {
@@ -2772,6 +2860,7 @@
                 notifyDesktopOtp(notifyTarget.otp, email, notifyTarget.subject);
               }
 
+              if (inboxGeneration !== authGeneration || !d.open || !listEl.isConnected) return;
               listEl.innerHTML = html;
 
               listEl.querySelectorAll("[data-toggle-msg]").forEach((btn) => {
@@ -2812,7 +2901,7 @@
             stopPolling();
             inboxPollInterval = setInterval(() => {
               if (d.open && autoCheck.checked) fetchInbox();
-            }, 3000);
+            }, isHotmail ? 10000 : 3000);
           };
 
           d.showModal();
@@ -2865,7 +2954,7 @@
           let parsed = [];
           const d = dialog(
             `<h2>Nhập tài khoản Gmail</h2>
-    <p class="muted">Dán danh sách text hoặc chọn file TXT / CSV. Hỗ trợ các định dạng: <span class="mono">email|pass|note</span> hoặc <span class="mono">email:pass:note</span> hoặc <span class="mono">email pass note</span>.</p>
+    <p class="muted">Dán danh sách text hoặc chọn file TXT / CSV. Mail thường: <span class="mono">email|pass|note</span>. Hotmail / Outlook đọc thư: <span class="mono">email|pass|refresh_token|client_id</span> (cũng nhận thứ tự client_id trước refresh_token). Token phải có quyền Microsoft Graph Mail.Read; chỉ email và mật khẩu sẽ chỉ lưu tài khoản.</p>
     <label>Dán danh sách vào đây<textarea id="pasteGmail" rows="6" class="mono" placeholder="user1@gmail.com|pass123|ghi chú nếu có&#10;user2@gmail.com|pass456&#10;user3@gmail.com:pass789"></textarea></label>
     <label style="margin-top:10px">Hoặc chọn file TXT / CSV<input type="file" id="fileGmail" accept=".txt,.csv"></label>
     <div id="previewGmail" style="margin-top:12px"></div>
@@ -2889,7 +2978,15 @@
                   uid,
                   email: item.email,
                   platform: "gmail",
-                  sec: { pass: item.pass },
+                  sec: {
+                    pass: item.pass,
+                    ...(item.refreshToken
+                      ? {
+                          refreshToken: item.refreshToken,
+                          clientId: item.clientId,
+                        }
+                      : {}),
+                  },
                   pass: item.pass,
                   note: item.note || old?.note || "",
                   status: old?.status || "live",

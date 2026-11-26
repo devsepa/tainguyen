@@ -7,11 +7,27 @@ function harness(){
  const handlers={};let reads=0;
  const context={document:{querySelector:node,addEventListener:(event,fn)=>handlers[event]=fn,activeElement:{tagName:'BODY'}},localStorage:{getItem(){reads++;return null},setItem(){throw Error('Local resource writes forbidden')}},navigator:{},addEventListener(){},structuredClone,TextEncoder,TextDecoder,Date,URL,AbortSignal,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},location:{hash:'#tai-khoan'},MXHCloud:Cloud};
  let js=[...fs.readFileSync(require('node:path').join(__dirname,'index.html'),'utf8').matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n');
- js=js.replace('boot();',`globalThis.T={boot,loadSession,commit,persistSettings,canWrite,acts,get,openAccount,render,checkAccountLive,igResultPatch,refreshMonitoringState,setupAuth(client){authClient=client},setup(api){cloudApi=api},status(){return {mode,currentUser,memberRole,cloudBusy,cloudError,count:all().length}}};`);
+ js=js.replace('boot();',`globalThis.T={boot,renderMailBody,parseGmailText,loadSession,commit,persistSettings,canWrite,acts,get,openAccount,render,checkAccountLive,igResultPatch,refreshMonitoringState,setupAuth(client){authClient=client},setup(api){cloudApi=api},status(){return {mode,currentUser,memberRole,cloudBusy,cloudError,count:all().length}}};`);
  context.window=context;vm.createContext(context);vm.runInContext(js,context);return {context,t:context.T,nodes,node,handlers,reads:()=>reads};
 }
 const session={user:{id:'allowed',email:'member@example.com'},access_token:'jwt'};
 const snapshot=()=>({resources:[{uid:'181',revision:1,data:{uid:'181',status:'new',sec:{pass:'credential'}}}],meta:[]});
+
+test('mail content is isolated with light colors and scripts disabled',()=>{
+ const h=harness();const html=h.t.renderMailBody('<style>body{color:red}</style><table><tr><td>Mail</td></tr></table><script>alert(1)</script>');
+ assert.match(html,/class="mail-body-frame"/);assert.match(html,/srcdoc="&lt;!doctype/);assert.match(html,/color-scheme:light/);assert(!html.includes('allow-scripts'));assert(!html.includes('allow-same-origin'));assert(!html.includes('<script>'));
+ const text=h.t.renderMailBody('<img src=x>',true);assert.match(text,/&amp;lt;img/);
+});
+test('inline scripts do not contain literal closing body tags that confuse Live Server',()=>{
+ const html=fs.readFileSync(require('node:path').join(__dirname,'index.html'),'utf8');
+ for(const script of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))assert(!/<\/body\s*>/i.test(script[1]),'Live Server would inject reload code into the script');
+});
+
+test('Outlook import recognizes both client ID and refresh token orders',()=>{
+ const h=harness(),client='12345678-1234-4234-8234-123456789abc',token='synthetic-refresh-token-for-unit-test-only';
+ for(const tail of [token+'|'+client,client+'|'+token]){const result=h.t.parseGmailText('test@outlook.com|example-pass|'+tail+'|ghi chú');assert.equal(result[0].clientId,client);assert.equal(result[0].refreshToken,token);assert.equal(result[0].note,'ghi chú');}
+ const simple=h.t.parseGmailText('test@hotmail.com|example-pass');assert.equal(simple[0].refreshToken,undefined);
+});
 
 test('manual IG Live confirmation persists timestamp and preserves automatic result',async()=>{
  const h=harness(),data=snapshot();Object.assign(data.resources[0].data,{platform:'instagram',status:'dead',igCheck:{status:'unknown',reason:'upstream_404'}});
