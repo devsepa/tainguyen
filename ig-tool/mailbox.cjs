@@ -1,13 +1,22 @@
 'use strict';
 
+function parseMessageTime(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return NaN;
+  const s = raw.trim();
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/i.test(s) && /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(s)) {
+    return Date.parse(s.replace(' ', 'T') + 'Z');
+  }
+  return Date.parse(s);
+}
+
 function selectOtp(messages, {email,since,seen,platform='instagram',now=Date.now()}) {
   const brandRe = platform === 'facebook' ? /facebook/i : /instagram/i;
   const codeRe = platform === 'facebook' ? /\b(?:FB-)?(\d{5,6})\b/gi : /\b(\d{6})\b/g;
   const matches = [];
   for (const m of messages) {
     const id = String(m.id ?? '');
-    const time = Date.parse(m.created_at || '');
-    if (!id || seen.has(id) || !Number.isFinite(time) || time < since || time > now+60000) continue;
+    const time = parseMessageTime(m.created_at || '');
+    if (!id || seen.has(id) || !Number.isFinite(time) || time < since - 30000 || time > now+60000) continue;
     const from = typeof m.from === 'object' ? m.from.address || '' : String(m.from || '');
     if (!/(?:^|[<\s])[^<>\s@]+@(?:[a-z0-9-]+\.)*(?:instagram\.com|facebookmail\.com)>?$/i.test(from.trim())) continue;
     const recipient = m.to ?? m.recipient;

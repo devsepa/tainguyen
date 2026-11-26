@@ -16,7 +16,8 @@ function validateInput(input, now = new Date()) {
   const platform = input.platform === 'facebook' ? 'facebook' : 'instagram';
   if (input.platform && !['instagram','facebook'].includes(input.platform)) throw Error('Nền tảng không hợp lệ.');
   const gender = input.gender === 'male' ? 'male' : 'female';
-  const out = { platform, gender };
+  const device = input.device === 'mobile' ? 'mobile' : 'desktop';
+  const out = { platform, gender, device };
   for (const key of ['email','name','username','password','birthday']) {
     const val = key === 'username' && platform === 'facebook' && input[key] === undefined ? '' : input[key];
     if (typeof val !== 'string' || val.length > 254 || /[\r\n\x00]/.test(val)) throw Error('Dữ liệu đăng ký không hợp lệ.');

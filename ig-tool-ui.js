@@ -23,6 +23,13 @@
   const MID_NAMES=['Minh','Gia','Thao','Ngoc','Quoc','Khanh','Hoang','Duc','Thanh','Anh','Bao','Tuan','Hai','Linh'];
   const LAST_NAMES=['Anh','Huy','Vy','Linh','Nam','Bao','Han','Trang','Khang','Phuc','Nhi','Quan','Tu','My','Khoa'];
   function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+  function randomBirthday(){
+    const nowYear=new Date().getFullYear();
+    const y=nowYear-23-Math.floor(Math.random()*15);
+    const m=String(1+Math.floor(Math.random()*12)).padStart(2,'0');
+    const d=String(1+Math.floor(Math.random()*28)).padStart(2,'0');
+    return `${d}/${m}/${y}`;
+  }
   function randomIdentity(){
     const first=pick(FIRST_NAMES),mid=pick(MID_NAMES),last=pick(LAST_NAMES);
     const num=Math.floor(1000+Math.random()*9000);
@@ -43,7 +50,7 @@
     try{storage?.setItem(STORAGE_KEY,JSON.stringify(data));}catch{}
   }
 
-  function mount(element,{canWrite=false,mails=[],save,fetchImpl=global.fetch?.bind(global),pollMs=1000}={}){
+  function mount(element,{canWrite=false,mails=[],generateMail,openInbox,save,fetchImpl=global.fetch?.bind(global),pollMs=1000}={}){
     if(!element)throw Error('Thiếu vùng hiển thị IG Tool.');
     const readWritable=()=>typeof canWrite==='function'?!!canWrite():!!canWrite;
     const readMails=()=>{
@@ -69,8 +76,12 @@
     const initDomain=typeof saved.zohoDomain==='string'&&saved.zohoDomain?saved.zohoDomain:'devsepa.id.vn';
     let draft={
       platform:['instagram','facebook'].includes(saved.platform)?saved.platform:'instagram',
+      device:['mobile','desktop'].includes(saved.device)?saved.device:'desktop',
       gender:['female','male'].includes(saved.gender)?saved.gender:'female',
-      mailMode:['warehouse','zoho'].includes(saved.mailMode)?saved.mailMode:'warehouse',
+      mailMode:['warehouse','tempamail','zoho'].includes(saved.mailMode)?saved.mailMode:'warehouse',
+      tempType:['other','edu'].includes(saved.tempType)?saved.tempType:'other',
+      genEmail:typeof saved.genEmail==='string'?saved.genEmail:'',
+      genKey:typeof saved.genKey==='string'?saved.genKey:'',
       zohoDomain:initDomain,
       customEmail:`${initId.mailLocal}@${initDomain}`,
       imapUser:typeof saved.imapUser==='string'&&saved.imapUser?saved.imapUser:`contact@${initDomain}`,
@@ -80,7 +91,7 @@
       name:initId.name,
       username:initId.username,
       password:'nguyenduy1805',
-      birthday:typeof saved.birthday==='string'&&saved.birthday?saved.birthday:'15/01/2000',
+      birthday:randomBirthday(),
       proxy:typeof saved.proxy==='string'?saved.proxy:'',
       protocol:['auto','http','socks5'].includes(saved.protocol)?saved.protocol:'auto',
       otp:'',
@@ -124,8 +135,12 @@
       proxyHistory.splice(0,proxyHistory.length,...nextHistory);
       const payload={
         platform:draft.platform,
+        device:draft.device,
         gender:draft.gender,
         mailMode:draft.mailMode,
+        tempType:draft.tempType,
+        genEmail:draft.genEmail,
+        genKey:draft.genKey,
         zohoDomain:draft.zohoDomain,
         imapUser:draft.imapUser,
         imapPass:draft.imapPass,
@@ -145,7 +160,7 @@
       try{
         const p=await api('/api/ig-tool/prefs');
         if(!p||typeof p!=='object'||destroyed)return;
-        for(const k of ['platform','gender','mailMode','zohoDomain','imapUser','imapPass','birthday','proxy','protocol']){
+        for(const k of ['platform','device','gender','mailMode','tempType','zohoDomain','imapUser','imapPass','proxy','protocol']){
           if(typeof p[k]==='string'&&p[k]&&!dirtyKeys.has(k)){
             draft[k]=p[k];
             const el=element.querySelector(`[data-ig="${k}"]`);
@@ -158,7 +173,7 @@
 
     function captureInputs(e){
       if(e?.target?.dataset?.ig)dirtyKeys.add(e.target.dataset.ig);
-      for(const key of ['platform','gender','mailMode','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol','otp']){
+      for(const key of ['platform','device','gender','mailMode','tempType','genEmail','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol','otp']){
         const el=element.querySelector(`[data-ig="${key}"]`);
         if(el)draft[key]=el.value;
       }
@@ -195,20 +210,47 @@
                   <option value="facebook" ${draft.platform==='facebook'?'selected':''}>Facebook</option>
                 </select>
               </div>
-              <div class="ig-tool-field" data-ig-slot="gender-field" ${draft.platform==='facebook'?'':'style="display:none"'}>
-                <label for="ig-gender">Giới tính (FB)</label>
-                <select id="ig-gender" data-ig="gender">
-                  <option value="female" ${draft.gender==='female'?'selected':''}>Nữ</option>
-                  <option value="male" ${draft.gender==='male'?'selected':''}>Nam</option>
+              <div class="ig-tool-field">
+                <label for="ig-device">Chế độ trình duyệt</label>
+                <select id="ig-device" data-ig="device">
+                  <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (iPhone 16 Pro Max)</option>
+                  <option value="desktop" ${draft.device==='desktop'?'selected':''}>Desktop (Máy tính)</option>
                 </select>
               </div>
+            </div>
+            <div class="ig-tool-field" data-ig-slot="gender-field" ${draft.platform==='facebook'?'':'style="display:none"'}>
+              <label for="ig-gender">Giới tính (FB)</label>
+              <select id="ig-gender" data-ig="gender">
+                <option value="female" ${draft.gender==='female'?'selected':''}>Nữ</option>
+                <option value="male" ${draft.gender==='male'?'selected':''}>Nam</option>
+              </select>
             </div>
             <div class="ig-tool-field">
               <label for="ig-mail-mode">Nguồn Email</label>
               <select id="ig-mail-mode" data-ig="mailMode">
                 <option value="warehouse" ${draft.mailMode==='warehouse'?'selected':''}>Email từ kho (Kho Gmail)</option>
+                <option value="tempamail" ${draft.mailMode==='tempamail'?'selected':''}>Tạo mới Tempamail (Dùng tới đâu tạo tới đó)</option>
                 <option value="zoho" ${draft.mailMode==='zoho'?'selected':''}>Domain riêng (Zoho Catch-all Auto OTP)</option>
               </select>
+            </div>
+            <div class="ig-tool-stack" data-ig-slot="tempamail-mail" style="display:${draft.mailMode==='tempamail'?'flex':'none'}">
+              <div class="ig-tool-row">
+                <div class="ig-tool-field">
+                  <label for="ig-temp-type">Loại Tempamail</label>
+                  <select id="ig-temp-type" data-ig="tempType">
+                    <option value="other" ${draft.tempType==='other'?'selected':''}>Temp Mail thường (ít bị chặn hơn)</option>
+                    <option value="edu" ${draft.tempType==='edu'?'selected':''}>Temp EDU (.edu.pl)</option>
+                  </select>
+                </div>
+                <div class="ig-tool-field">
+                  <label for="ig-gen-email">Email vừa tạo (Auto OTP)</label>
+                  <input id="ig-gen-email" data-ig="genEmail" type="text" readonly value="${esc(draft.genEmail)}" placeholder="Tự tạo khi bấm Bắt đầu" />
+                </div>
+              </div>
+              <div class="ig-tool-actions">
+                <button type="button" data-act="gen-mail">Tạo 1 mail mới</button>
+                <button type="button" data-act="open-gen-inbox" data-ig-slot="gen-mail-link" style="display:${draft.genKey?'inline-flex':'none'};align-items:center;gap:5px;border-color:#2fbf71;color:#2fbf71">Hộp thư &amp; OTP</button>
+              </div>
             </div>
             <div class="ig-tool-field" data-ig-slot="warehouse-mail" ${draft.mailMode==='zoho'?'style="display:none"':''}>
               <label for="ig-mail-select">Email từ kho</label>
@@ -302,17 +344,19 @@
       const unsaved=status.state==='succeeded'&&!status.saved;
       const lockInputs=active||!writable;
 
-      for(const key of ['platform','gender','mailMode','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol']){
+      for(const key of ['platform','device','gender','mailMode','tempType','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','protocol']){
         const el=element.querySelector(`[data-ig="${key}"]`);
         if(el)el.disabled=lockInputs;
       }
       const userSlot=element.querySelector('[data-ig-slot="username-field"]');
       const genderSlot=element.querySelector('[data-ig-slot="gender-field"]');
       const whSlot=element.querySelector('[data-ig-slot="warehouse-mail"]');
+      const tmSlot=element.querySelector('[data-ig-slot="tempamail-mail"]');
       const zohoSlot=element.querySelector('[data-ig-slot="zoho-mail"]');
       if(userSlot)userSlot.style.display=draft.platform==='facebook'?'none':'';
       if(genderSlot)genderSlot.style.display=draft.platform==='facebook'?'':'none';
-      if(whSlot)whSlot.style.display=draft.mailMode==='zoho'?'none':'';
+      if(whSlot)whSlot.style.display=draft.mailMode==='warehouse'?'':'none';
+      if(tmSlot)tmSlot.style.display=draft.mailMode==='tempamail'?'flex':'none';
       if(zohoSlot)zohoSlot.style.display=draft.mailMode==='zoho'?'flex':'none';
       const protoEl=element.querySelector('[data-ig="protocol"]');
       if(protoEl&&protoEl.value!==draft.protocol)protoEl.value=draft.protocol;
@@ -340,6 +384,7 @@
       const isMailUsed=draft.mailMode==='warehouse'&&!!mailAfter?.usedOn?.[draft.platform];
 
       const btnRand=element.querySelector('button[data-act="randomize"]');
+      const btnGenMail=element.querySelector('button[data-act="gen-mail"]');
       const btnTweak=element.querySelector('button[data-act="tweak-email"]');
       const btnTest=element.querySelector('button[data-act="test-proxy"]');
       const btnTestImap=element.querySelector('button[data-act="test-imap"]');
@@ -347,6 +392,9 @@
       const btnStart=element.querySelector('button[data-act="start"]');
       const btnStop=element.querySelector('button[data-act="stop"]');
       if(btnRand)btnRand.disabled=active||!writable||busyAction;
+      if(btnGenMail)btnGenMail.disabled=active||!writable||busyAction;
+      const genLink=element.querySelector('[data-ig-slot="gen-mail-link"]');
+      if(genLink)genLink.style.display=draft.genKey?'inline-flex':'none';
       if(btnTweak)btnTweak.disabled=(active&&status.state!=='paused')||!writable||busyAction;
       if(btnTest)btnTest.disabled=active||!writable||busyAction;
       if(btnTestImap)btnTestImap.disabled=active||!writable||busyAction;
@@ -387,10 +435,24 @@
 
       const slot=element.querySelector('[data-ig-slot="status-body"]');
       if(!slot)return;
+      let inboxHref='';
+      let inboxKey='';
+      if(status.email){
+        const matchedMail=readMails().find(m=>String(m.email||'').toLowerCase()===String(status.email||'').toLowerCase());
+        inboxKey=matchedMail?.accessKey||(draft.genEmail&&draft.genEmail.toLowerCase()===String(status.email||'').toLowerCase()?draft.genKey:'');
+        if(inboxKey)inboxHref=`https://tempamail.com/access?key=${encodeURIComponent(inboxKey)}`;
+        else if(draft.mailMode==='zoho'||(draft.zohoDomain&&status.email.toLowerCase().endsWith('@'+draft.zohoDomain.trim().toLowerCase())))inboxHref='https://mail.zoho.com';
+        else if(status.email.toLowerCase().endsWith('@gmail.com'))inboxHref='https://mail.google.com';
+      }
+      const inboxActionHtml=(inboxKey&&typeof openInbox==='function')
+        ?`<button type="button" data-act="open-status-inbox" style="padding:3px 9px;border:1px solid #2fbf71;color:#2fbf71;border-radius:6px;font-size:12px">Hộp thư &amp; OTP</button>`
+        :(inboxHref?`<a href="${esc(inboxHref)}" target="_blank" rel="noopener noreferrer" class="mini link" style="padding:2px 8px;border:1px solid var(--line);border-radius:6px;text-decoration:none;font-size:11.5px">Mở hộp thư ↗</a>`:'');
+
       slot.innerHTML=`
         <div class="ig-tool-status" data-state="${esc(status.state||'idle')}">
           <span class="ig-tool-badge">${esc(stateText)}</span>
           <div>${esc(status.message||'')}</div>
+          ${status.email?`<div class="ig-tool-meta" style="align-items:center"><span>Email: ${esc(status.email)}</span>${inboxActionHtml}${status.otp?`<span>OTP: <b>${esc(status.otp)}</b></span>`:''}</div>`:''}
           ${status.protocol||status.ip?`<div class="ig-tool-meta"><span>Giao thức: ${esc(status.protocol||'—')}</span><span>IP: ${esc(status.ip||'—')}</span></div>`:''}
         </div>
         ${status.state==='waiting_otp'?`
@@ -428,13 +490,16 @@
       const ok=typeof save==='function'?await save(result):false;
       if(!ok)throw Error('Lưu vào kho thất bại hoặc bị từ chối. Kết quả vẫn được giữ để thử lại.');
       status=await api('/api/ig-tool/acknowledge',{method:'POST'});
+      draft.genEmail='';draft.genKey='';
+      const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value='';
       const next=randomIdentity();
-      draft.name=next.name;draft.username=next.username;
+      draft.name=next.name;draft.username=next.username;draft.birthday=randomBirthday();
       const dom=(draft.zohoDomain||'devsepa.id.vn').trim();
       draft.customEmail=`${next.mailLocal}@${dom}`;
-      for(const [sel,val] of [['[data-ig="name"]',draft.name],['[data-ig="username"]',draft.username],['[data-ig="customEmail"]',draft.customEmail]]){
+      for(const [sel,val] of [['[data-ig="name"]',draft.name],['[data-ig="username"]',draft.username],['[data-ig="birthday"]',draft.birthday],['[data-ig="customEmail"]',draft.customEmail]]){
         const el=element.querySelector(sel);if(el)el.value=val;
       }
+      saveDraftPrefs();
       serverError='';
     }
 
@@ -442,6 +507,13 @@
       if(destroyed||!element.isConnected){destroy();return;}
       try{
         status=await api('/api/ig-tool/status');
+        if(ACTIVE_STATES.has(status.state)&&draft.mailMode==='tempamail'&&!draft.genKey){
+          const mb=await api('/api/ig-tool/mailbox-url').catch(()=>null);
+          if(mb?.url){
+            const m=mb.url.match(/key=([0-9a-f-]+)/i);
+            if(m){draft.genKey=m[1];draft.genEmail=status.email||draft.genEmail;}
+          }
+        }
         serverError='';
       }catch(err){
         serverError=err.message||'Chưa bật máy chủ IG Tool cục bộ (chạy ig-tool/start.ps1).';
@@ -459,16 +531,33 @@
       try{
         if(act==='randomize'){
           const next=randomIdentity();
-          draft.name=next.name;draft.username=next.username;
+          draft.name=next.name;draft.username=next.username;draft.birthday=randomBirthday();
           const dom=(draft.zohoDomain||'devsepa.id.vn').trim();
           draft.customEmail=`${next.mailLocal}@${dom}`;
           const nameEl=element.querySelector('[data-ig="name"]');
           const userEl=element.querySelector('[data-ig="username"]');
+          const bdayEl=element.querySelector('[data-ig="birthday"]');
           const customEl=element.querySelector('[data-ig="customEmail"]');
           if(nameEl)nameEl.value=draft.name;
           if(userEl)userEl.value=draft.username;
+          if(bdayEl)bdayEl.value=draft.birthday;
           if(customEl)customEl.value=draft.customEmail;
           saveDraftPrefs();
+        }else if(act==='open-gen-inbox'){
+          if(typeof openInbox==='function'&&draft.genKey)openInbox({email:draft.genEmail,accessKey:draft.genKey});
+        }else if(act==='open-status-inbox'){
+          const targetEmail=status.email||draft.genEmail;
+          const matched=readMails().find(m=>String(m.email||'').toLowerCase()===String(targetEmail||'').toLowerCase());
+          const key=matched?.accessKey||(draft.genEmail&&draft.genEmail.toLowerCase()===String(targetEmail||'').toLowerCase()?draft.genKey:'');
+          if(typeof openInbox==='function')openInbox({email:targetEmail,accessKey:key});
+        }else if(act==='gen-mail'){
+          if(typeof generateMail!=='function')throw Error('Chức năng tạo mail chưa sẵn sàng.');
+          const gen=await generateMail(draft.tempType);
+          if(!gen?.email||!gen?.accessKey)throw Error('Không tạo được Tempamail mới.');
+          draft.genEmail=gen.email;draft.genKey=gen.accessKey;
+          const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value=gen.email;
+          saveDraftPrefs();
+          serverError='';
         }else if(act==='tweak-email'){
           const cur=draft.customEmail.trim();
           const at=cur.indexOf('@');
@@ -499,7 +588,16 @@
           serverError='';
         }else if(act==='start'){
           const isZoho=draft.mailMode==='zoho';
-          if(!isZoho){
+          const isTemp=draft.mailMode==='tempamail';
+          if(isTemp&&(!draft.genEmail||!draft.genKey)){
+            if(typeof generateMail!=='function')throw Error('Chức năng tạo mail chưa sẵn sàng.');
+            const gen=await generateMail(draft.tempType);
+            if(!gen?.email||!gen?.accessKey)throw Error('Không tạo được Tempamail mới.');
+            draft.genEmail=gen.email;draft.genKey=gen.accessKey;
+            const ge=element.querySelector('[data-ig="genEmail"]');if(ge)ge.value=gen.email;
+            saveDraftPrefs();
+          }
+          if(draft.mailMode==='warehouse'){
             const chosen=readMails().find(m=>m.email===draft.email);
             if(chosen?.usedOn?.[draft.platform])throw Error(`Email này đã được sử dụng cho ${draft.platform==='facebook'?'Facebook':'Instagram'}.`);
           }
@@ -508,9 +606,10 @@
           if(dmY)birthday=`${dmY[3]}-${dmY[2].padStart(2,'0')}-${dmY[1].padStart(2,'0')}`;
           status=await api('/api/ig-tool/start',{method:'POST',body:JSON.stringify({
             platform:draft.platform,
+            device:draft.device,
             gender:draft.gender,
-            email:isZoho?draft.customEmail.trim():draft.email,
-            accessKey:isZoho?'':draft.accessKey,
+            email:isZoho?draft.customEmail.trim():isTemp?draft.genEmail:draft.email,
+            accessKey:isZoho?'':isTemp?draft.genKey:draft.accessKey,
             imap:isZoho&&draft.imapPass?{port:993,user:draft.imapUser.trim(),pass:draft.imapPass}:null,
             name:draft.name,
             username:draft.username,

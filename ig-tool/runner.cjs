@@ -41,7 +41,7 @@ class Runner {
   }
   resume(){
     if(this.job?.state!=='paused')throw Error('Phiên không ở trạng thái tạm dừng.');
-    this.job.state='working';this.job.message='Đang kiểm tra bước hiện tại…';this.job.unknownSince=Date.now();
+    this.job.state='working';this.job.message='Đang kiểm tra bước hiện tại…';this.job.unknownSince=Date.now();this.job.otpWaitSince=null;
   }
   async updateEmail(email){
     const j=this.job;
@@ -64,6 +64,7 @@ class Runner {
     return {...this.job.result};
   }
   acknowledge(){if(this.job?.state!=='succeeded')throw Error('Chưa có kết quả.');this.job.saved=true;this.job.result=null;return this.status();}
+  mailboxUrl(){return this.job?.input?.accessKey?`https://tempamail.com/access?key=${this.job.input.accessKey}`:null;}
   async run(j){
     const signal=j.controller.signal;let proxy,browser,box,seen=new Set(),success=false;
     try{
@@ -75,7 +76,7 @@ class Runner {
         catch {signal.throwIfAborted();j.manualOnly=true;j.mailWarning='Không đọc được hộp thư; hãy nhập OTP thủ công.';}
       }
       this.set(j,'starting','Đang mở trình duyệt riêng…');
-      browser=await this.browserFactory({proxy:proxy.server,signal,platform:j.input.platform});j.browser=browser;signal.throwIfAborted();
+      browser=await this.browserFactory({proxy:proxy.server,signal,platform:j.input.platform,device:j.input.device});j.browser=browser;signal.throwIfAborted();
       this.set(j,'working','Đang điền thông tin đăng ký…');
       try {
         const filled=await browser.fill(j.input);signal.throwIfAborted();
@@ -83,6 +84,7 @@ class Runner {
         else {j.since=Date.now();await browser.submit();}
       }catch {signal.throwIfAborted();this.set(j,'paused','Chưa gửi được biểu mẫu. Kiểm tra thông tin trong trình duyệt rồi bấm Tiếp tục.');}
       j.since ||= Date.now();j.unknownSince=Date.now();let birthdaySubmitted=false,lastOtpAt=0,lastMailAt=0;
+      const doneSteps=new Set();
       while(!signal.aborted){
         if(j.state==='paused'){await delay(this.pollMs,undefined,{signal});continue;}
         if(j.pendingOtp){const code=j.pendingOtp;j.pendingOtp=null;j.otp=code;await browser.submitOtp(code);lastOtpAt=Date.now();}
@@ -100,22 +102,26 @@ class Runner {
         }
         if(state.kind==='success'){
           if(j.input.platform==='instagram'&&state.username?.toLowerCase()!==j.input.username.toLowerCase())this.set(j,'paused','Tài khoản đang đăng nhập khác username đã nhập. Kiểm tra lại trình duyệt.');
-          else{success=true;j.result={platform:j.input.platform,email:j.input.email,username:state.username||j.input.username,name:j.input.name,password:j.input.password,birthday:j.input.birthday,completedAt:Date.now(),jobId:j.id};break;}
+          else{success=true;j.result={platform:j.input.platform,email:j.input.email,accessKey:j.input.accessKey||'',username:state.username||j.input.username,name:j.input.name,password:j.input.password,birthday:j.input.birthday,completedAt:Date.now(),jobId:j.id};break;}
         }else if(state.kind==='checkpoint'||state.kind==='error'){
           this.set(j,'paused','Nền tảng yêu cầu kiểm tra hoặc xác minh thêm. Xử lý trong trình duyệt rồi bấm Tiếp tục.');
         }else if(state.kind==='birthday'&&!birthdaySubmitted){
           try {await browser.fillBirthday(j.input.birthday);await browser.submit();birthdaySubmitted=true;j.unknownSince=Date.now();}
           catch {this.set(j,'paused','Hãy chọn ngày sinh trong trình duyệt và chuyển sang bước tiếp theo, rồi bấm Tiếp tục.');}
+        }else if(state.kind==='step'&&state.step&&!doneSteps.has(state.step)&&browser.fillStep){
+          try {await browser.fillStep(state.step,j.input);await browser.submit();doneSteps.add(state.step);j.unknownSince=Date.now();}
+          catch {this.set(j,'paused','Kiểm tra thông tin bước hiện tại trong trình duyệt rồi bấm Tiếp tục.');}
         }else if(state.kind==='otp'){
           j.unknownSince=Date.now();
+          if(!j.otpWaitSince)j.otpWaitSince=Date.now();
           if(lastOtpAt && Date.now()-lastOtpAt<3000){await delay(this.pollMs,undefined,{signal});continue;}
-          if(Date.now()-j.since>this.otpTimeoutMs)j.manualOnly=true;
+          if(Date.now()-j.otpWaitSince>this.otpTimeoutMs)j.manualOnly=true;
           this.set(j,'waiting_otp',j.mailWarning || (j.manualOnly?'Nhập mã OTP 6 số từ hộp thư.':'Đang chờ OTP mới của đúng email…'));
           if(box&&!j.manualOnly&&Date.now()-lastMailAt>=3000){
             lastMailAt=Date.now();
             try{
               const match=await box.findOtp({since:j.since,seen,platform:j.input.platform});signal.throwIfAborted();
-              if(match){seen.add(match.id);j.pendingOtp=match.code;this.set(j,'verifying','Đã nhận OTP mới, đang xác nhận…');}
+              if(match){seen.add(match.id);j.pendingOtp=match.code;this.set(j,'verifying',`Đã nhận OTP ${match.code} cho ${j.email}, đang xác nhận…`);}
             }catch {signal.throwIfAborted();j.manualOnly=true;j.mailWarning='Không đọc được hộp thư; hãy nhập OTP thủ công.';}
           }
         }else if(Date.now()-j.unknownSince>20000){
@@ -124,8 +130,8 @@ class Runner {
         await delay(this.pollMs,undefined,{signal});
       }
     }catch (err) {
-      console.error('[ig-tool] run error:',err?.stack||err?.message||err);
       if(!signal.aborted){
+        console.error('[ig-tool] run error:',err?.stack||err?.message||err);
         const msg=err?.message==='browser_closed'
           ?'Trình duyệt đã bị đóng.'
           :'Không thể tiếp tục phiên. Kiểm tra proxy, kết nối, hoặc cài đặt trình duyệt rồi chạy lại.';

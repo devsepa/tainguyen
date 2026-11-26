@@ -2557,7 +2557,10 @@
               },
             );
           }
+          showTempMailModal(email, emailUuid);
+        }
 
+        function showTempMailModal(email, emailUuid) {
           const d = $("#dlg");
           requestNotificationPermission();
           d.innerHTML = `<div class="inbox-shell" style="display:grid;gap:12px;max-height:80vh;overflow-y:auto">
@@ -4614,6 +4617,10 @@
         }
         let igToolHandle = null;
         function renderIgTool(v, list) {
+          if (igToolHandle && v.querySelector(".ig-tool-grid")) {
+            igToolHandle.refresh?.();
+            return;
+          }
           igToolHandle?.destroy();
           if (!globalThis.IgTool?.mount) {
             v.innerHTML = '<div class="panel empty">Không tải được giao diện IG Tool.</div>';
@@ -4648,6 +4655,40 @@
           igToolHandle = globalThis.IgTool.mount(v, {
             canWrite,
             mails,
+            openInbox: ({ email, accessKey }) => {
+              if (accessKey) return showTempMailModal(email, accessKey);
+              const target = String(email || "").trim().toLowerCase();
+              const rec = all().find(
+                (a) =>
+                  a.platform === "gmail" &&
+                  String(a.email || a.uid || "").trim().toLowerCase() === target,
+              );
+              if (rec) return openTempMailInbox(rec.uid);
+              toast("Không tìm thấy hộp thư cho email này", "error");
+            },
+            generateMail: async (type = "other") => {
+              const tld = type === "edu" ? "edu" : "";
+              const domains = await fetchTempMailDomains(tld);
+              const body = new URLSearchParams({
+                client_uuid: "unknown",
+                app_uuid: "a5x-cj6a-ka1q",
+                tld,
+              });
+              if (domains.length) {
+                const picked = domains[Math.floor(Math.random() * domains.length)];
+                body.append("domain_id", picked.id || picked.domain_id);
+                body.append("action", "custom");
+                body.append("alias", "user" + Math.floor(100000 + Math.random() * 900000));
+              }
+              const res = await fetch("https://api.tempamail.com/v1/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body,
+              });
+              const data = await res.json();
+              if (!data?.email?.address || !data?.email?.uuid) throw Error(data?.error || "Không tạo được Tempamail mới.");
+              return { email: data.email.address, accessKey: data.email.uuid };
+            },
             save: async (result) => {
               if (!canWrite()) {
                 toast("Bạn không có quyền chỉnh sửa hoặc hệ thống đang lưu", "error");
@@ -4674,7 +4715,8 @@
                   String(a.email || a.uid || "").trim().toLowerCase() === mailTarget,
               );
               const mailSec = mailRec ? secretsOf(mailRec) : {};
-              const mailPass = mailSec.pass || mailRec?.pass || "";
+              const accessUrl = result.accessKey ? `https://tempamail.com/access?key=${result.accessKey}` : "";
+              const mailPass = mailSec.pass || mailRec?.pass || accessUrl;
               const rec = revise(
                 {},
                 {
@@ -4693,7 +4735,22 @@
                 },
                 plat === "facebook" ? "Thêm tài khoản FB" : "Thêm tài khoản IG",
               );
-              const ok = await commit([rec]);
+              const toCommit = [rec];
+              if (!mailRec && mailTarget && accessUrl) {
+                const dom = mailTarget.split("@")[1] || "";
+                toCommit.push({
+                  uid: makeGmailUid(result.email),
+                  email: result.email,
+                  platform: "gmail",
+                  sec: { pass: accessUrl },
+                  pass: accessUrl,
+                  note: `[${dom.includes("edu") ? "Temp EDU" : "Temp Mail"}] ${dom}`,
+                  status: "live",
+                  added: Date.now(),
+                  updated: Date.now(),
+                });
+              }
+              const ok = await commit(toCommit);
               if (generation !== authGeneration) return false;
               if (ok) toast(`Đã lưu tài khoản ${plat === "facebook" ? "Facebook" : "Instagram"} vào kho`);
               return ok;

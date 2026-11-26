@@ -175,3 +175,13 @@ test('real browser detects Facebook confirmemail.php OTP input',async t=>{
   const browser=await openBrowser({headless:true,platform:'facebook',startUrl:`http://127.0.0.1:${server.address().port}/confirmemail.php?next=undefined`});t.after(()=>browser.close());
   assert.deepEqual(await browser.state(),{kind:'otp',email:'edited.fb@devsepa.id.vn'});
 });
+
+test('real browser supports mobile device emulation mode',async t=>{
+  const server=http.createServer((req,res)=>{
+    res.setHeader('Content-Type','text/html; charset=utf-8');
+    res.end(`<!doctype html><html><body><p id="ua"></p><input name="emailOrPhone"><input type="password" name="password"><input name="fullName"><input name="username"><script>document.getElementById('ua').textContent=navigator.userAgent;</script></body></html>`);
+  });
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  assert.equal(await browser.fill({email:'m@example.edu',password:'fake-secret',name:'Mobile User',username:'mob.user',birthday:'2000-01-15'}),true);
+});

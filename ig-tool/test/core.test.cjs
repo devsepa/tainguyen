@@ -26,6 +26,7 @@ test('OTP ignores old IDs, old dates, unrelated senders, wrong recipients, and a
     assert.equal(selectOtp([message(patch)],opts),null,JSON.stringify(patch));
   }
   assert.deepEqual(selectOtp([message()],opts),{id:'2',code:'123456'});
+  assert.deepEqual(selectOtp([message({created_at:'2026-11-26 10:00:05'})],opts),{id:'2',code:'123456'});
 });
 test('mailbox binds access and subsequent messages to the chosen key',async()=>{
   const calls=[];

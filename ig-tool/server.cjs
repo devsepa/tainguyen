@@ -94,6 +94,9 @@ function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFac
         if(req.method==='GET'&&pathname==='/api/ig-tool/status'){
           return sendJson(res,200,runner.status());
         }
+        if(req.method==='GET'&&pathname==='/api/ig-tool/mailbox-url'){
+          return sendJson(res,200,{url:runner.mailboxUrl()});
+        }
         if(req.method==='POST'&&pathname==='/api/ig-tool/proxy'){
           const body=await readJson(req);
           const config=parseProxy(body.proxy||'',body.protocol||'auto');
@@ -143,7 +146,7 @@ function createToolServer({proxyFactory=connectProxy,runner=new Runner({proxyFac
           if(!prefsFile)return sendJson(res,200,{ok:true});
           const body=await readJson(req);
           const allowed={};
-          for(const k of ['platform','gender','mailMode','zohoDomain','imapUser','imapPass','birthday','proxy','protocol']){
+          for(const k of ['platform','device','gender','mailMode','zohoDomain','imapUser','imapPass','birthday','proxy','protocol']){
             if(typeof body[k]==='string')allowed[k]=body[k];
           }
           await fs.promises.mkdir(path.dirname(prefsFile),{recursive:true});

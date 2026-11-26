@@ -50,7 +50,28 @@ $openWindow = {
     )
     $browserExe = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($browserExe) {
-      Start-Process $browserExe -ArgumentList "--app=$targetUrl", "--new-window", "--window-size=620,800", "--window-position=560,20"
+      Start-Process $browserExe -ArgumentList "--app=$targetUrl", "--new-window", "--window-size=700,820"
+      Add-Type -AssemblyName System.Windows.Forms
+      Add-Type @"
+        using System;
+        using System.Runtime.InteropServices;
+        public class WinPos {
+          [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+        }
+"@
+      $area = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+      $w = [Math]::Min(720, [int]($area.Width * 0.55))
+      $h = [Math]::Max(680, $area.Height - 24)
+      $x = $area.Right - $w - 12
+      $y = $area.Top + 12
+      for ($j = 0; $j -lt 25; $j++) {
+        $proc = Get-Process | Where-Object { $_.MainWindowTitle -match 'Kho tài nguyên|Tạo IG' -and $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+        if ($proc) {
+          [WinPos]::MoveWindow($proc.MainWindowHandle, $x, $y, $w, $h, $true) | Out-Null
+          break
+        }
+        Start-Sleep -Milliseconds 150
+      }
       return
     }
   }

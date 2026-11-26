@@ -3,33 +3,60 @@ const {chromium}=require('playwright');
 
 async function visible(locator){for(const item of await locator.all())if(await item.isVisible())return item;return null;}
 const otpSelector='input[name="confirmationCode"],input[name="email_confirmation_code"],input[name="code"],input[name="c"],#code_in_cliff,input[autocomplete="one-time-code"],input[inputmode="numeric"]';
+const IPHONE_16_PM_UA='Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 
-async function openBrowser({proxy,signal,headless=false,platform='instagram',startUrl}={}){
-  const urlDefault=platform==='facebook'?'https://www.facebook.com/r.php':'https://www.instagram.com/accounts/emailsignup/';
+async function openBrowser({proxy,signal,headless=false,platform='instagram',device='desktop',startUrl}={}){
+  const isMobile=device==='mobile';
+  const urlDefault=platform==='facebook'
+    ?'https://www.facebook.com/r.php'
+    :(isMobile?'https://www.instagram.com/accounts/signup/email/':'https://www.instagram.com/accounts/emailsignup/');
   const targetUrl=startUrl||urlDefault;
+  const isIg=platform!=='facebook';
+  const winW=isMobile?460:(isIg?620:450), winH=isMobile?860:(isIg?800:700);
+  const vpW=isMobile?430:(isIg?600:430), vpH=isMobile?760:(isIg?720:620);
+  const zoomVal=isMobile?'0.82':(isIg?'0.85':'0.75');
   const browser=await chromium.launch({
     headless,
     proxy:proxy?{server:proxy}:undefined,
-    args:headless?[]:['--window-size=450,700','--window-position=20,20'],
+    args:headless?[]:[`--window-size=${winW},${winH}`,'--window-position=20,20'],
   });
   const close=async()=>{await browser.close().catch(()=>{});};
   const abort=()=>{void close();};signal?.addEventListener('abort',abort,{once:true});
   try{
     signal?.throwIfAborted();
-    const context=await browser.newContext({locale:'vi-VN',viewport:{width:430,height:620}});
+    const ctxOpts=isMobile
+      ? {userAgent:IPHONE_16_PM_UA,locale:'vi-VN',viewport:{width:vpW,height:vpH},deviceScaleFactor:3,isMobile:true,hasTouch:true}
+      : {locale:'vi-VN',viewport:{width:vpW,height:vpH}};
+    const context=await browser.newContext(ctxOpts);
     if(!headless){
-      await context.addInitScript(()=>{
-        const apply=()=>{if(document.documentElement)document.documentElement.style.zoom='0.75';};
+      await context.addInitScript((z)=>{
+        const apply=()=>{if(document.documentElement)document.documentElement.style.zoom=z;};
         if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
         else apply();
-      });
+      },zoomVal);
     }
-    const page=await context.newPage();page.setDefaultTimeout(8000);
+    let page=await context.newPage();page.setDefaultTimeout(8000);
+    if(isMobile){
+      const cdp=await context.newCDPSession(page).catch(()=>null);
+      if(cdp){
+        await cdp.send('Emulation.setUserAgentOverride',{userAgent:IPHONE_16_PM_UA,platform:'iPhone'}).catch(()=>{});
+      }
+    }
     try{
       await page.goto(targetUrl,{waitUntil:'domcontentloaded',timeout:45000});
     }catch(err){
       signal?.throwIfAborted();
-      await page.goto(targetUrl,{waitUntil:'domcontentloaded',timeout:45000});
+      const isHttpErr=/ERR_HTTP_RESPONSE_CODE_FAILURE|chrome-error/i.test(err?.message||'');
+      if(!startUrl&&isHttpErr){
+        await page.close().catch(()=>{});
+        page=await context.newPage();page.setDefaultTimeout(8000);
+        const home=platform==='facebook'?'https://www.facebook.com/':'https://www.instagram.com/';
+        await page.goto(home,{waitUntil:'domcontentloaded',timeout:45000}).catch(()=>{throw Error('Nền tảng từ chối kết nối qua proxy này ở chế độ hiện tại. Thử đổi sang Desktop hoặc proxy khác.');});
+        const regLink=await visible(page.locator('a[href*="emailsignup"],a[href*="/accounts/signup"],a[href*="/r.php"],a[href*="/reg/"]'));
+        if(regLink)await regLink.click();
+      }else{
+        await page.goto(targetUrl,{waitUntil:'domcontentloaded',timeout:45000});
+      }
     }
     await page.locator('input').first().waitFor({state:'visible',timeout:15000}).catch(()=>{});
 
@@ -89,15 +116,17 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',sta
           await field.selectOption(selected);
         }else{
           await field.click();
+          await page.waitForTimeout(headless?40:200);
           const candidates=values[name];
           let picked=false;
           for(const text of candidates){
-            const exact=new RegExp(`^${text}$`,'i');
+            const exact=new RegExp(`^\\s*${text}\\s*$`,'i');
             const opt=await visible(page.getByRole('option',{name:exact}))
               || await visible(page.getByRole('menuitem',{name:exact}))
               || await visible(page.getByRole('radio',{name:exact}))
-              || await visible(page.locator('[role="listbox"] [role="option"],[role="menu"] [role="menuitem"],[role="dialog"] [role="button"],[role="listbox"] div,[role="menu"] div').filter({hasText:exact}));
-            if(opt){await opt.click();picked=true;break;}
+              || await visible(page.locator('[role="listbox"] [role="option"],[role="menu"] [role="menuitem"],[role="dialog"] [role="button"],[role="dialog"] [role="option"],[role="listbox"] div,[role="menu"] div').filter({hasText:exact}))
+              || await visible(page.getByText(exact));
+            if(opt){await opt.scrollIntoViewIfNeeded().catch(()=>{});await opt.click();picked=true;break;}
           }
           if(!picked)throw Error('birthday_option_missing');
         }
@@ -151,6 +180,12 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',sta
           ['name','input[name="fullName"],input[name="full_name"]',/^tên$|tên đầy đủ|full name/i],
           ['username','input[name="username"]',/tên người dùng|username/i],
         ];
+        const emailField=await findInput(specs[0][1],specs[0][2]);
+        const passField=await findInput(specs[1][1],specs[1][2]);
+        if(emailField&&!passField){
+          await typeField(emailField,input.email);
+          return true;
+        }
         for(const [key,selector,label] of specs){
           const field=await findInput(selector,label);
           if(!field)return false;
@@ -161,6 +196,21 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',sta
         return true;
       },
       fillBirthday,
+      async fillStep(step,input){
+        if(step==='password'){
+          const f=await findInput('input[name="password"],input[type="password"],input[autocomplete="new-password"]',/mật khẩu|password/i);
+          if(!f)throw Error('step_field_missing');
+          await typeField(f,input.password);
+        }else if(step==='name'){
+          const f=await findInput('input[name="fullName"],input[name="full_name"]',/^tên$|tên đầy đủ|full name/i);
+          if(!f)throw Error('step_field_missing');
+          await typeField(f,input.name);
+        }else if(step==='username'){
+          const f=await findInput('input[name="username"]',/tên người dùng|username/i);
+          if(!f)throw Error('step_field_missing');
+          await typeField(f,input.username);
+        }
+      },
       async updateEmail(newEmail){
         const emailEl=await findInput('input[name="reg_email__"],input[name="emailOrPhone"],input[name="email"],input[type="email"]',/số di động hoặc email|mobile number or email|email/i);
         if(!emailEl)return false;
@@ -175,8 +225,8 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',sta
         await btn.click();
       },
       async submitOtp(code){
-        const field=await otpInput();if(!field)throw Error('otp_missing');await field.fill(code);
-        const button=await visible(page.getByRole('button',{name:/^(tiếp tục|continue|next|confirm|xác nhận|gửi|submit)$/i}));
+        const field=await otpInput();if(!field)throw Error('otp_missing');await typeField(field,code);
+        const button=await visible(page.getByRole('button',{name:/^(tiếp|tiếp tục|continue|next|confirm|xác nhận|gửi|submit)$/i}));
         if(!button)throw Error('confirm_missing');await button.click();
       },
       async state(){
@@ -204,12 +254,31 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',sta
           return {kind:'unknown',...(validEmail?{email:validEmail}:{})};
         }
         if((await birthdayFields()).every(([,field])=>field) && !(await visible(page.locator('input[type="password"]'))))return {kind:'birthday',...(validEmail?{email:validEmail}:{})};
-        if(await visible(page.locator('a[href^="/direct/inbox"]'))){
+        if(platform==='instagram'&&!emailField){
+          if(await findInput('input[name="password"],input[type="password"],input[autocomplete="new-password"]',/mật khẩu|password/i))return {kind:'step',step:'password'};
+          if(await findInput('input[name="fullName"],input[name="full_name"]',/^tên$|tên đầy đủ|full name/i))return {kind:'step',step:'name'};
+          if(await findInput('input[name="username"]',/tên người dùng|username/i))return {kind:'step',step:'username'};
+        }
+        const igCookies=await context.cookies('https://www.instagram.com').catch(()=>[]);
+        const hasIgSession=igCookies.some(c=>c.name==='ds_user_id'&&/^\d+$/.test(c.value));
+        if(hasIgSession || await visible(page.locator('a[href^="/direct/inbox"],a[href="/explore/"],svg[aria-label="Trang chủ"],svg[aria-label="Home"]'))){
           const identity=await page.evaluate(async()=>{
             try{
-              const response=await fetch('/api/v1/accounts/current_user/?edit=true',{credentials:'include',headers:{'X-IG-App-ID':'936619743392459'},signal:AbortSignal.timeout(8000)});
-              if(!response.ok)return null;const data=await response.json();return data.user?.username || null;
-            }catch{return null;}
+              const csrf=(document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)||[])[1]||'';
+              const response=await fetch('/api/v1/accounts/current_user/?edit=true',{
+                credentials:'include',
+                headers:{'X-IG-App-ID':'936619743392459',...(csrf?{'X-CSRFToken':csrf}:{})},
+                signal:AbortSignal.timeout(8000),
+              });
+              if(response.ok){
+                const data=await response.json();
+                if(data.user?.username)return data.user.username;
+              }
+            }catch{}
+            const profLink=document.querySelector('a[href^="/"]:has(img[alt*="ảnh đại diện" i]),a[href^="/"]:has(img[alt*="profile picture" i])');
+            const href=profLink?.getAttribute('href')||'';
+            const m=href.match(/^\/([a-z0-9._]+)\/?$/i);
+            return m?m[1]:null;
           });
           if(identity)return {kind:'success',username:identity};
         }
