@@ -1331,7 +1331,7 @@
           <td data-label="Chọn email"><input type="checkbox" data-gsel="${u}" aria-label="Chọn ${email}" ${selGmail.has(a.uid) ? "checked" : ""}></td>
           <td data-label="Email / Thời gian">
             <div style="display:flex;flex-direction:column;gap:2px">
-              <span class="sec"><span style="color:${isEdu ? "#2fbf71" : "#7b42ff"};display:inline-flex;align-items:center" title="${isEdu ? "Mail Edu" : "TempMail Cloud"}">${icon("mail")}</span> <b>${email}</b> ${ib("cpText", email, "copy", "Chép Email")}</span>
+              <span class="sec"><span style="color:${isEdu ? "#2fbf71" : "#7b42ff"};display:inline-flex;align-items:center" title="${isEdu ? "Mail Edu" : "TempMail Cloud"}">${icon("mail")}</span> <button type="button" class="link" data-act="cpText" data-v="${email}" title="Bấm để sao chép Email" style="font-weight:600;color:var(--fg);text-decoration:none">${email}</button></span>
               <span class="muted mono" style="font-size:11px;padding-left:22px">${esc(timeLabel)}</span>
               <div style="padding-left:22px;display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">${
                 (linkedByEmail[String(a.email || "").trim().toLowerCase()] || []).length
@@ -1481,9 +1481,18 @@
         function showMailCornerPopup({ email, subject, from, otp }) {
           const stack = $("#mailNotifStack");
           if (!stack) return;
+          const openDlg = $("#dlg")?.open ? $("#dlg") : null;
+          if (typeof stack.showPopover !== "function") {
+            const targetParent = openDlg || document.body;
+            if (stack.parentElement !== targetParent) targetParent.appendChild(stack);
+          } else if (stack.parentElement !== document.body) {
+            document.body.appendChild(stack);
+          }
           stack.hidden = false;
           try {
-            if (!stack.matches(":popover-open")) stack.showPopover?.();
+            if (typeof stack.showPopover === "function" && !stack.matches(":popover-open")) {
+              stack.showPopover();
+            }
           } catch {}
 
           const card = document.createElement("div");
@@ -2576,6 +2585,7 @@
         <button type="button" class="mini" id="btnNotifToggle" title="Bật/Tắt thông báo đẩy góc màn hình máy tính" style="display:inline-flex;align-items:center;gap:4px">
           ${"Notification" in window && Notification.permission === "granted" ? "🔔 Báo Desktop: Bật" : "🔔 Báo Desktop"}
         </button>
+        <button type="button" class="mini" id="btnTestMailNotif" title="Kiểm tra âm thanh và popup góc màn hình">🔔 Thử</button>
         <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
           <input type="checkbox" id="autoCheck" checked> Tự động (3s)
         </label>
@@ -2596,7 +2606,21 @@
             btnRefresh = d.querySelector("#btnRefreshInbox"),
             autoCheck = d.querySelector("#autoCheck"),
             btnClose = d.querySelector("#btnCloseInbox"),
-            btnNotif = d.querySelector("#btnNotifToggle");
+            btnNotif = d.querySelector("#btnNotifToggle"),
+            btnTestNotif = d.querySelector("#btnTestMailNotif");
+
+          if (btnTestNotif) {
+            btnTestNotif.onclick = () => {
+              playChime("otp");
+              showMailCornerPopup({
+                email,
+                subject: "Thử thông báo thư mới & OTP",
+                from: "Hệ thống",
+                otp: "123456",
+              });
+              notifyDesktopOtp("123456", email, "Thử thông báo Desktop");
+            };
+          }
 
           if (btnNotif) {
             btnNotif.onclick = async () => {
