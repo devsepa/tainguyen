@@ -5,6 +5,7 @@
   else root.MXHCloud=api;
 })(globalThis,function(){
   'use strict';
+  const clone=typeof globalThis.structuredClone==='function'?globalThis.structuredClone:v=>JSON.parse(JSON.stringify(v));
   function create({url,key,fetch:fetcher=globalThis.fetch,getToken=async()=>null,pageSize=1000}){
     const project=new URL(url);
     if(project.protocol!=='https:'||!project.hostname.endsWith('.supabase.co')||project.username||project.password||project.pathname!=='/'||project.search||project.hash)throw Error('Invalid Supabase project URL');
@@ -23,9 +24,13 @@
       const headers={apikey:key,'Content-Type':'application/json'};
       if(token)headers.Authorization='Bearer '+token;
       else if(!key.startsWith('sb_publishable_'))headers.Authorization='Bearer '+key;
-      const options={method:body===undefined?'GET':'POST',headers,cache:'no-store',signal:AbortSignal.timeout(30000)};
+      const ac=typeof AbortController==='function'?new AbortController():null;
+      const timer=ac?setTimeout(()=>ac.abort(),30000):0;
+      const options={method:body===undefined?'GET':'POST',headers,cache:'no-store'};
+      if(ac)options.signal=ac.signal;
       if(body!==undefined)options.body=JSON.stringify(body);
-      const response=await fetcher(base+path,options);
+      let response;
+      try{response=await fetcher(base+path,options)}finally{if(timer)clearTimeout(timer)}
       let data;try{data=await response.json()}catch{throw Object.assign(Error('Invalid database response'),{status:response.status})}
       if(!response.ok)throw Object.assign(Error(data?.message||'Database request failed'),{code:data?.code,status:response.status});
       return data;
@@ -39,7 +44,7 @@
         if(!Array.isArray(page))throw Error('Invalid database rows');
         result.push(...page);
         if(page.length<pageSize)break;
-        const next=page.at(-1)[id];
+        const next=page[page.length-1][id];
         if(typeof next!=='string'||next===cursor)throw Error('Invalid pagination cursor');
         cursor=next;
       }
@@ -67,7 +72,7 @@
   }
   function workspace(api){
     let resources=new Map(),meta=new Map();
-    function state(){return structuredClone({resources:[...resources.values()],meta:[...meta.values()]})}
+    function state(){return clone({resources:[...resources.values()],meta:[...meta.values()]})}
     return {
       state,
       async load(){
@@ -79,7 +84,7 @@
       async commit(put,del,day){
         const changes=new Map();
         for(const uid of del)if(resources.has(uid))changes.set(uid,{uid,expected:resources.get(uid).revision,data:null});
-        for(const data of put)changes.set(data.uid,{uid:data.uid,expected:resources.get(data.uid)?.revision??null,data:structuredClone(data)});
+        for(const data of put)changes.set(data.uid,{uid:data.uid,expected:resources.get(data.uid)?.revision??null,data:clone(data)});
         const rows=[...changes.values()];let committed=0;
         try{
           for(let i=0;i<rows.length;i+=1000){
@@ -99,7 +104,7 @@
         return state();
       },
       async settings(data){
-        const payload=structuredClone(data);
+        const payload=clone(data);
         const result=await api.writeMeta({key:'settings',expected:meta.get('settings')?.revision??null,data:payload});
         meta.set('settings',{key:'settings',data:payload,revision:result.meta[0].revision});
         return state();

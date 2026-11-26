@@ -72,6 +72,9 @@
     <script>
       (() => {
         "use strict";
+        if (typeof globalThis.structuredClone !== "function") {
+          globalThis.structuredClone = (v) => JSON.parse(JSON.stringify(v));
+        }
         const SHARDS = 64,
           LIMIT = 250000,
           DAY = 864e5;
@@ -370,7 +373,7 @@
         const all = () => shards.flatMap((s) => Object.values(s));
         const get = (uid) => {
           const s = shards[hash(uid)];
-          return Object.hasOwn(s, uid) ? s[uid] : undefined;
+          return Object.prototype.hasOwnProperty.call(s, uid) ? s[uid] : undefined;
         };
         const st = (id) =>
           settings.statuses.find((s) => s.id === id) || {
@@ -2018,16 +2021,23 @@
               }
               const { data, error } = await authClient.auth.getSession();
               if (error || !data.session?.access_token) return { status: "unknown", plat, reason: "login_required" };
-              const res = await fetch(cfg.url + '/functions/v1/check-ig', {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey: cfg.key,
-                  Authorization: `Bearer ${data.session.access_token}`,
-                },
-                body: JSON.stringify({ username: a.igUsername || a.uid, igId: a.igId || "" }),
-                signal: AbortSignal.timeout(25000),
-              });
+              const ac = typeof AbortController === "function" ? new AbortController() : null;
+              const igTimer = ac ? setTimeout(() => ac.abort(), 25000) : 0;
+              let res;
+              try {
+                res = await fetch(cfg.url + '/functions/v1/check-ig', {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    apikey: cfg.key,
+                    Authorization: `Bearer ${data.session.access_token}`,
+                  },
+                  body: JSON.stringify({ username: a.igUsername || a.uid, igId: a.igId || "" }),
+                  ...(ac ? { signal: ac.signal } : {}),
+                });
+              } finally {
+                if (igTimer) clearTimeout(igTimer);
+              }
               if (!res.ok) {
                 return { status: "unknown", plat, reason: "fn_" + res.status };
               }
