@@ -112,6 +112,7 @@
       birthday:randomBirthday(),
       proxy:typeof saved.proxy==='string'?saved.proxy:'',
       proxyPool:typeof saved.proxyPool==='string'?saved.proxyPool:'',
+      useProxy:saved.useProxy!==false,
       protocol:['auto','http','socks5'].includes(saved.protocol)?saved.protocol:'auto',
       otp:'',
     };
@@ -170,6 +171,7 @@
         birthday:draft.birthday,
         proxy:draft.proxy,
         proxyPool:draft.proxyPool,
+        useProxy:draft.useProxy,
         protocol:draft.protocol,
         proxyHistory:nextHistory,
       };
@@ -207,6 +209,8 @@
         const el=element.querySelector(`[data-ig="${key}"]`);
         if(el)draft[key]=el.value;
       }
+      const upEl=element.querySelector('[data-ig="useProxy"]');
+      if(upEl)draft.useProxy=!!upEl.checked;
       const selected=readMails().find(m=>m.email===draft.email);
       draft.accessKey=selected?.accessKey||'';
       saveDraftPrefs();
@@ -354,7 +358,12 @@
               </div>
 
               <div class="ig-tool-field">
-                <label for="ig-proxy">Proxy phiên này (tuỳ chọn)</label>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                  <label for="ig-proxy">Proxy phiên này (tuỳ chọn)</label>
+                  <label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:${draft.useProxy?'#2fbf71':'var(--muted)'}">
+                    <input type="checkbox" data-ig="useProxy" ${draft.useProxy?'checked':''} style="width:auto;margin:0" /> Dùng Proxy
+                  </label>
+                </div>
                 <div class="ig-tool-inline">
                   <input id="ig-proxy" name="ig_proxy" data-ig="proxy" type="text" list="ig-proxy-history" autocomplete="off" value="${esc(draft.proxy)}" placeholder="1.2.3.4:8000:user:pass" />
                   <button type="button" data-act="pick-proxy">🎲 Đổi</button>
@@ -427,9 +436,14 @@
       for(const key of ['platform','device','gender','mailMode','tempType','zohoDomain','customEmail','imapUser','imapPass','email','name','username','password','birthday','proxy','proxyPool','protocol']){
         const el=element.querySelector(`[data-ig="${key}"]`);
         if(el){
-          el.disabled=(key==='customEmail'&&isLegacySingle&&jobs[0]?.state==='paused')?!writable:lockInputs;
+          el.disabled=(key==='customEmail'&&isLegacySingle&&jobs[0]?.state==='paused')?!writable:(key==='proxy'?(lockInputs||!draft.useProxy):lockInputs);
           if(el.tagName==='SELECT'&&el.value!==draft[key])el.value=draft[key];
         }
+      }
+      const upEl=element.querySelector('[data-ig="useProxy"]');
+      if(upEl){
+        upEl.disabled=lockInputs;
+        upEl.checked=!!draft.useProxy;
       }
       element.querySelectorAll('button[data-act="set-pill"]').forEach(b=>{
         const k=b.dataset.key,v=b.dataset.val;
@@ -491,13 +505,13 @@
       const btnStart=element.querySelector('button[data-act="start"]');
       const btnStop=element.querySelector('button[data-act="stop"]');
       if(btnRand)btnRand.disabled=lockInputs||busyAction;
-      if(btnPickProxy)btnPickProxy.disabled=lockInputs||busyAction||!parseProxyPool().length;
+      if(btnPickProxy)btnPickProxy.disabled=lockInputs||busyAction||!draft.useProxy||!parseProxyPool().length;
       if(btnFilterProxies)btnFilterProxies.disabled=lockInputs||busyAction||!parseProxyPool().length;
       if(btnGenMail)btnGenMail.disabled=lockInputs||busyAction;
       const genLink=element.querySelector('[data-ig-slot="gen-mail-link"]');
       if(genLink)genLink.style.display=draft.genKey?'inline-flex':'none';
       if(btnTweak)btnTweak.disabled=lockInputs||busyAction;
-      if(btnTest)btnTest.disabled=lockInputs||busyAction;
+      if(btnTest)btnTest.disabled=lockInputs||busyAction||!draft.useProxy;
       if(btnTestImap)btnTestImap.disabled=lockInputs||busyAction;
       if(btnReadImap)btnReadImap.disabled=lockInputs||busyAction;
       if(btnReadImap)btnReadImap.textContent=activeMailAction==='read-imap'?'Đang mở hộp thư…':'Đọc thư email này';
@@ -926,7 +940,7 @@
             const chosen=readMails().find(m=>m.email===draft.email);
             if(chosen?.usedOn?.[draft.platform])throw Error(`Email này đã được sử dụng cho ${draft.platform==='facebook'?'Facebook':'Instagram'}.`);
           }
-          if(!draft.proxy.trim()&&parseProxyPool().length){
+          if(draft.useProxy&&!draft.proxy.trim()&&parseProxyPool().length){
             draft.proxy=pickRandomProxy(false);
             const px=element.querySelector('[data-ig="proxy"]');if(px)px.value=draft.proxy;
           }
@@ -944,7 +958,7 @@
             username:draft.username,
             password:draft.password,
             birthday,
-            proxy:draft.proxy,
+            proxy:draft.useProxy?draft.proxy:'',
             protocol:draft.protocol,
           })});
           if(isLegacySingle)jobs=[started];

@@ -4166,7 +4166,7 @@
             let savedDraft = {};
             try { savedDraft = JSON.parse(localStorage.getItem("ig_tool_draft_v1") || "{}"); } catch {}
             const pool = String(savedDraft.proxyPool || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-            const proxy = savedDraft.proxy || (pool.length ? pool[Math.floor(Math.random() * pool.length)] : "");
+            const proxy = savedDraft.useProxy === false ? "" : (savedDraft.proxy || (pool.length ? pool[Math.floor(Math.random() * pool.length)] : ""));
             try {
               const sRes = await fetch("/api/ig-tool/session", { headers: { "X-IG-Tool-Client": "1" } });
               const sData = sRes.ok ? await sRes.json().catch(() => null) : null;
@@ -4657,7 +4657,7 @@
               "error",
             );
             return false;
-          }
+          }x
           if (!cloudWorkspace) {
             settings = next;
             saveSettings();

@@ -197,6 +197,7 @@ function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({pro
           for(const k of ['platform','device','gender','mailMode','zohoDomain','imapUser','imapPass','birthday','proxy','proxyPool','protocol']){
             if(typeof body[k]==='string')allowed[k]=body[k];
           }
+          if(typeof body.useProxy==='boolean')allowed.useProxy=body.useProxy;
           await fs.promises.mkdir(path.dirname(prefsFile),{recursive:true});
           await fs.promises.writeFile(prefsFile,JSON.stringify(allowed,null,2),'utf8');
           return sendJson(res,200,{ok:true});
