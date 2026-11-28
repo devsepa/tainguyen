@@ -72,6 +72,7 @@
     <script src="./supabase-config.js"></script>
     <script src="./supabase-store.js"></script>
     <script src="./ig-tool-ui.js?v=1"></script>
+    <script src="./domain-mail.js?v=1"></script>
     <script>
       (() => {
         "use strict";
@@ -85,6 +86,7 @@
           "tong-quan": "Tổng quan",
           "tai-khoan": "Tài khoản MXH",
           gmail: "Kho Gmail",
+          chatgpt: "Kho ChatGPT",
           "tao-ig": "Tạo IG / FB",
           "lich-su": "Lịch sử",
           "cai-dat": "Cài đặt",
@@ -160,6 +162,8 @@
           bolt: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
           refresh:
             '<path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M22 12.5a10 10 0 0 1-18.8 4.2L2.5 16"/>',
+          chatgpt:
+            '<path d="M12 3a4.5 4.5 0 0 1 4.5 4.5v1.1a4.5 4.5 0 0 1 2.6 6.4 4.5 4.5 0 0 1-5.6 5.6A4.5 4.5 0 0 1 7.5 19a4.5 4.5 0 0 1-2.6-6.4 4.5 4.5 0 0 1 2.6-5.1A4.5 4.5 0 0 1 12 3z"/><circle cx="12" cy="12" r="2.2"/>',
         };
         const PLATFORMS = {
           facebook: {
@@ -183,6 +187,8 @@
         };
         const plat = (p) => PLATFORMS[p] || PLATFORMS.facebook;
         const platOf = (a) => PLATFORMS[a?.platform] || PLATFORMS.facebook;
+        const isSocial = (a) =>
+          a?.platform !== "gmail" && a?.platform !== "chatgpt";
         const pillPlat = (p) => {
           const pl = plat(p);
           return `<span class="pill" style="--c:${pl.color};gap:5px">${icon(pl.icon)}${pl.name}</span>`;
@@ -195,6 +201,7 @@
           "tong-quan": "grid",
           "tai-khoan": "users",
           gmail: "mail",
+          chatgpt: "chatgpt",
           "tao-ig": "instagram",
           "lich-su": "clock",
           "cai-dat": "gear",
@@ -203,6 +210,7 @@
           "tong-quan": "Tình hình kho tài nguyên",
           "tai-khoan": "Tra cứu, cập nhật tài khoản Facebook & Instagram",
           gmail: "Lưu trữ tài khoản Gmail, mật khẩu và ghi chú",
+          chatgpt: "Kho tài khoản ChatGPT: Mail, Pass, 2FA & ngày sử dụng",
           "tao-ig": "Tạo tài khoản Instagram qua trình duyệt cục bộ",
           "lich-su": "Các thay đổi gần đây",
           "cai-dat": "Trạng thái, bảo mật và dữ liệu",
@@ -350,6 +358,122 @@
               .replace("@", "_at_")
               .replace(/[^A-Za-z0-9._-]/g, "_");
           return clean.slice(0, 60);
+        }
+        let qChatGpt = "",
+          sortChatGpt = { k: "usedAt", d: -1 },
+          pageChatGpt = 1,
+          perChatGpt = 25,
+          selChatGpt = new Set(),
+          fUsageChatGpt = "";
+        function makeChatGptUid(email) {
+          const clean =
+            "gpt_" +
+            String(email || "")
+              .trim()
+              .toLowerCase()
+              .replace("@", "_at_")
+              .replace(/[^A-Za-z0-9._-]/g, "_");
+          return clean.slice(0, 60);
+        }
+        function parseChatGptText(text) {
+          const lines = String(text || "")
+              .split(/\r?\n/)
+              .map((l) => l.trim())
+              .filter(Boolean),
+            items = [];
+          for (const line of lines) {
+            let parts;
+            if (line.includes("|")) parts = line.split("|");
+            else if (line.includes("\t")) parts = line.split("\t");
+            else if (line.includes(":") && !line.startsWith("http"))
+              parts = line.split(":");
+            else parts = line.split(/\s+/);
+            const email = String(parts[0] || "")
+              .trim()
+              .toLowerCase();
+            if (!email || !email.includes("@")) continue;
+            const pass = String(parts[1] || "").trim();
+            const twofa = String(parts[2] || "").trim();
+            const note = parts.slice(3).join(" ").trim();
+            items.push({ email, pass, twofa, note });
+          }
+          return items;
+        }
+        function fmtChatGptUsage(usedAt) {
+          const ts = Number(usedAt || 0);
+          if (!ts) {
+            return {
+              used: false,
+              label: "Chưa sử dụng",
+              sub: "Tự tính khi sao chép",
+              color: "#8b95a7",
+            };
+          }
+          const d = new Date(ts);
+          const pad = (n) => String(n).padStart(2, "0");
+          const dateStr = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          const days = Math.max(0, Math.floor((Date.now() - ts) / DAY));
+          return {
+            used: true,
+            label: days === 0 ? "Hôm nay (0 ngày)" : `Đã dùng ${days} ngày`,
+            sub: `Từ ${dateStr}`,
+            color: days >= 25 ? "#e5b53b" : "#10a37f",
+          };
+        }
+        function fmtChatGptExpiry(startAt, durationDays = 30) {
+          const ts = Number(startAt || 0);
+          const days = Math.max(1, Number(durationDays || 30));
+          if (!ts) {
+            return {
+              hasStart: false,
+              label: "Chưa đặt ngày",
+              sub: `Mặc định ${days} ngày`,
+              color: "#8b95a7",
+              expireAt: 0,
+              remainDays: Infinity,
+            };
+          }
+          const expireAt = ts + days * DAY;
+          const remainMs = expireAt - Date.now();
+          const remainDays = Math.ceil(remainMs / DAY);
+          const fmtD = (t) => {
+            const d = new Date(t);
+            const p = (n) => String(n).padStart(2, "0");
+            return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+          };
+          let label, color;
+          if (remainMs <= 0) {
+            const over = Math.abs(Math.floor(remainMs / DAY));
+            label = over === 0 ? "Hết hạn hôm nay" : `Quá hạn ${over} ngày`;
+            color = "#ef5350";
+          } else if (remainDays <= 7) {
+            label = `Còn ${remainDays} ngày`;
+            color = "#e5b53b";
+          } else {
+            label = `Còn ${remainDays} ngày`;
+            color = "#10a37f";
+          }
+          return {
+            hasStart: true,
+            label,
+            sub: `${fmtD(ts)} → ${fmtD(expireAt)}`,
+            color,
+            expireAt,
+            remainDays,
+          };
+        }
+        async function markChatGptUsed(uids) {
+          const arr = Array.isArray(uids) ? uids : [uids];
+          const now = Date.now();
+          const toUpdate = [];
+          for (const u of arr) {
+            const a = get(u);
+            if (!a || a.platform !== "chatgpt" || a.usedAt) continue;
+            const r = revise(a, { usedAt: now }, null, "Bắt đầu sử dụng (sao chép)");
+            if (r) toUpdate.push(r);
+          }
+          if (!toUpdate.length || !canWrite()) return false;
+          return commit(toUpdate);
         }
         function parseGmailText(text) {
           const lines = text
@@ -520,7 +644,7 @@
         let mutationEpoch = 0;
         const igCheckSources = new WeakMap();
         async function commit(put = [], del = []) {
-          put = put.filter(a => !igCheckSources.has(a) || get(a.uid) === igCheckSources.get(a));
+          put = put.filter(a => a && (!igCheckSources.has(a) || get(a.uid) === igCheckSources.get(a)));
           if (!put.length && !del.length) return false;
           if (!canWrite()) {
             toast(
@@ -711,9 +835,18 @@
         /* ---------- hiển thị ---------- */
         const route = () =>
           VIEWS[location.hash.slice(1)] ? location.hash.slice(1) : "tong-quan";
+        let domainMailHandle = null;
         function render() {
           const r = route(),
             list = all();
+          if (domainMailHandle && (r !== "gmail" || mailSubTab !== "domain" || !ready())) {
+            domainMailHandle.destroy();
+            domainMailHandle = null;
+          }
+          if (r !== "tao-ig" && igToolHandle) {
+            igToolHandle.destroy();
+            igToolHandle = null;
+          }
           $("#title").textContent = VIEWS[r];
           $("#subtitle").textContent =
             SUB[r] +
@@ -728,9 +861,10 @@
             `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
           $("#tip").hidden = true;
           $("#menu").innerHTML = Object.entries(VIEWS)
+            .filter(([k]) => k !== "tao-ig" || location.port === "4312")
             .map(
               ([k, v]) =>
-                `<a href="#${k}" ${k === r ? 'aria-current="page"' : ""}>${icon(NAVI[k])}${v}${k === "tai-khoan" && ready() ? `<span class="num">${list.filter((a) => a.platform !== "gmail").length}</span>` : k === "gmail" && ready() ? `<span class="num">${list.filter((a) => a.platform === "gmail").length}</span>` : ""}</a>`,
+                `<a href="#${k}" ${k === r ? 'aria-current="page"' : ""}>${icon(NAVI[k])}${v}${k === "tai-khoan" && ready() ? `<span class="num">${list.filter(isSocial).length}</span>` : k === "gmail" && ready() ? `<span class="num">${list.filter((a) => a.platform === "gmail").length}</span>` : k === "chatgpt" && ready() ? `<span class="num">${list.filter((a) => a.platform === "chatgpt").length}</span>` : ""}</a>`,
             )
             .join("");
           for (const id of ["#btnAdd", "#btnImport"])
@@ -759,6 +893,10 @@
             $("#btnAdd").innerHTML = icon("plus") + "Thêm Gmail";
             $("#btnImport").innerHTML = icon("up") + "Nhập text/file";
             $("#btnExport").innerHTML = icon("down") + "Xuất Gmail";
+          } else if (r === "chatgpt") {
+            $("#btnAdd").innerHTML = icon("plus") + "Thêm ChatGPT";
+            $("#btnImport").innerHTML = icon("up") + "Nhập text/file";
+            $("#btnExport").innerHTML = icon("down") + "Xuất ChatGPT";
           } else {
             $("#btnAdd").innerHTML = icon("plus") + "Thêm tài khoản";
             $("#btnImport").innerHTML = icon("up") + "Nhập file";
@@ -787,6 +925,7 @@
             "tong-quan": overview,
             "tai-khoan": accounts,
             gmail: gmailView,
+            chatgpt: chatgptView,
             "tao-ig": renderIgTool,
             "lich-su": history,
             "cai-dat": config,
@@ -814,7 +953,8 @@
               (a) => (a.platform || "facebook") === "facebook",
             ).length,
             igCount = list.filter((a) => a.platform === "instagram").length,
-            gmCount = list.filter((a) => a.platform === "gmail").length;
+            gmCount = list.filter((a) => a.platform === "gmail").length,
+            gptCount = list.filter((a) => a.platform === "chatgpt").length;
           const days = [...Array(30)].map((_, i) => {
             const d = new Date(today() + "T00:00:00Z");
             d.setUTCDate(d.getUTCDate() - 29 + i);
@@ -867,7 +1007,7 @@
             off += len;
             return `<circle cx="60" cy="60" r="50" pathLength="100" stroke="${esc(s.color)}" stroke-dasharray="${Math.max(len - gap, 0.4)} ${100 - Math.max(len - gap, 0.4)}" stroke-dashoffset="${-o}" data-tip="${esc(s.name + ": " + c + " (" + pct(c) + "%)")}"/>`;
           }).join("");
-          const mxhList = list.filter((a) => a.platform !== "gmail");
+          const mxhList = list.filter(isSocial);
           const alerts = list
             .filter((a) => !["live", "new"].includes(a.status))
             .sort((a, b) => b.updated - a.updated);
@@ -896,7 +1036,7 @@
             .slice(0, 6);
           const who = (a, sub) =>
             `<span class="who"><span class="dot" style="--c:${esc(st(a.status).color)}" title="${esc(st(a.status).name)}"></span><span><button class="link mono" data-act="open" data-v="${esc(a.uid)}">${esc(a.uid)}</button><small>${esc(sub)}</small></span></span>`;
-          v.innerHTML = `<div class="stats">${card("filter", "", "Tổng tài nguyên", n, `${fbCount} FB · ${igCount} IG · ${gmCount} Mail`, "users", "#5b8cff")}${card("pFilter", "facebook", "Facebook", fbCount, pct(fbCount) + "% MXH", "facebook", "#1877f2")}${card("pFilter", "instagram", "Instagram", igCount, pct(igCount) + "% MXH", "instagram", "#e1306c")}${card("gTab", "", "Kho Gmail", gmCount, "Lưu trữ Email & Pass", "mail", "#ea4335")}${stc("live", "check")}${stc("dead", "x")}${card("stale", "", "Cần kiểm tra", old, "Quá " + settings.staleDays + " ngày chưa kiểm tra", "clock", "#e5b53b")}</div>
+          v.innerHTML = `<div class="stats">${card("filter", "", "Tổng tài nguyên", n, `${fbCount} FB · ${igCount} IG · ${gmCount} Mail · ${gptCount} GPT`, "users", "#5b8cff")}${card("pFilter", "facebook", "Facebook", fbCount, pct(fbCount) + "% MXH", "facebook", "#1877f2")}${card("pFilter", "instagram", "Instagram", igCount, pct(igCount) + "% MXH", "instagram", "#e1306c")}${card("gTab", "", "Kho Gmail", gmCount, "Lưu trữ Email & Pass", "mail", "#ea4335")}${card("gptTab", "", "Kho ChatGPT", gptCount, "Mail, Pass, 2FA & Ngày dùng", "chatgpt", "#10a37f")}${stc("live", "check")}${stc("dead", "x")}${card("stale", "", "Cần kiểm tra", old, "Quá " + settings.staleDays + " ngày chưa kiểm tra", "clock", "#e5b53b")}</div>
   <div class="grid"><section class="panel wide"><div class="head"><h2>Biến động 30 ngày</h2><span class="muted">Số tài khoản theo trạng thái</span></div>
   <div class="chart"><div class="yaxis"><span>${max}</span><span>${max / 2}</span><span>0</span></div><div class="trend">${days
     .map((d) => {
@@ -934,7 +1074,7 @@
           return all()
             .filter(
               (a) =>
-                a.platform !== "gmail" &&
+                isSocial(a) &&
                 (!fStatus || a.status === fStatus) &&
                 (!fPlatform || (a.platform || "facebook") === fPlatform) &&
                 (!fStale || stale(a)) &&
@@ -1220,6 +1360,39 @@
     </button>
   </div>`;
 
+          const domainTab = `<button data-act="switchMailTab" data-v="domain" aria-pressed="${mailSubTab === "domain"}" class="${mailSubTab === "domain" ? "primary" : ""}">Mail domain</button>`;
+          const mailTabs = tabSwitcher.replace('</div>', domainTab + '</div>');
+          if (mailSubTab === "domain") {
+            if (domainMailHandle && v.querySelector('[data-domain-mail]')) return;
+            domainMailHandle?.destroy();
+            v.innerHTML = mailTabs + '<section data-domain-mail></section>';
+            if (!globalThis.DomainMail?.mount) {
+              v.querySelector('[data-domain-mail]').textContent = 'Không tải được giao diện Mail domain. Hãy tải lại trang.';
+              return;
+            }
+            domainMailHandle = DomainMail.mount(v.querySelector('[data-domain-mail]'), {
+              canWrite,
+              request: async (body) => {
+                if (!authClient) throw Error('Hãy đăng nhập để đọc Mail domain trên web.');
+                const { data, error } = await authClient.auth.getSession();
+                if (error || !data.session) throw Error('Phiên đăng nhập hết hạn. Hãy đăng nhập lại.');
+                let res;
+                try {
+                  res = await fetch(MXH_SUPABASE.url + '/functions/v1/domain-mail', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', apikey: MXH_SUPABASE.key, Authorization: 'Bearer ' + data.session.access_token },
+                    body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
+                  });
+                } catch { throw Error('Chưa kết nối được Mail domain. Cần triển khai API domain-mail trên Supabase.'); }
+                const result = await res.json().catch(() => ({}));
+                if (res.status === 404) throw Error('API Mail domain chưa được triển khai trên Supabase.');
+                if (!res.ok && !result.error) throw Error('Dịch vụ Mail domain chưa sẵn sàng.');
+                return result;
+              },
+            });
+            return;
+          }
+
           let noteBanner = "";
           if (mailSubTab === "edu") {
             noteBanner = `<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(47,191,113,0.06);border:1px solid rgba(47,191,113,0.25);border-radius:10px">
@@ -1276,7 +1449,7 @@
           }
 
           if (!rows.length && !qGmail && !fStatusGmail && !fDomainGmail && !fUsageGmail) {
-            v.innerHTML = `${tabSwitcher}${noteBanner}<div class="panel empty">Chưa có tài khoản nào trong danh sách này.<div>${actionBtns}</div></div>`;
+            v.innerHTML = `${mailTabs}${noteBanner}<div class="panel empty">Chưa có tài khoản nào trong danh sách này.<div>${actionBtns}</div></div>`;
             return;
           }
 
@@ -1287,7 +1460,7 @@
             if (!linkedByEmail[emKey]) linkedByEmail[emKey] = [];
             linkedByEmail[emKey].push(acc);
           }
-          v.innerHTML = `${tabSwitcher}${noteBanner}<div class="tools filters">
+          v.innerHTML = `${mailTabs}${noteBanner}<div class="tools filters">
     <input id="qGmail" class="grow" type="search" placeholder="Tìm kiếm địa chỉ mail, mật khẩu, ghi chú… ( phím / )" value="${esc(qGmail)}" aria-label="Tìm kiếm Mail">
     <select id="fStatusGmail" style="padding:6px 10px;font-size:12.5px;border-radius:8px">
       <option value="" ${!fStatusGmail ? "selected" : ""}>Tất cả trạng thái</option>
@@ -1353,6 +1526,9 @@
                 (linkedByEmail[String(a.email || "").trim().toLowerCase()] || []).length
                   ? (linkedByEmail[String(a.email || "").trim().toLowerCase()] || [])
                       .map((acc) => {
+                        if (acc.platform === "chatgpt") {
+                          return `<button type="button" class="mini" data-act="gptTab" title="Mở Kho ChatGPT: ${esc(acc.email)}" style="padding:1px 6px;font-size:10.5px;border-color:#10a37f;color:#10a37f;background:rgba(16,163,127,0.08)">🤖 ChatGPT</button>`;
+                        }
                         const pl = platOf(acc);
                         return `<button type="button" class="mini" data-act="open" data-v="${esc(acc.uid)}" title="Mở tài khoản ${pl.name}: ${esc(acc.uid)}" style="padding:1px 6px;font-size:10.5px;border-color:${pl.color};color:${pl.color};background:rgba(255,255,255,0.03)">🔗 ${pl.name === "Instagram" ? "IG" : "FB"}: ${esc(acc.uid)}</button>`;
                       })
@@ -1399,6 +1575,181 @@
       )}</select>
       <button data-act="prevGmail" ${pageGmail <= 1 ? "disabled" : ""} style="padding:7px 16px;font-size:13px;font-weight:600">◀ Trước</button>
       <button data-act="nextGmail" ${pageGmail >= pages ? "disabled" : ""} style="padding:7px 16px;font-size:13px;font-weight:600">Sau ▶</button>
+    </span>
+  </div>`;
+        }
+
+        function filteredChatGpt() {
+          const k = norm(qChatGpt);
+          let base = all().filter((a) => a.platform === "chatgpt");
+          if (fUsageChatGpt === "unused") {
+            base = base.filter((a) => !a.usedAt);
+          } else if (fUsageChatGpt === "used") {
+            base = base.filter((a) => !!a.usedAt);
+          } else if (fUsageChatGpt === "expiring") {
+            base = base.filter((a) => {
+              const ex = fmtChatGptExpiry(a.startAt, a.durationDays);
+              return ex.hasStart && ex.remainDays > 0 && ex.remainDays <= 7;
+            });
+          } else if (fUsageChatGpt === "expired") {
+            base = base.filter((a) => {
+              const ex = fmtChatGptExpiry(a.startAt, a.durationDays);
+              return ex.hasStart && ex.expireAt <= Date.now();
+            });
+          }
+          if (k) {
+            base = base.filter((a) =>
+              norm([a.email, a.note].join(" ")).includes(k),
+            );
+          }
+          return base.sort((a, b) => {
+            const val = (x) =>
+              sortChatGpt.k === "usedAt"
+                ? Number(x.usedAt || 0)
+                : sortChatGpt.k === "expireAt"
+                  ? fmtChatGptExpiry(x.startAt, x.durationDays).expireAt || 0
+                  : sortChatGpt.k === "updated"
+                    ? x.updated || x.added || 0
+                    : String(x[sortChatGpt.k] ?? "");
+            const x = val(a),
+              y = val(b);
+            return (
+              sortChatGpt.d *
+              (typeof x === "number"
+                ? x - y
+                : String(x).localeCompare(String(y), "vi"))
+            );
+          });
+        }
+
+        function chatgptView(v, list) {
+          const allGpt = list.filter((a) => a.platform === "chatgpt");
+          const usedCount = allGpt.filter((a) => !!a.usedAt).length;
+          const unusedCount = allGpt.length - usedCount;
+          const mailByEmail = {};
+          for (const m of list) {
+            if (m.platform !== "gmail" || !m.email) continue;
+            mailByEmail[String(m.email).trim().toLowerCase()] = m;
+          }
+          const rows = filteredChatGpt(),
+            pages = Math.max(1, Math.ceil(rows.length / perChatGpt));
+          pageChatGpt = Math.min(pageChatGpt, pages);
+          const shownRows = rows.slice(
+            (pageChatGpt - 1) * perChatGpt,
+            pageChatGpt * perChatGpt,
+          );
+
+          const banner = `<div class="panel" style="margin-bottom:14px;padding:12px 16px;background:rgba(16,163,127,0.07);border:1px solid rgba(16,163,127,0.28);border-radius:10px">
+    <div style="font-weight:600;color:var(--fg);margin-bottom:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="color:#10a37f;display:inline-flex">${icon("chatgpt")}</span> <b>Kho tài khoản ChatGPT (${allGpt.length})</b>
+      <span class="pill" style="--c:#8b95a7;font-size:11.5px">Chưa dùng: ${unusedCount}</span>
+      <span class="pill" style="--c:#10a37f;font-size:11.5px">Đang dùng: ${usedCount}</span>
+    </div>
+    <div style="font-size:12.5px;color:var(--mute)">Bấm <b>Sao chép</b> (Mail, Pass, 2FA, Mail|Pass) để tự động ghi nhận <b>ngày tháng bắt đầu sử dụng</b> ngay tại thời điểm đó.</div>
+  </div>`;
+
+          if (!rows.length && !qChatGpt && !fUsageChatGpt) {
+            v.innerHTML = `${banner}<div class="panel empty">Chưa có tài khoản ChatGPT nào trong kho. Dùng nút <b>+ Thêm ChatGPT</b> hoặc <b>Nhập text/file</b> ở góc trên để thêm danh sách <span class="mono">email|pass|2fa</span>.</div>`;
+            return;
+          }
+
+          v.innerHTML = `${banner}<div class="tools filters">
+    <input id="qChatGpt" class="grow" type="search" placeholder="Tìm kiếm email ChatGPT, ghi chú… ( phím / )" value="${esc(qChatGpt)}" aria-label="Tìm kiếm ChatGPT">
+    <select id="fUsageChatGpt" style="padding:6px 10px;font-size:12.5px;border-radius:8px" aria-label="Lọc theo ngày sử dụng">
+      <option value="" ${!fUsageChatGpt ? "selected" : ""}>Tất cả (${allGpt.length})</option>
+      <option value="unused" ${fUsageChatGpt === "unused" ? "selected" : ""}>✨ Chưa sử dụng (${unusedCount})</option>
+      <option value="used" ${fUsageChatGpt === "used" ? "selected" : ""}>⏱️ Đã sử dụng (${usedCount})</option>
+      <option value="expiring" ${fUsageChatGpt === "expiring" ? "selected" : ""}>⚠️ Sắp hết hạn (≤ 7 ngày)</option>
+      <option value="expired" ${fUsageChatGpt === "expired" ? "selected" : ""}>🔴 Đã hết hạn</option>
+    </select>
+  </div>
+  ${
+    selChatGpt.size
+      ? `<div class="tools bulk"><b>Đã chọn ${selChatGpt.size}</b>
+    ${selChatGpt.size < rows.length ? `<button class="link" data-act="selAllChatGpt">Chọn cả ${rows.length}</button>` : ""}
+    <button data-act="bCopyChatGptFull" style="color:#10a37f;border-color:rgba(16,163,127,0.35);font-weight:600">${icon("copy")} Chép Mail|Pass|2FA (Tính ngày dùng)</button>
+    <button data-act="bExportChatGpt">Xuất file</button>
+    <button class="danger" data-act="bDelChatGpt">Xoá</button>
+    <button class="link" data-act="selNoneChatGpt">Bỏ chọn</button>
+  </div>`
+      : ""
+  }
+  <div class="tablewrap mobile-cards"><table>
+    <thead><tr>
+      <th style="width:36px"><input type="checkbox" id="pageAllChatGpt" aria-label="Chọn cả trang" ${shownRows.length && shownRows.every((a) => selChatGpt.has(a.uid)) ? "checked" : ""}></th>
+      <th style="min-width:220px"><button data-act="sortChatGpt" data-v="email">Mail ChatGPT ${sortChatGpt.k === "email" ? (sortChatGpt.d > 0 ? " ↑" : " ↓") : ""}</button></th>
+      <th style="min-width:160px">Mật khẩu</th>
+      <th style="min-width:190px">2FA (Lấy mã ngay)</th>
+      <th style="min-width:175px"><button data-act="sortChatGpt" data-v="usedAt">Ngày sử dụng ${sortChatGpt.k === "usedAt" ? (sortChatGpt.d > 0 ? " ↑" : " ↓") : ""}</button></th>
+      <th style="min-width:190px"><button data-act="sortChatGpt" data-v="expireAt">Hạn gói (30 ngày) ${sortChatGpt.k === "expireAt" ? (sortChatGpt.d > 0 ? " ↑" : " ↓") : ""}</button></th>
+      <th style="min-width:180px">Ghi chú</th>
+      <th style="min-width:210px">Sao chép &amp; Thao tác</th>
+    </tr></thead>
+    <tbody>
+      ${
+        shownRows
+          .map((a) => {
+            const u = esc(a.uid),
+              email = esc(a.email || ""),
+              sec = secretsOf(a),
+              pass = sec.pass || "",
+              twofa = sec.twofa || "",
+              passId = a.uid + "|pass",
+              twofaId = a.uid + "|twofa",
+              onPass = shown.has(passId),
+              onTwofa = shown.has(twofaId),
+              usage = fmtChatGptUsage(a.usedAt),
+              expiry = fmtChatGptExpiry(a.startAt, a.durationDays),
+              linkedMail = mailByEmail[String(a.email || "").trim().toLowerCase()];
+            return `<tr data-gptuid="${u}">
+          <td data-label="Chọn"><input type="checkbox" data-gptsel="${u}" aria-label="Chọn ${email}" ${selChatGpt.has(a.uid) ? "checked" : ""}></td>
+          <td data-label="Mail">
+            <span class="sec"><span style="color:#10a37f;display:inline-flex">${icon("chatgpt")}</span><button type="button" class="link" data-act="cpGptField" data-v="${u}|email" title="Sao chép Mail &amp; tính ngày sử dụng" style="font-weight:600;color:var(--fg);text-decoration:none">${email}</button></span>
+            ${linkedMail ? `<div style="padding-left:22px;margin-top:2px"><button type="button" class="mini" data-act="${isEduMailRecord(linkedMail) ? "inboxTempMail" : "openCloudInbox"}" data-v="${esc(linkedMail.uid)}" style="padding:1px 6px;font-size:10.5px;border-color:#2fbf71;color:#2fbf71;background:rgba(47,191,113,0.08)" title="Mở hộp thư liên kết trong Kho Gmail">📬 Hộp thư &amp; OTP</button></div>` : ""}
+          </td>
+          <td data-label="Mật khẩu">${pass ? `<span class="sec"><span class="mono">${onPass ? esc(pass) : "••••••••"}</span>${ib("show", esc(passId), onPass ? "off" : "eye", onPass ? "Ẩn mật khẩu" : "Hiện mật khẩu")}${ib("cpGptField", `${u}|pass`, "copy", "Sao chép mật khẩu & tính ngày dùng")}</span>` : '<span class="muted">—</span>'}</td>
+          <td data-label="2FA">${twofa ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><button type="button" class="mini" data-act="cpGpt2fa" data-v="${u}" style="color:#10a37f;border-color:rgba(16,163,127,0.4);font-weight:600" title="Tạo &amp; sao chép mã 2FA 6 số ngay">${icon("key")} Lấy mã 2FA</button><span class="sec">${ib("show", esc(twofaId), onTwofa ? "off" : "eye", onTwofa ? "Ẩn secret 2FA" : "Hiện secret 2FA")}${ib("cpGptField", `${u}|twofa`, "copy", "Chép secret 2FA")}</span>${onTwofa ? `<div class="mono muted" style="font-size:11px;width:100%">${esc(twofa)}</div>` : ""}</div>` : '<span class="muted">—</span>'}</td>
+          <td data-label="Ngày sử dụng">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span class="pill" style="--c:${usage.color}"><span class="dot" style="--c:${usage.color}"></span>${esc(usage.label)}</span>
+              ${usage.used ? `<button type="button" class="ico" data-act="resetGptUsage" data-v="${u}" title="Đặt lại thành Chưa sử dụng">${icon("refresh")}</button>` : ""}
+            </div>
+            <div class="muted mono" style="font-size:11px;margin-top:2px">${esc(usage.sub)}</div>
+          </td>
+          <td data-label="Hạn gói">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span class="pill" style="--c:${expiry.color}"><span class="dot" style="--c:${expiry.color}"></span>${esc(expiry.label)}</span>
+              ${!expiry.hasStart
+                ? `<button type="button" class="mini" data-act="setGptStartToday" data-v="${u}" title="Đặt ngày bắt đầu là hôm nay (${a.durationDays || 30} ngày)" style="padding:1px 7px;font-size:11px;color:#10a37f;border-color:rgba(16,163,127,0.35)">📅 Đặt hôm nay</button>`
+                : ""}
+            </div>
+            <div class="muted mono" style="font-size:11px;margin-top:2px">${esc(expiry.sub)}</div>
+          </td>
+          <td data-label="Ghi chú">
+            <input type="text" data-note-gpt="${u}" value="${esc(a.note || "")}" placeholder="— Nhập ghi chú..." title="Nhấp vào để sửa ghi chú, nhấn Enter hoặc bấm ra ngoài để lưu" style="background:transparent;border:1px dashed transparent;border-radius:6px;padding:4px 8px;width:100%;max-width:240px;color:var(--fg);font-size:12.5px" onfocus="this.style.background='var(--raise)';this.style.borderColor='var(--accent)';this.style.borderStyle='solid'" onblur="this.style.background='transparent';this.style.borderColor='transparent';this.style.borderStyle='dashed'">
+          </td>
+          <td data-label="Thao tác" style="white-space:nowrap">
+            <button class="mini" data-act="cpGptMailPass" data-v="${u}" title="Sao chép mail|pass &amp; tính ngày dùng">${icon("copy")} Mail|Pass</button>
+            <button class="mini" data-act="cpGptFull" data-v="${u}" style="color:#10a37f;border-color:rgba(16,163,127,0.35);font-weight:600" title="Sao chép mail|pass|2fa &amp; tính ngày dùng">${icon("copy")} Full</button>
+            <button class="mini" data-act="editChatGpt" data-v="${u}" title="Sửa tài khoản">${icon("edit")}</button>
+            <button class="mini danger" data-act="delChatGpt" data-v="${u}" title="Xoá">${icon("x")}</button>
+          </td>
+        </tr>`;
+          })
+          .join("") ||
+        `<tr><td colspan="8" class="empty">Không tìm thấy tài khoản ChatGPT nào khớp bộ lọc. <button class="link" data-act="resetChatGpt">Xoá bộ lọc</button></td></tr>`
+      }
+    </tbody>
+  </table></div>
+  <div class="tools" style="justify-content:space-between;align-items:center;padding:6px 2px;margin-top:6px">
+    <span class="muted" style="font-size:13px">${rows.length} tài khoản · trang ${pageChatGpt}/${pages}</span>
+    <span class="tools" style="gap:8px">
+      <select id="perChatGpt" aria-label="Số dòng mỗi trang" style="padding:6px 12px;font-size:13px;border-radius:8px;font-weight:600">${opts(
+        [25, 50, 100, 200].map((n) => [String(n), n + " dòng"]),
+        String(perChatGpt),
+      )}</select>
+      <button data-act="prevChatGpt" ${pageChatGpt <= 1 ? "disabled" : ""} style="padding:7px 16px;font-size:13px;font-weight:600">◀ Trước</button>
+      <button data-act="nextChatGpt" ${pageChatGpt >= pages ? "disabled" : ""} style="padding:7px 16px;font-size:13px;font-weight:600">Sau ▶</button>
     </span>
   </div>`;
         }
@@ -3073,6 +3424,251 @@
             },
           );
         }
+
+        function openChatGpt(uid) {
+          if (!ready()) return;
+          if (cloudBusy) return toast("Hãy chờ thao tác lưu hoàn tất", "error");
+          if (!uid && !canWrite())
+            return toast("Bạn không có quyền thêm tài khoản ChatGPT", "error");
+          const old = uid ? get(uid) : null,
+            sec = old ? secretsOf(old) : {},
+            curPass = sec.pass || "",
+            curTwofa = sec.twofa || "";
+          const toLocalInput = (ts) => {
+            if (!ts) return "";
+            const d = new Date(ts);
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          };
+          const toDateInput = (ts) => {
+            if (!ts) return "";
+            const d = new Date(ts);
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+          };
+          const parseDateInput = (val) => {
+            if (!val) return 0;
+            const [y, m, d] = val.split("-").map(Number);
+            if (!y || !m || !d) return 0;
+            return new Date(y, m - 1, d).getTime();
+          };
+          dialog(
+            `<h2>${old ? "Chỉnh sửa tài khoản ChatGPT" : "Thêm tài khoản ChatGPT"}</h2>
+    <label>Email ChatGPT<input id="gpt-email" type="email" value="${esc(old?.email || "")}" placeholder="user@domain.com" ${old ? "readonly" : ""} required autocomplete="off"></label>
+    <label style="margin-top:10px">Mật khẩu<input id="gpt-pass" type="text" class="mono" value="${esc(curPass)}" placeholder="Nhập mật khẩu" autocomplete="off"></label>
+    <label style="margin-top:10px">Khoá 2FA (Secret)<input id="gpt-twofa" type="text" class="mono" value="${esc(curTwofa)}" placeholder="Nhập mã bí mật 2FA (nếu có)" autocomplete="off"></label>
+    <div style="display:grid;grid-template-columns:1fr 140px;gap:10px;margin-top:10px">
+      <label>Ngày bắt đầu gói (tính hạn hết hạn)<input id="gpt-startAt" type="date" value="${esc(toDateInput(old?.startAt))}"></label>
+      <label>Thời hạn (ngày)<input id="gpt-durationDays" type="number" min="1" max="3650" value="${esc(String(old?.durationDays || 30))}"></label>
+    </div>
+    <label style="margin-top:10px">Ngày sử dụng (để trống = Chưa sử dụng, tự tính khi sao chép)<input id="gpt-usedAt" type="datetime-local" value="${esc(toLocalInput(old?.usedAt))}"></label>
+    <label style="margin-top:10px">Ghi chú<textarea id="gpt-note" rows="3" placeholder="Ghi chú thêm (gói Plus/Team, nguồn, hạn…)">${esc(old?.note || "")}</textarea></label>`,
+            async () => {
+              const email = $("#gpt-email").value.trim().toLowerCase(),
+                pass = $("#gpt-pass").value.trim(),
+                twofa = $("#gpt-twofa").value.trim(),
+                startAt = parseDateInput($("#gpt-startAt").value.trim()),
+                durationDays = Math.max(1, Number($("#gpt-durationDays").value) || 30),
+                usedVal = $("#gpt-usedAt").value.trim(),
+                note = $("#gpt-note").value.trim();
+              if (!email || !email.includes("@"))
+                return "Vui lòng nhập địa chỉ Email hợp lệ.";
+              const targetUid = old ? old.uid : makeChatGptUid(email);
+              if (!old && get(targetUid))
+                return "Tài khoản ChatGPT này đã có trong kho.";
+              const usedAt = usedVal ? new Date(usedVal).getTime() || 0 : 0;
+              const record = {
+                uid: targetUid,
+                email,
+                platform: "chatgpt",
+                sec: { pass, twofa },
+                pass,
+                twofa,
+                startAt,
+                durationDays,
+                usedAt,
+                note,
+                status: old?.status || "live",
+                added: old?.added || Date.now(),
+                updated: Date.now(),
+              };
+              if (!(await commit([record])))
+                return cloudError || "Không lưu được tài khoản ChatGPT.";
+              toast(
+                old
+                  ? "Đã cập nhật tài khoản ChatGPT"
+                  : "Đã thêm tài khoản ChatGPT mới",
+              );
+            },
+          );
+        }
+
+        function importChatGptDialog() {
+          if (!canWrite())
+            return toast("Bạn không có quyền nhập dữ liệu", "error");
+          let parsed = [];
+          dialog(
+            `<h2>Nhập tài khoản ChatGPT</h2>
+    <p class="muted">Dán danh sách hoặc chọn file TXT / CSV. Hỗ trợ: <span class="mono">email|pass|2fa|note</span> hoặc <span class="mono">email|pass|2fa</span> hoặc <span class="mono">email|pass</span>.</p>
+    <label>Dán danh sách vào đây<textarea id="pasteChatGpt" rows="6" class="mono" placeholder="user1@mail.com|pass123|JBSWY3DPEHPK3PXP|Plus 1 tháng&#10;user2@mail.com|pass456|ABCD1234EFGH5678"></textarea></label>
+    <label style="margin-top:10px">Hoặc chọn file TXT / CSV<input type="file" id="fileChatGpt" accept=".txt,.csv"></label>
+    <div id="previewChatGpt" style="margin-top:12px"></div>
+    <label style="margin-top:10px">Khi Email đã tồn tại trong kho ChatGPT<select id="dupChatGpt"><option value="update">Cập nhật Pass, 2FA &amp; ghi chú mới</option><option value="skip">Bỏ qua</option></select></label>`,
+            async () => {
+              if (!parsed.length)
+                return "Chưa có tài khoản ChatGPT nào hợp lệ để nhập.";
+              const update = $("#dupChatGpt").value === "update",
+                put = new Map();
+              let add = 0,
+                up = 0,
+                skip = 0;
+              for (const item of parsed) {
+                const uid = makeChatGptUid(item.email),
+                  old = get(uid);
+                if (old && !update) {
+                  skip++;
+                  continue;
+                }
+                const oldSec = old ? secretsOf(old) : {};
+                const pass = item.pass || oldSec.pass || "";
+                const twofa = item.twofa || oldSec.twofa || "";
+                const record = {
+                  uid,
+                  email: item.email,
+                  platform: "chatgpt",
+                  sec: { pass, twofa },
+                  pass,
+                  twofa,
+                  startAt: old?.startAt || 0,
+                  durationDays: old?.durationDays || 30,
+                  usedAt: old?.usedAt || 0,
+                  note: item.note || old?.note || "",
+                  status: old?.status || "live",
+                  added: old?.added || Date.now(),
+                  updated: Date.now(),
+                };
+                if (old) up++;
+                else add++;
+                put.set(uid, record);
+              }
+              if (!put.size)
+                return `Không có gì để nhập. Bỏ qua ${skip} tài khoản đã có.`;
+              if (!(await commit([...put.values()])))
+                return cloudError || "Chưa lưu được dữ liệu. Vui lòng thử lại.";
+              toast(
+                `Đã nhập xong: Thêm mới ${add}, Cập nhật ${up}${skip ? `, Bỏ qua ${skip}` : ""}`,
+              );
+              go("chatgpt");
+            },
+          );
+          const updatePreview = () => {
+            const el = $("#previewChatGpt");
+            if (!el) return;
+            if (!parsed.length) {
+              el.innerHTML = "";
+              return;
+            }
+            el.innerHTML = `<p class="muted">Đã nhận diện <b>${parsed.length}</b> tài khoản ChatGPT hợp lệ:</p>
+    <div class="tablewrap" style="max-height:180px"><table>
+      <thead><tr><th>STT</th><th>Mail</th><th>Pass</th><th>2FA</th><th>Ghi chú</th></tr></thead>
+      <tbody>${parsed
+        .slice(0, 50)
+        .map(
+          (x, i) =>
+            `<tr><td class="muted">${i + 1}</td><td><b>${esc(x.email)}</b></td><td class="mono">${esc(x.pass || "—")}</td><td class="mono">${esc(x.twofa || "—")}</td><td class="muted">${esc(x.note || "—")}</td></tr>`,
+        )
+        .join("")}
+      ${parsed.length > 50 ? `<tr><td colspan="5" class="muted" style="text-align:center">… và ${parsed.length - 50} tài khoản khác</td></tr>` : ""}
+      </tbody></table></div>`;
+          };
+          $("#pasteChatGpt").oninput = (e) => {
+            parsed = parseChatGptText(e.target.value);
+            updatePreview();
+          };
+          $("#fileChatGpt").onchange = async (e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            try {
+              const text = await f.text();
+              $("#pasteChatGpt").value = text;
+              parsed = parseChatGptText(text);
+              updatePreview();
+            } catch {
+              toast("Không đọc được file TXT này", "error");
+            }
+          };
+        }
+
+        function exportChatGptDialog(onlySel) {
+          const picked = onlySel
+            ? [...selChatGpt]
+            : filteredChatGpt().map((a) => a.uid);
+          if (!picked.length)
+            return toast("Không có tài khoản ChatGPT nào để xuất", "error");
+          dialog(
+            `<h2>Xuất ${picked.length} tài khoản ChatGPT</h2>
+    <label>Định dạng xuất<select id="xgptf">
+      <option value="txt_full">TXT (email|pass|2fa)</option>
+      <option value="txt_note">TXT (email|pass|2fa|note)</option>
+      <option value="txt_pipe">TXT (email|pass)</option>
+      <option value="csv">CSV (kèm Ngày sử dụng)</option>
+    </select></label>`,
+            () => {
+              const f = $("#xgptf").value,
+                list = picked.map(get).filter(Boolean);
+              const name = `chatgpt-list-${today()}.${f.startsWith("txt") ? "txt" : "csv"}`;
+              if (f === "txt_pipe") {
+                save(
+                  name,
+                  list
+                    .map((a) => `${a.email}|${secretsOf(a).pass || ""}`)
+                    .join("\r\n"),
+                );
+              } else if (f === "txt_full") {
+                save(
+                  name,
+                  list
+                    .map((a) => {
+                      const s = secretsOf(a);
+                      return `${a.email}|${s.pass || ""}|${s.twofa || ""}`;
+                    })
+                    .join("\r\n"),
+                );
+              } else if (f === "txt_note") {
+                save(
+                  name,
+                  list
+                    .map((a) => {
+                      const s = secretsOf(a);
+                      return `${a.email}|${s.pass || ""}|${s.twofa || ""}|${a.note || ""}`;
+                    })
+                    .join("\r\n"),
+                );
+              } else {
+                save(
+                  name,
+                  csv([
+                    ["Email", "Mật khẩu", "2FA", "Ngày sử dụng", "Ngày bắt đầu gói", "Thời hạn (ngày)", "Hạn còn lại", "Ghi chú"],
+                    ...list.map((a) => {
+                      const s = secretsOf(a);
+                      const ex = fmtChatGptExpiry(a.startAt, a.durationDays);
+                      return [
+                        a.email,
+                        s.pass || "",
+                        s.twofa || "",
+                        a.usedAt ? fmtTime(a.usedAt) : "Chưa sử dụng",
+                        a.startAt ? fmtTime(a.startAt) : "",
+                        String(a.durationDays || 30),
+                        ex.hasStart ? ex.label : "",
+                        a.note || "",
+                      ];
+                    }),
+                  ]),
+                );
+              }
+            },
+          );
+        }
         function history(v, list) {
           const h = list
             .flatMap((a) => (a.hist || []).map((x) => ({ ...x, a })))
@@ -3832,6 +4428,7 @@
             const hide = shown.has(id);
             hide ? shown.delete(id) : shown.add(id);
             if (route() === "gmail") gmailView($("#view"), all());
+            else if (route() === "chatgpt") chatgptView($("#view"), all());
             else table();
             toast((hide ? "Đã ẩn " : "Đã hiện ") + LABEL[k]);
           },
@@ -3958,6 +4555,129 @@
               }
           },
           gTab: () => go("gmail"),
+          gptTab: () => go("chatgpt"),
+          addChatGpt: () => openChatGpt(),
+          editChatGpt: (u) => openChatGpt(u),
+          importChatGpt: () => importChatGptDialog(),
+          exportChatGpt: () => exportChatGptDialog(),
+          selAllChatGpt: () => {
+            filteredChatGpt().forEach((a) => selChatGpt.add(a.uid));
+            render();
+          },
+          selNoneChatGpt: () => {
+            selChatGpt.clear();
+            render();
+          },
+          sortChatGpt: (k) => {
+            sortChatGpt = { k, d: sortChatGpt.k === k ? -sortChatGpt.d : 1 };
+            render();
+          },
+          prevChatGpt: () => {
+            pageChatGpt--;
+            render();
+          },
+          nextChatGpt: () => {
+            pageChatGpt++;
+            render();
+          },
+          resetChatGpt: () => {
+            qChatGpt = "";
+            fUsageChatGpt = "";
+            pageChatGpt = 1;
+            render();
+          },
+          cpGptField: async (v) => {
+            const [u, k] = v.split("|");
+            const a = get(u);
+            if (!a) return toast("Không tìm thấy tài khoản", "error");
+            const val = k === "email" ? a.email : secretsOf(a)[k] || "";
+            if (!val) return toast("Không có dữ liệu để sao chép", "error");
+            await copy(
+              val,
+              k === "email"
+                ? `Đã chép Mail: ${val}`
+                : k === "pass"
+                  ? "Đã chép Mật khẩu"
+                  : "Đã chép khoá 2FA",
+            );
+            await markChatGptUsed(u);
+          },
+          cpGpt2fa: async (u) => {
+            const a = get(u);
+            if (!a) return toast("Không tìm thấy tài khoản", "error");
+            const c = await totp(secretsOf(a).twofa || "");
+            if (!c) return toast("Khoá 2FA không hợp lệ", "error");
+            const rem = 30 - (Math.floor(Date.now() / 1000) % 30);
+            await copy(c, `Đã sao chép mã 2FA: ${c} (còn ${rem}s)`);
+            await markChatGptUsed(u);
+          },
+          cpGptMailPass: async (u) => {
+            const a = get(u);
+            if (!a) return toast("Không tìm thấy tài khoản", "error");
+            const p = secretsOf(a).pass || "";
+            await copy(`${a.email}|${p}`, `Đã chép: ${a.email}|${p}`);
+            await markChatGptUsed(u);
+          },
+          cpGptFull: async (u) => {
+            const a = get(u);
+            if (!a) return toast("Không tìm thấy tài khoản", "error");
+            const s = secretsOf(a);
+            const str = `${a.email}|${s.pass || ""}|${s.twofa || ""}`;
+            await copy(str, `Đã chép: ${str}`);
+            await markChatGptUsed(u);
+          },
+          bCopyChatGptFull: async () => {
+            const uids = [...selChatGpt];
+            const list = uids.map(get).filter(Boolean);
+            const lines = list.map((a) => {
+              const s = secretsOf(a);
+              return `${a.email}|${s.pass || ""}|${s.twofa || ""}`;
+            });
+            await copy(
+              lines.join("\n"),
+              `Đã chép ${lines.length} tài khoản (mail|pass|2fa)`,
+            );
+            await markChatGptUsed(uids);
+          },
+          bExportChatGpt: () => exportChatGptDialog(true),
+          bDelChatGpt: () =>
+            ask(
+              "Xoá tài khoản ChatGPT",
+              `Xoá ${selChatGpt.size} tài khoản ChatGPT đã chọn?`,
+              async () => {
+                if (!(await commit([], [...selChatGpt]))) return false;
+                selChatGpt.clear();
+                render();
+                toast("Đã xoá các tài khoản ChatGPT đã chọn");
+              },
+            ),
+          delChatGpt: (u) =>
+            ask("Xoá tài khoản ChatGPT", "Xoá tài khoản ChatGPT này?", async () => {
+              if (!(await commit([], [u]))) return false;
+              render();
+              toast("Đã xoá tài khoản ChatGPT");
+            }),
+          resetGptUsage: async (u) => {
+            const a = get(u);
+            if (!a || !canWrite()) return;
+            const r = revise(a, { usedAt: 0 }, null, "Đặt lại ngày sử dụng");
+            if (r && (await commit([r]))) toast("Đã đặt lại thành Chưa sử dụng");
+          },
+          setGptStartToday: async (u) => {
+            const a = get(u);
+            if (!a || !canWrite()) return;
+            const d = new Date();
+            const startAt = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+            const durationDays = a.durationDays || 30;
+            const r = revise(a, { startAt, durationDays }, null, "Đặt ngày bắt đầu gói");
+            if (r && (await commit([r]))) toast(`Đã đặt ngày bắt đầu hôm nay (${durationDays} ngày)`);
+          },
+          resetGptStart: async (u) => {
+            const a = get(u);
+            if (!a || !canWrite()) return;
+            const r = revise(a, { startAt: 0 }, null, "Xoá ngày bắt đầu gói");
+            if (r && (await commit([r]))) toast("Đã xoá ngày bắt đầu gói");
+          },
           addGmail: () => openGmail(),
           importGmail: () => importGmailDialog(),
           exportGmail: () => exportGmailDialog(),
@@ -4248,7 +4968,7 @@
             }
           },
           checkAllLive: () => {
-            const list = filtered().filter((a) => a.platform !== "gmail");
+            const list = filtered().filter(isSocial);
             if (!list.length)
               return toast(
                 "Không có tài khoản nào trong bộ lọc hiện tại để kiểm tra",
@@ -4260,7 +4980,7 @@
             const list = [...sel]
               .map(get)
               .filter(Boolean)
-              .filter((a) => a.platform !== "gmail");
+              .filter(isSocial);
             if (!list.length)
               return toast(
                 "Vui lòng chọn ít nhất 1 tài khoản để kiểm tra",
@@ -4369,14 +5089,17 @@
         }
         $("#btnAdd").onclick = () => {
           if (route() === "gmail") openGmail();
+          else if (route() === "chatgpt") openChatGpt();
           else openAccount();
         };
         $("#btnImport").onclick = () => {
           if (route() === "gmail") importGmailDialog();
+          else if (route() === "chatgpt") importChatGptDialog();
           else importDialog();
         };
         $("#btnExport").onclick = () => {
           if (route() === "gmail") exportGmailDialog();
+          else if (route() === "chatgpt") exportChatGptDialog();
           else exportDialog();
         };
         document.addEventListener("input", (e) => {
@@ -4387,6 +5110,10 @@
           } else if (e.target.id === "qGmail") {
             qGmail = e.target.value;
             pageGmail = 1;
+            render();
+          } else if (e.target.id === "qChatGpt") {
+            qChatGpt = e.target.value;
+            pageChatGpt = 1;
             render();
           }
         });
@@ -4433,6 +5160,35 @@
             fUsageGmail = t.value;
             pageGmail = 1;
             render();
+          } else if (t.id === "pageAllChatGpt") {
+            $("#view")
+              .querySelectorAll("[data-gptsel]")
+              .forEach((c) =>
+                t.checked
+                  ? selChatGpt.add(c.dataset.gptsel)
+                  : selChatGpt.delete(c.dataset.gptsel),
+              );
+            render();
+          } else if (t.dataset.gptsel !== undefined) {
+            t.checked
+              ? selChatGpt.add(t.dataset.gptsel)
+              : selChatGpt.delete(t.dataset.gptsel);
+            render();
+          } else if (t.id === "perChatGpt") {
+            perChatGpt = +t.value;
+            pageChatGpt = 1;
+            render();
+          } else if (t.id === "fUsageChatGpt") {
+            fUsageChatGpt = t.value;
+            pageChatGpt = 1;
+            render();
+          } else if (t.dataset.noteGpt !== undefined) {
+            const a = get(t.dataset.noteGpt);
+            if (!a || !canWrite()) return;
+            const nextNote = t.value.trim();
+            if ((a.note || "") === nextNote) return;
+            const r = revise(a, { note: nextNote }, "Cập nhật ghi chú");
+            if (r && (await commit([r]))) toast("Đã lưu ghi chú");
           } else if (t.id === "fPlatform") {
             fPlatform = t.value;
             page = 1;
@@ -4504,6 +5260,9 @@
             if (route() === "gmail" && $("#qGmail")) {
               e.preventDefault();
               $("#qGmail").focus();
+            } else if (route() === "chatgpt" && $("#qChatGpt")) {
+              e.preventDefault();
+              $("#qChatGpt").focus();
             } else if ($("#q")) {
               e.preventDefault();
               $("#q").focus();
@@ -4657,7 +5416,7 @@
               "error",
             );
             return false;
-          }x
+          }
           if (!cloudWorkspace) {
             settings = next;
             saveSettings();

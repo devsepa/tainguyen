@@ -5,6 +5,12 @@ const {Mailbox, selectOtp} = require('../mailbox.cjs');
 const {ImapMailbox}=require('../imap.cjs');
 
 const valid = () => ({email:'person@example.edu',name:'Test Person',username:'test.person',password:'example-password',birthday:'2000-04-12',proxy:'',protocol:'auto'});
+
+test('WebKit selection keeps mobile flow and carries the engine into the session',()=>{
+  const input=validateInput({...valid(),device:'mobile-webkit'});
+  assert.equal(input.device,'mobile');assert.equal(input.engine,'webkit');
+  assert.equal(validateInput({...valid(),device:'mobile'}).engine,'chromium');
+});
 test('proxy parsing retains colons in passwords and encodes credentials', () => {
   const p = parseProxy('127.0.0.1:8123:test:pass:with:@symbols', 'auto');
   assert.equal(p.password,'pass:with:@symbols');

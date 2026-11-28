@@ -20,6 +20,7 @@ const STATIC_ALLOWLIST=new Map([
   ['/favicon.svg','favicon.svg'],
   ['/ig-tool-ui.js','ig-tool-ui.js'],
   ['/ig-tool-ui.css','ig-tool-ui.css'],
+  ['/domain-mail.js','domain-mail.js'],
 ]);
 const MIME={
   '.html':'text/html; charset=utf-8',
@@ -177,6 +178,7 @@ function createToolServer({proxyFactory=connectProxy,runner=new MultiRunner({pro
             cookie,
             proxy:proxyHandle?.server,
             device,
+            engine:body.device==='mobile-webkit'?'webkit':'chromium',
             onClose:async()=>{
               if(session)cookieSessions.delete(session);
               await proxyHandle?.close().catch(()=>{});

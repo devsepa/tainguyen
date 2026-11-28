@@ -1,5 +1,5 @@
 'use strict';
-const {chromium,devices}=require('playwright');
+const {chromium,webkit,devices}=require('playwright');
 const {observePage}=require('./diagnostics.cjs');
 const {generateTotp}=require('./totp.cjs');
 
@@ -89,7 +89,7 @@ async function navigateToRegistration(page,{platform='instagram',device='desktop
   }
 }
 
-async function openBrowser({proxy,signal,headless=false,platform='instagram',device='desktop',startUrl,windowPosition}={}){
+async function openBrowser({proxy,signal,headless=false,platform='instagram',device='desktop',engine='chromium',startUrl,windowPosition}={}){
   const isMobile=device==='mobile';
   const isIg=platform!=='facebook';
   const winW=isMobile?460:(isIg?620:450), winH=isMobile?860:(isIg?800:700);
@@ -98,17 +98,19 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
   const posX=Number.isFinite(windowPosition?.x)?windowPosition.x:20;
   const posY=Number.isFinite(windowPosition?.y)?windowPosition.y:20;
   const launchArgs=headless?[]:[`--window-size=${winW},${winH}`,`--window-position=${posX},${posY}`];
-  const browser=await chromium.launch({
+  const useWebkit=isMobile&&engine==='webkit';
+  const browser=await (useWebkit?webkit:chromium).launch({
     headless,
     proxy:proxy?{server:proxy}:undefined,
-    args:launchArgs,
+    args:useWebkit?[]:launchArgs,
   });
   const close=async()=>{await browser.close().catch(()=>{});};
   const abort=()=>{void close();};signal?.addEventListener('abort',abort,{once:true});
   try{
     signal?.throwIfAborted();
-    const {defaultBrowserType:mobileEngine,...mobileOptions}=devices['Pixel 7'];
-    if(isMobile&&mobileEngine!=='chromium')throw Error('mobile_profile_engine_mismatch');
+    // Device Mode emulation in Chromium, matching Chrome DevTools' iPhone preset.
+    // The preset's preferred engine is WebKit; this does not launch Safari.
+    const {defaultBrowserType:mobileEngine,...mobileOptions}=devices['iPhone 16'];
     const ctxOpts=isMobile
       ? {...mobileOptions,locale:'vi-VN'}
       : {locale:'vi-VN',viewport:{width:vpW,height:vpH}};
@@ -338,7 +340,7 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
     };
 
     return {
-      diagnostics(){return {engine:'chromium',device,profile:isMobile?'chrome-android':'desktop',events:observation.snapshot()};},
+      diagnostics(){return {engine:useWebkit?'webkit':'chromium',device,profile:isMobile?`iphone-16-${useWebkit?'webkit':'chromium'}`:'desktop',events:observation.snapshot()};},
       async fill(input){
         if(platform==='facebook'){
           const parts=input.name.trim().split(/\s+/);
@@ -701,19 +703,20 @@ async function openBrowser({proxy,signal,headless=false,platform='instagram',dev
     };
   }catch(error){signal?.removeEventListener('abort',abort);await close();throw error;}
 }
-async function openWithCookie({platform='instagram',cookie='',proxy,device='mobile',headless=false,onClose}={}){
+async function openWithCookie({platform='instagram',cookie='',proxy,device='mobile',engine='chromium',headless=false,onClose}={}){
   const isMobile=device==='mobile';
   const isIg=platform!=='facebook';
   const winW=isMobile?460:(isIg?620:450), winH=isMobile?860:(isIg?800:700);
   const vpW=isMobile?430:(isIg?600:430), vpH=isMobile?760:(isIg?720:620);
   const launchArgs=['--disable-blink-features=AutomationControlled'];
   if(!headless)launchArgs.push(`--window-size=${winW},${winH}`,'--window-position=40,40');
-  const browser=await chromium.launch({headless,proxy:proxy?{server:proxy}:undefined,args:launchArgs});
+  const useWebkit=isMobile&&engine==='webkit';
+  const browser=await (useWebkit?webkit:chromium).launch({headless,proxy:proxy?{server:proxy}:undefined,args:useWebkit?[]:launchArgs});
   const close=async()=>{await browser.close().catch(()=>{});if(onClose)await Promise.resolve(onClose()).catch(()=>{});};
   browser.on('disconnected',()=>{if(onClose)void Promise.resolve(onClose()).catch(()=>{});});
   try{
-    const {defaultBrowserType:mobileEngine,...mobileOptions}=devices['Pixel 7'];
-    const ctxOpts=isMobile&&mobileEngine==='chromium'?{...mobileOptions,locale:'vi-VN'}:{locale:'vi-VN',viewport:{width:vpW,height:vpH}};
+    const {defaultBrowserType:mobileEngine,...mobileOptions}=devices['iPhone 16'];
+    const ctxOpts=isMobile?{...mobileOptions,locale:'vi-VN'}:{locale:'vi-VN',viewport:{width:vpW,height:vpH}};
     const context=await browser.newContext(ctxOpts);
     const targetUrl=isIg?'https://www.instagram.com/':'https://www.facebook.com/';
     const cookies=String(cookie||'').split(';').map(part=>{

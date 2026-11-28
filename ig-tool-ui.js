@@ -94,7 +94,7 @@
     const initDomain=typeof saved.zohoDomain==='string'&&saved.zohoDomain?saved.zohoDomain:'devsepa.id.vn';
     let draft={
       platform:['instagram','facebook'].includes(saved.platform)?saved.platform:'instagram',
-      device:['mobile','desktop'].includes(saved.device)?saved.device:'desktop',
+      device:['mobile','mobile-webkit','desktop'].includes(saved.device)?saved.device:'desktop',
       gender:['female','male'].includes(saved.gender)?saved.gender:'female',
       mailMode:['warehouse','tempamail','zoho'].includes(saved.mailMode)?saved.mailMode:'warehouse',
       tempType:['other','edu'].includes(saved.tempType)?saved.tempType:'other',
@@ -265,11 +265,13 @@
                 <div class="ig-tool-field">
                   <label>Chế độ</label>
                   <div class="ig-tool-pills">
-                    <button type="button" data-act="set-pill" data-key="device" data-val="mobile" aria-pressed="${draft.device==='mobile'}">Mobile</button>
+                    <button type="button" data-act="set-pill" data-key="device" data-val="mobile" aria-pressed="${draft.device==='mobile'}">Mobile (iPhone 16)</button>
+                    <button type="button" data-act="set-pill" data-key="device" data-val="mobile-webkit" aria-pressed="${draft.device==='mobile-webkit'}">iPhone 16 · WebKit</button>
                     <button type="button" data-act="set-pill" data-key="device" data-val="desktop" aria-pressed="${draft.device==='desktop'}">Desktop</button>
                   </div>
                   <select id="ig-device" data-ig="device" hidden>
-                    <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (Chrome Android)</option>
+                    <option value="mobile" ${draft.device==='mobile'?'selected':''}>Mobile (iPhone 16 · Chromium)</option>
+                    <option value="mobile-webkit" ${draft.device==='mobile-webkit'?'selected':''}>Mobile (iPhone 16 · WebKit)</option>
                     <option value="desktop" ${draft.device==='desktop'?'selected':''}>Desktop (Máy tính)</option>
                   </select>
                 </div>
@@ -775,7 +777,7 @@
 
     async function handleClick(e){
       const btn=e.target.closest('button[data-act]');
-      if(!btn)return;
+      if(destroyed||!btn||!element.contains(btn)||!btn.closest('.ig-tool-shell, .ig-tool-grid'))return;
       e.stopPropagation();
       if(btn.disabled)return;
       captureInputs();

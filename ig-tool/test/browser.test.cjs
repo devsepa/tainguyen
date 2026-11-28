@@ -6,6 +6,14 @@ const {chromium}=require('playwright');
 const {Runner}=require('../runner.cjs');
 async function waitFor(fn){for(let i=0;i<40;i++){if(await fn())return;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out waiting for form');}
 
+test('WebKit mobile opens an isolated iPhone context and fills a local form',async t=>{
+  const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html');res.end('<meta name="viewport" content="width=device-width"><input name="email"><input name="password"><input name="fullName"><input name="username">');});
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const browser=await openBrowser({headless:true,device:'mobile',engine:'webkit',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
+  assert.equal(browser.diagnostics().engine,'webkit');
+  assert.equal(await browser.fill({email:'local@example.com',password:'synthetic-secret',name:'Local Test',username:'local.test',birthday:'2000-01-15'}),true);
+});
+
 test('Facebook mobile dismisses the Meta account prompt before clicking signup underneath',async t=>{
   let registered=0;
   const server=http.createServer((req,res)=>{
@@ -307,7 +315,7 @@ test('real browser supports mobile device emulation mode',async t=>{
   assert.equal(await browser.fill({email:'m@example.edu',password:'fake-secret',name:'Mobile User',username:'mob.user',birthday:'2000-01-15'}),true);
 });
 
-test('mobile uses a Chromium mobile profile consistently in HTTP and JavaScript',async t=>{
+test('mobile emulates iPhone 16 in Chromium consistently in HTTP and JavaScript',async t=>{
   let profile;
   const server=http.createServer(async(req,res)=>{
     if(req.url==='/profile'){
@@ -322,10 +330,9 @@ test('mobile uses a Chromium mobile profile consistently in HTTP and JavaScript'
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
   const browser=await openBrowser({headless:true,device:'mobile',startUrl:'http://127.0.0.1:'+server.address().port});t.after(()=>browser.close());
   await waitFor(()=>!!profile);
-  assert.match(profile.httpUa,/Android/);assert.match(profile.httpUa,/Chrome\//);
-  assert(!/iPhone|Version\/.*Safari\//.test(profile.httpUa));
-  assert.equal(profile.jsUa,profile.httpUa);assert(profile.touch>0);assert(profile.width<500);
-  assert.equal(browser.diagnostics().profile,'chrome-android');
+  assert.match(profile.httpUa,/iPhone/);
+  assert.equal(profile.jsUa,profile.httpUa);assert(profile.touch>0);assert.equal(profile.width,393);
+  assert.equal(browser.diagnostics().profile,'iphone-16-chromium');
 });
 
 test('facebook mobile starts at home and follows signup into registration',async t=>{

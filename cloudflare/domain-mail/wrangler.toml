@@ -1,0 +1,8 @@
+name = "mxh-domain-mail"
+main = "index.js"
+compatibility_date = "2026-11-27"
+workers_dev = false
+
+[vars]
+INGEST_URL = "https://uecdimszburryafqtszf.supabase.co/functions/v1/domain-mail"
+FORWARD_TO = "nguyenduynd1805@gmail.com"

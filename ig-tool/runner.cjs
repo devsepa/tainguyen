@@ -101,7 +101,7 @@ class Runner {
         catch {signal.throwIfAborted();j.manualOnly=true;j.mailWarning='Không đọc được hộp thư; hãy nhập OTP thủ công.';}
       }
       this.set(j,'starting','Đang mở trình duyệt riêng…');
-      browser=await this.browserFactory({proxy:proxy.server,signal,platform:j.input.platform,device:j.input.device,...(this.windowPosition?{windowPosition:this.windowPosition}:{})});j.browser=browser;signal.throwIfAborted();
+      browser=await this.browserFactory({proxy:proxy.server,signal,platform:j.input.platform,device:j.input.device,engine:j.input.engine,...(this.windowPosition?{windowPosition:this.windowPosition}:{})});j.browser=browser;signal.throwIfAborted();
       this.set(j,'working','Đang điền thông tin đăng ký…');
       try {
         const filled=await browser.fill(j.input);signal.throwIfAborted();

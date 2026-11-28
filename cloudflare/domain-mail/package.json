@@ -1,0 +1,8 @@
+{
+  "name":"mxh-domain-mail-worker",
+  "private":true,
+  "type":"module",
+  "scripts":{"deploy":"wrangler deploy","check":"wrangler deploy --dry-run"},
+  "dependencies":{"postal-mime":"^2.4.0"},
+  "devDependencies":{"wrangler":"^4.0.0"}
+}

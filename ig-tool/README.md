@@ -101,3 +101,8 @@ Instagram sẽ chấp nhận một phiên đăng ký thực tế.
 cd ig-tool
 npm test
 ```
+# Mobile WebKit
+
+Chọn **iPhone 16 · WebKit** trong Chế độ để mở phiên mới bằng WebKit với preset iPhone 16. Lựa chọn Mobile (iPhone 16) tiếp tục dùng Chromium. Cả hai đều là giả lập trên máy tính, không phải iPhone thật.
+
+Cài trình duyệt bằng `npm run install-browser` (Chromium và WebKit). WebKit không dùng các tham số kích thước/vị trí cửa sổ dành riêng cho Chromium. Kiểm thử WebKit dùng form cục bộ; không xác nhận khả năng đăng ký, OTP hoặc xử lý checkpoint của Meta.
